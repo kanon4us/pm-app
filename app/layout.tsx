@@ -1,4 +1,5 @@
-import { ConfigProvider, theme } from 'antd'
+import { ConfigProvider, theme, Layout } from 'antd'
+import { AppNav } from '@/components/AppNav'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
@@ -14,7 +15,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             token: { colorPrimary: '#388bfd', fontFamily: 'SF Mono, Fira Code, monospace' },
           }}
         >
-          {children}
+          <Layout style={{ minHeight: '100vh' }}>
+            <AppNav />
+            <Layout.Content>{children}</Layout.Content>
+          </Layout>
         </ConfigProvider>
       </body>
     </html>
