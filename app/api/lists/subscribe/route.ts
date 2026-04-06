@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
+import type { Json } from '@/lib/supabase/types'
 
 // POST /api/lists/subscribe — subscribe to up to 10 lists, register webhooks, import tasks
 export async function POST(req: NextRequest) {
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
           list_id: list.id,
           name: t.name,
           status: t.status.status,
-          custom_fields: (t.custom_fields ?? []) as any,
+          custom_fields: (t.custom_fields ?? []) as unknown as Json, // custom_fields is a JSON-compatible array from ClickUp API
         })),
         { onConflict: 'clickup_task_id' }
       )
