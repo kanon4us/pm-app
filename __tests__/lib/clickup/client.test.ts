@@ -3,7 +3,6 @@ import { buildClickUpClient } from '@/lib/clickup/client'
 describe('buildClickUpClient', () => {
   it('getTeams returns array', async () => {
     const client = buildClickUpClient('fake-token')
-    // @ts-expect-error — we mock fetch
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ teams: [{ id: '1', name: 'Viscap', spaces: [] }] }),
@@ -14,7 +13,6 @@ describe('buildClickUpClient', () => {
 
   it('throws on non-ok response', async () => {
     const client = buildClickUpClient('bad-token')
-    // @ts-expect-error
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) })
     await expect(client.getTeams()).rejects.toThrow('ClickUp API error: 401')
   })
