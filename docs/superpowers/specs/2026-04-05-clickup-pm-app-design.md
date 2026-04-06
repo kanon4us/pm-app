@@ -101,13 +101,59 @@ Each trigger card shows:
 Status tabs: Pending · Running · Done · Failed
 
 ### Screen 2: Sprint Planner `/sprint`
-FVI-ranked task list for the active sprint.
+FVI-ranked task list for the active sprint with four integrated features:
 
-- Cost budget bar (current cost / budget, e.g. 38.4 / 50)
-- Per-task: name, FVI score, cost units
-- Over-budget tasks flagged in orange
-- PM Agent suggestion: which tasks to move to next sprint and remaining capacity after move
-- Rebalance is a trigger — developer approves in the queue like any other action
+**SDLC Flow Progress Bar**
+
+8-segment multi-color bar showing sprint progress across lifecycle stages. Formula:
+
+```
+Sprint Progress % = (Σ stages completed across all tasks / n × 8) × 100
+```
+
+Segments color-coded by stage: Ready for Dev (green) → In Progress (yellow) → Architecting (orange) → Dev Implement (dark orange) → Code Review (blue) → Ready for QA (blue) → QA (purple) → Deployed (green). Bottlenecks (multiple tasks stalled at one stage) are immediately visible without reading the table.
+
+**Per-task columns:** Sync Pulse · Feature name · FVI · Cost · SDLC Status (with stage number) · Kickoff Checklist · Actions
+
+**Sync Pulse Indicator**
+
+A colored dot in the first column of each task row:
+- Green — vault spec was updated in the same commit as the last code push
+- Orange — Doc-Drift detected: code was pushed without a corresponding spec update. Blocks the task from advancing to Code Review until resolved.
+
+**Kickoff Checklist**
+
+Four gates verified before a task can enter Architecting. Displayed per-row as a 4-item checklist:
+1. Vault branch exists
+2. User-Perspective SKILLs loaded into CLAUDE.md
+3. Figma Selection Link embedded in spec
+4. Baseline tests defined (Iron Law)
+
+All four must be green. Task cannot enter Architecting until they are.
+
+**Compare UI ⟷**
+
+Button on each task row. Runs the developer's local branch at `localhost`, captures the current UI, pushes it to the `🔍 Review` page in the linked Figma file as a real frame (not a screenshot) placed next to the designer's mockup.
+
+Each frame card in the comparison panel has an **↗ Open** link in its header. Clicking it opens that single design in a new browser window — nothing else, just the component at full size — for close inspection.
+
+When a divergence is detected, the task is soft-blocked from advancing to Ready for QA until the developer takes one of two explicit actions:
+- **Path A — Fix the code:** update the implementation to match the Figma spec, re-run Compare UI to clear
+- **Path B — Update Vault Spec:** accept the coded version as the new design decision; PM Agent updates `[slug].md` Acceptance Criteria and logs the rationale
+
+Both paths write to the audit trail. Neither can be silently skipped.
+
+**PM Agent Budget Alert Banner**
+
+When the active sprint exceeds the 50-unit FVI cost cap (triggered by FVI recalculation during Architecting), a banner appears above the task list with the PM Agent's rebalance suggestion (which task to move, remaining capacity after move) and Approve / Dismiss actions. Approval routes through the trigger queue like any other action.
+
+**Automated Asset Delivery (per status)**
+
+| Status | PM Agent delivers |
+|--------|-------------------|
+| Architecting | Syncs Engineering Plan → Vault · Re-calculates FVI + sprint cost · Pulls Figma component updates into Acceptance Criteria · Budget Alert if > 50 units |
+| Ready for QA | Iron Law Gate · Divergence Report · QA Checklist + ScribeHow steps as ClickUp comment |
+| Deployed | Merges Vault branch · Archives spec (shipped) · Strips CLAUDE.md · Publishes Webflow post · Upgrades Coming Soon stub · Pushes Master Design to Figma (Phase 2) |
 
 ### Screen 3: Setup `/setup`
 One-time configuration. Revisit anytime.
@@ -122,13 +168,15 @@ Columns: When status → | PM Agent action | Write-backs | on_failure | Edit
 
 Default trigger rules (from PM Agent SOP):
 
-| Status transition | PM Agent action | Write-backs |
-|-------------------|----------------|-------------|
-| → In Progress | Start feature kickoff | ClickUp · Docs · Webflow · Figma |
-| → In Review / Deployed | Deploy cleanup | ClickUp · Docs · Webflow |
-| → Archived (from active) | Kill feature | ClickUp · Docs |
-| Custom: Flag Lifted | Upgrade Coming Soon stub | Webflow |
-| Milestone: Sprint Close | Generate release notes | ClickUp · Webflow |
+| Status transition | PM Agent action | Write-backs | Validation gates | Purpose |
+|-------------------|----------------|-------------|-----------------|---------|
+| → In Progress | Start feature kickoff | ClickUp · Docs · Webflow · Figma | — | Creates vault branch, CLAUDE.md injection, initial user stories, Webflow stub, Figma page |
+| → Architecting | Sync Engineering Plan | Docs · Figma · ClickUp¹ | Budget Watch: re-calculate FVI + sprint cost; post Budget Alert to ClickUp if active sprint exceeds 50-unit cap | Pull latest Figma component updates into vault spec Acceptance Criteria (Canvas → Code). Can fire multiple times as plan evolves. ¹ClickUp write-back is conditional — only fires on budget alert. |
+| → Ready for QA | QA Logic Sync | Docs · ClickUp | **Iron Law Gate:** scan branch for test files (`__tests__/` or `*.test.ts`). If missing → ClickUp comment leads with `⚠️ BLOCKED: Missing Test Coverage` and QA does not start. If passing → post updated User Stories as QA Checklist + Divergence Report highlighting where implementation differs from spec. | Compare actual code against Phase 1 User Stories; update stories to reflect reality |
+| → Deployed | Deploy cleanup — **Path A (Shipped)** | ClickUp · Docs · Webflow | — | Merge vault branch, archive spec with status: `shipped`, strip CLAUDE.md, generate Webflow post |
+| → Archived (from active) | Kill feature — **Path B (Deferred/Killed)** | ClickUp · Docs | — | Delete vault branch, archive spec with status: `killed` + Priority Analysis reasoning. If FVI < 0.5 at time of kill, reasoning is mandatory in the archive record. |
+| Custom: Flag Lifted | Upgrade Coming Soon stub | Webflow | — | Promote stub to full feature post on viscap.ai |
+| Milestone: Sprint Close | Generate release notes | ClickUp · Webflow | — | Batch release note from all features deployed in sprint |
 
 ---
 
@@ -358,9 +406,15 @@ The PM Agent is a **co-pilot**, not an autonomous gatekeeper:
 - PM Agent runs via Claude API on approval
 - Four write-back targets: ClickUp, docs repo branch, Webflow draft, Figma page
 - Canvas → Code Figma sync (Phase 1)
-- Sprint planner with FVI cost budget
-- Trigger config UI
-- Setup / OAuth connection management
+- Sprint planner with:
+  - 8-segment SDLC Flow progress bar
+  - Sync Pulse doc-drift indicator (blocks Code Review if spec stale)
+  - Kickoff Checklist (4 gates before Architecting)
+  - Compare UI ⟷ with per-frame ↗ Open link (new window, design only)
+  - Divergence soft-block gate (Path A / Path B)
+  - Budget Watch alert with PM Agent rebalance suggestion
+- Trigger config UI (7 rules with validation gates)
+- Setup / OAuth connection management (ClickUp, GitHub, Figma, Webflow)
 
 ### Out of Scope (v1)
 - Code → Canvas Figma sync (Phase 2 — requires localhost)
