@@ -1,0 +1,68 @@
+const CLICKUP_BASE = 'https://api.clickup.com/api/v2'
+
+export interface ClickUpTeam {
+  id: string
+  name: string
+  spaces: ClickUpSpace[]
+}
+
+export interface ClickUpSpace {
+  id: string
+  name: string
+}
+
+export interface ClickUpList {
+  id: string
+  name: string
+  space: { id: string; name: string }
+  folder: { id: string; name: string } | null
+  task_count: number
+}
+
+export interface ClickUpTask {
+  id: string
+  name: string
+  status: { status: string }
+  custom_fields: Array<{ id: string; name: string; value: unknown }>
+}
+
+async function clickupFetch<T>(token: string, path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${CLICKUP_BASE}${path}`, {
+    ...options,
+    headers: { Authorization: token, 'Content-Type': 'application/json', ...options?.headers },
+  })
+  if (!res.ok) throw new Error(`ClickUp API error: ${res.status}`)
+  return res.json() as Promise<T>
+}
+
+export function buildClickUpClient(token: string) {
+  return {
+    getTeams: () =>
+      clickupFetch<{ teams: ClickUpTeam[] }>(token, '/team').then((r) => r.teams),
+
+    getLists: (spaceId: string) =>
+      clickupFetch<{ lists: ClickUpList[] }>(token, `/space/${spaceId}/list?archived=false`).then((r) => r.lists),
+
+    getFolderLists: (folderId: string) =>
+      clickupFetch<{ lists: ClickUpList[] }>(token, `/folder/${folderId}/list?archived=false`).then((r) => r.lists),
+
+    getSpaces: (teamId: string) =>
+      clickupFetch<{ spaces: ClickUpSpace[] }>(token, `/team/${teamId}/space?archived=false`).then((r) => r.spaces),
+
+    getTasks: (listId: string) =>
+      clickupFetch<{ tasks: ClickUpTask[] }>(token, `/list/${listId}/task?archived=false`).then((r) => r.tasks),
+
+    createWebhook: (teamId: string, endpoint: string, secret: string) =>
+      clickupFetch<{ id: string; webhook: { id: string } }>(token, `/team/${teamId}/webhook`, {
+        method: 'POST',
+        body: JSON.stringify({
+          endpoint,
+          events: ['taskStatusUpdated'],
+          secret,
+        }),
+      }),
+
+    deleteWebhook: (webhookId: string) =>
+      clickupFetch<void>(token, `/webhook/${webhookId}`, { method: 'DELETE' }),
+  }
+}
