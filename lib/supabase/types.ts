@@ -84,6 +84,97 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      objectives_registry: {
+        Row: { id: string; objective_id: number; name: string; owner_name: string; mandate: string; score_matrix: Json; is_active: boolean; updated_at: string }
+        Insert: { id?: string; objective_id: number; name: string; owner_name: string; mandate: string; score_matrix?: Json }
+        Update: { name?: string; owner_name?: string; mandate?: string; score_matrix?: Json; is_active?: boolean; updated_at?: string }
+        Relationships: []
+      }
+      role_registry: {
+        Row: { id: string; role_name: string; team_domain: string; influence_type: string; weight: number; is_active: boolean }
+        Insert: { id?: string; role_name: string; team_domain: string; influence_type: string; weight: number; is_active?: boolean }
+        Update: { is_active?: boolean }
+        Relationships: []
+      }
+      assessment_conversations: {
+        Row: { id: string; task_id: string; status: 'in_progress' | 'complete' | 'abandoned'; vault_context: Json | null; proposed_scores: Json | null; final_scores: Json | null; effort: number | null; risk: number | null; fvi_score: number | null; created_at: string; completed_at: string | null }
+        Insert: { id?: string; task_id: string; status?: 'in_progress' | 'complete' | 'abandoned'; vault_context?: Json | null; proposed_scores?: Json | null }
+        Update: { status?: 'in_progress' | 'complete' | 'abandoned'; proposed_scores?: Json | null; final_scores?: Json | null; effort?: number | null; risk?: number | null; fvi_score?: number | null; completed_at?: string | null }
+        Relationships: []
+      }
+      assessment_messages: {
+        Row: { id: string; conversation_id: string; role: 'assistant' | 'user'; content: string; objective_id: number | null; proposed_score: number | null; vault_evidence: string | null; created_at: string }
+        Insert: { id?: string; conversation_id: string; role: 'assistant' | 'user'; content: string; objective_id?: number | null; proposed_score?: number | null; vault_evidence?: string | null }
+        Update: never
+        Relationships: []
+      }
+      conversation_role_assessments: {
+        Row: { id: string; conversation_id: string; role_id: string; usage_frequency: number; created_at: string }
+        Insert: { id?: string; conversation_id: string; role_id: string; usage_frequency: number }
+        Update: never
+        Relationships: []
+      }
+      developer_experiments: {
+        Row: {
+          id: string
+          github_email: string
+          github_username: string | null
+          vidf_tag: string
+          bundle_version: string
+          sop_version: string
+          sprint: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          github_email: string
+          github_username?: string | null
+          vidf_tag?: string
+          bundle_version?: string
+          sop_version?: string
+          sprint?: string
+        }
+        Update: {
+          github_username?: string | null
+          vidf_tag?: string
+          bundle_version?: string
+          sop_version?: string
+          sprint?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bundle_versions: {
+        Row: {
+          id: string
+          version: string
+          description: string
+          files: Json
+          claude_context: string | null
+          is_active: boolean
+          activated_at: string
+          deactivated_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          version: string
+          description: string
+          files?: Json
+          claude_context?: string | null
+          is_active?: boolean
+          activated_at?: string
+        }
+        Update: {
+          description?: string
+          files?: Json
+          claude_context?: string | null
+          is_active?: boolean
+          deactivated_at?: string | null
+        }
+        Relationships: []
+      }
     }
   }
 }
