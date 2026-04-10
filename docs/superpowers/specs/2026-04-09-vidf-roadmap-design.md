@@ -160,6 +160,7 @@ The Resource Bundle is committed to `docs/feature/[slug]` in `ViscapMedia/docume
 | `webflow-stub.md` | Coming Soon draft pre-populated with feature name and FVI rationale |
 | `roles-affected.md` | Which of 26 roles are affected, usage frequency per role, influence breakdown |
 | `release-notes-draft.md` | Stub populated at deploy time; consolidated at sprint close |
+| `scribehow-link.md` | **Optional.** If PM attaches a ScribeHow flow during assessment, pm-agent includes it in the Acceptance Criteria section of `spec.md`. If absent, Acceptance Criteria is a manual placeholder. |
 
 The bundle version is logged in PM-App when generated. Subsequent bundle structure iterations increment the version number (`v1.1`, `v1.2`, `v2.0` for major changes). Results (bug rate, churn, deviations) are measured per bundle version.
 
@@ -217,10 +218,12 @@ viscap-plugin/
 │   └── quality-gate/
 │       └── SKILL.md
 ├── hooks/
-│   └── hooks.json           # SessionStart hook loads experiment context
+│   └── hooks.json           # SessionStart hook: loads experiment context + self-repair check
 └── scripts/
-    └── install-git-hook.sh  # One-time global hook installer
+    └── install-git-hook.sh  # One-time global hook installer (also run by self-repair)
 ```
+
+**SessionStart self-repair:** On every session open, the `SessionStart` hook checks whether the global git hook is installed in the current repo. If missing, it immediately offers to run `install-git-hook.sh`. Developer confirms with one keypress. This prevents PR failures for developers who missed the initial install step.
 
 ### 5.2 `pm-agent` Skill
 
@@ -243,15 +246,24 @@ For cases where a developer must re-run the spec mid-feature (risk matrix trigge
 | No Delay | Does this change keep the sprint deadline intact? | Halt |
 | No Side Effects | Does this change touch zero other features or Critical Path? | Halt |
 
-All three Yes → Developer logs deviation in `spec.md` and proceeds. Any No → Developer halts and surfaces to PM via ClickUp comment.
+All three Yes → Developer logs deviation in `spec.md` and proceeds. Any No → two paths:
 
-Deviations are stored in PM-App as `spec_deviations` associated with the active bundle version.
+**Standard path:** Developer halts and surfaces to PM via ClickUp comment. Session waits for PM response.
+
+**Low-Risk Bypass:** Developer can proceed past any "No" by writing a Super-Explanation (minimum 3 sentences: what changed, why it's worth the risk, explicit rollback plan). The bypass is appended to the commit message as `[risk:bypass]` and logged in PM-App as `priority: high` in the SOP Improvement Candidates queue for PM review next session. The bypass is always available — it is a documented override with full accountability, not a loophole.
+
+Deviations (both standard and bypassed) are stored in PM-App as `spec_deviations` associated with the active bundle version.
 
 ### 5.4 `quality-gate` Skill
 
-Phase 8 gate before `finishing-a-development-branch` completes. Checklist:
+Phase 8 gate before `finishing-a-development-branch` completes.
 
-- Vault branch updated with lessons learned
+**Pull-before-write:** Before writing anything to the vault branch, the skill pulls the latest remote state. If a conflict exists (e.g., BE developer already wrote to the branch), the skill surfaces it for the developer to resolve before the gate can close.
+
+**Checklist:**
+
+- Pull latest vault branch (resolve conflicts if any)
+- Vault branch updated with lessons learned in the correct FE or BE section
 - `spec.md` marked complete with final FVI actuals
 - TDD skips logged with documented reasons
 - `webflow-stub.md` confirmed present in vault branch
@@ -282,9 +294,17 @@ Every VIDF lifecycle transition is triggered by a ClickUp status change hitting 
 | Milestone: Sprint Close | — | Consolidates all feature release notes for sprint into one Webflow release notes post | PM approves |
 | → Archived | Next Release → Archive | Merges vault branch → main; strips Feature Focus from CLAUDE.md; archives spec; closes bundle experiment record | No |
 
-### 6.2 Sync Pulse (QA Gate)
+### 6.2 Sync Pulse (QA Gate) + Back-Fill Logic
 
-Before QA begins, PM-App compares the vault spec's last-updated timestamp against the most recent commit timestamp on the feature branch. If the spec predates recent commits, PM-App blocks the QA trigger and surfaces a spec-drift warning in the trigger queue. Developer must update `spec.md` before QA proceeds.
+**Sync Pulse:** Before QA begins, PM-App compares the vault spec's last-updated timestamp against the most recent commit timestamp on the feature branch. If the spec predates recent commits, PM-App blocks the QA trigger and surfaces a spec-drift warning in the trigger queue. Developer must update `spec.md` before QA proceeds.
+
+**Status Jump Back-Fill:** Developers sometimes skip statuses (e.g., In Progress → Deployed without hitting → Ready for QA). PM-App detects these jumps by comparing the current status against expected prior statuses in the task's history. When a jump is detected:
+1. PM-App runs all missed automation steps in order before processing the current status
+2. If Sync Pulse never fired (QA was skipped), it runs retroactively before any Deployed automation executes
+3. If spec is stale, Deployed trigger pauses and surfaces the drift warning before publishing anything to Webflow
+4. The gap is logged in the trigger queue as a warning (not a blocker for the merge)
+
+The GitHub Action does NOT block merges for missed status triggers. It only enforces the experiment tag presence.
 
 ### 6.3 Archive Loop
 
@@ -396,15 +416,19 @@ This is not a real-time dashboard. It runs at sprint close and stores the snapsh
 
 ## 9. Open Questions (Resolved)
 
-All design questions from the VIDF brainstorm draft have been resolved:
+All design questions from the VIDF brainstorm draft and team review have been resolved:
 
 | Question | Resolution |
 |----------|-----------|
 | Git Blame SOP version tag in commit messages? | Yes — automated via global git hook, not manual |
-| ScribeHow integration? | Not in scope for VIDF v1; revisit in Phase 4 depth pass |
+| ScribeHow integration? | Optional field in v1 bundle. If PM attaches a ScribeHow link during assessment, pm-agent includes it in Acceptance Criteria in `spec.md`. Required-field consideration deferred to Phase 4. |
 | TDD skip archive location? | PM-App `tdd_skips` table against bundle version record; not in vault |
 | FE/BE split without list duplication? | Separate ClickUp tasks with same vault branch; dependency chain enforces sequencing |
 | PM Agent execution model? | Hybrid — Viscap Plugin orchestrates; Superpowers executes; PM-App handles lifecycle automation |
+| FE/BE concurrent vault branch writes? | Sequential by design (BE blocks FE). `quality-gate` skill does pull-before-write on vault branch. `spec.md` and `release-notes-draft.md` have dedicated `## FE` and `## BE` sections to minimize conflict surface. |
+| Missed ClickUp status updates (status skipping)? | PM-App detects status jumps and back-fills missed automation in order. GitHub Action does NOT block merges for missed triggers. Sync Pulse runs retroactively before Deployed automation fires — if spec is stale, Deployed trigger pauses and surfaces drift warning before any Webflow publish. |
+| Git hook adoption for new hires / contractors? | Viscap Plugin `SessionStart` hook self-detects missing global hook and offers immediate install. GitHub Action remains enforcement backstop for repos without the hook. PRs fail if tag is missing — self-repair is the path out. |
+| Developer blocked at 2 AM by risk matrix "Halt"? | Low-Risk Bypass added to `chief-architect` skill. Developer can proceed past any "No" by writing a Super-Explanation (minimum 3 sentences: what changed, why it's worth the risk, rollback plan). Bypass tagged `[risk:bypass]` in commit; flagged `priority: high` in SOP Improvement Candidates queue for PM review next session. |
 
 ---
 
