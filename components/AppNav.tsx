@@ -17,6 +17,7 @@ export function AppNav() {
           { key: '/', label: <Link href="/">Trigger Queue</Link> },
           { key: '/sprint', label: <Link href="/sprint">Sprint Planner</Link> },
           { key: '/triggers/config', label: <Link href="/triggers/config">Trigger Config</Link> },
+          { key: '/experiments', label: <Link href="/experiments">Experiments</Link> },
           { key: '/setup', label: <Link href="/setup">Setup</Link> },
         ]}
       />
