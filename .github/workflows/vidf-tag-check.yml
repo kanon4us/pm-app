@@ -1,0 +1,65 @@
+name: VIDF Tag Check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  vidf-tag:
+    name: Verify VIDF experiment tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check VIDF tag in commit messages
+        env:
+          VIDF_ENFORCE_DATE: ${{ vars.VIDF_ENFORCE_DATE }}
+        run: |
+          # Collect commit messages in this push
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            MSGS=$(git log --format="%s %b" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} 2>/dev/null || git log -1 --format="%s %b")
+          else
+            MSGS=$(git log -1 --format="%s %b")
+          fi
+
+          echo "Commit messages to check:"
+          echo "$MSGS"
+          echo ""
+
+          if echo "$MSGS" | grep -q "\[vidf:"; then
+            echo "✓ VIDF tag found"
+            exit 0
+          fi
+
+          echo "✗ VIDF tag missing from commit message(s)"
+          echo ""
+          echo "Every commit must include:"
+          echo "  [vidf:<tag> | bundle:<version> | sop:<version> | sprint:YYYY-MM]"
+          echo ""
+          echo "To fix: Install the VIDF git hook on your machine:"
+          echo "  bash scripts/vidf-hook/install-git-hook.sh"
+          echo ""
+          echo "Then set environment variables (add to ~/.zshrc):"
+          echo "  export VIDF_PMAPP_URL=https://your-pm-app.vercel.app"
+          echo "  export VIDF_API_KEY=<get-from-pm-dashboard>"
+          echo ""
+
+          # Enforce only after VIDF_ENFORCE_DATE (format: YYYY-MM-DD)
+          if [ -n "$VIDF_ENFORCE_DATE" ]; then
+            TODAY=$(date +%Y-%m-%d)
+            if [[ "$TODAY" > "$VIDF_ENFORCE_DATE" ]]; then
+              echo "❌ Hard enforcement active since $VIDF_ENFORCE_DATE"
+              exit 1
+            else
+              echo "⚠️  Soft warning only (enforcement begins $VIDF_ENFORCE_DATE)"
+              exit 0
+            fi
+          else
+            echo "⚠️  Soft warning only (set VIDF_ENFORCE_DATE repo variable to enable hard enforcement)"
+            exit 0
+          fi
