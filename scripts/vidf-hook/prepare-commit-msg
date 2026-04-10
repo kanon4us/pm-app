@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# VIDF prepare-commit-msg hook
+# Appends VIDF experiment metadata to every commit message.
+# Install globally via: bash scripts/vidf-hook/install-git-hook.sh
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+
+# Skip merge commits — message is auto-generated and shouldn't be modified
+if [ "$COMMIT_SOURCE" = "merge" ]; then
+  exit 0
+fi
+
+# Skip if already tagged (handles amends and manual tags)
+if grep -q "\[vidf:" "$COMMIT_MSG_FILE"; then
+  exit 0
+fi
+
+# Only tag Viscap repositories
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+if ! echo "$REMOTE_URL" | grep -qi "viscapmedia\|viscap"; then
+  exit 0
+fi
+
+PMAPP_URL="${VIDF_PMAPP_URL:-}"
+VIDF_API_KEY="${VIDF_API_KEY:-}"
+GIT_EMAIL=$(git config user.email 2>/dev/null || echo "")
+
+# Graceful degradation: if config is missing, use default tag and warn once
+if [ -z "$PMAPP_URL" ] || [ -z "$VIDF_API_KEY" ] || [ -z "$GIT_EMAIL" ]; then
+  SPRINT=$(date +%Y-%m)
+  DEFAULT_TAG="[vidf:pre | bundle:v0 | sop:v0 | sprint:$SPRINT]"
+  echo "" >> "$COMMIT_MSG_FILE"
+  echo "$DEFAULT_TAG" >> "$COMMIT_MSG_FILE"
+  if [ -z "$PMAPP_URL" ] || [ -z "$VIDF_API_KEY" ]; then
+    echo "[VIDF] Warning: VIDF_PMAPP_URL or VIDF_API_KEY not set. Using default tag." >&2
+    echo "[VIDF] Run: bash scripts/vidf-hook/install-git-hook.sh to complete setup." >&2
+  fi
+  exit 0
+fi
+
+# URL-encode the email
+ENCODED_EMAIL=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$GIT_EMAIL" 2>/dev/null)
+if [ -z "$ENCODED_EMAIL" ]; then
+  ENCODED_EMAIL="$GIT_EMAIL"
+fi
+
+# Call PM-App API
+RESPONSE=$(curl -sf \
+  --max-time 3 \
+  -H "Authorization: Bearer $VIDF_API_KEY" \
+  "$PMAPP_URL/api/developers/$ENCODED_EMAIL/experiment" \
+  2>/dev/null)
+
+if [ $? -ne 0 ] || [ -z "$RESPONSE" ]; then
+  # Network failure: use default tag so commit is never blocked
+  SPRINT=$(date +%Y-%m)
+  TAG="[vidf:pre | bundle:v0 | sop:v0 | sprint:$SPRINT]"
+  echo "[VIDF] Warning: Could not reach PM-App. Using default tag." >&2
+else
+  COMMIT_TAG=$(python3 -c "
+import sys, json
+try:
+    data = json.loads(sys.argv[1])
+    print(data.get('commit_tag', ''))
+except:
+    print('')
+" "$RESPONSE" 2>/dev/null)
+
+  if [ -z "$COMMIT_TAG" ]; then
+    SPRINT=$(date +%Y-%m)
+    TAG="[vidf:pre | bundle:v0 | sop:v0 | sprint:$SPRINT]"
+  else
+    TAG="$COMMIT_TAG"
+  fi
+fi
+
+# Append tag to commit message file
+echo "" >> "$COMMIT_MSG_FILE"
+echo "$TAG" >> "$COMMIT_MSG_FILE"
