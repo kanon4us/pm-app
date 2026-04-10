@@ -49,7 +49,7 @@ export function ExperimentsView({ developers, bundleVersions }: Props) {
       <Alert
         type="info"
         style={{ marginBottom: 24 }}
-        title="Developer Hook Setup"
+        message="Developer Hook Setup"
         description={
           <span>
             Each developer must install the VIDF git hook once:{' '}
