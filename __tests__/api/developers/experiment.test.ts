@@ -54,6 +54,14 @@ function mockDbNotFound() {
     .mockReturnValueOnce({ upsert: jest.fn().mockReturnValue(upsertChain) })
 }
 
+function mockDbError() {
+  const chain = {
+    eq: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: null, error: { code: '500', message: 'connection refused' } }),
+  }
+  mockFrom.mockReturnValue({ select: jest.fn().mockReturnValue(chain) })
+}
+
 describe('GET /api/developers/[email]/experiment', () => {
   it('returns 401 with no API key', async () => {
     const res = await GET(makeRequest('dev@example.com'), { params: Promise.resolve({ email: 'dev@example.com' }) })
@@ -87,6 +95,14 @@ describe('GET /api/developers/[email]/experiment', () => {
     const body = await res.json()
     expect(body.tag).toBe('pre')
     expect(body.bundle_version).toBe('v0')
+  })
+
+  it('returns 500 on non-PGRST116 database error', async () => {
+    mockDbError()
+    const res = await GET(makeRequest('dev@viscap.ai', VALID_KEY), { params: Promise.resolve({ email: 'dev@viscap.ai' }) })
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.error).toBe('Database error')
   })
 
   it('returns the commit tag string', async () => {

@@ -28,9 +28,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   let record = existing
 
-  if (!record || error?.code === 'PGRST116') {
+  // Non-PGRST116 errors are real database errors — surface them
+  if (error && error.code !== 'PGRST116') {
+    console.error('[VIDF] developer_experiments lookup error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
+
+  // PGRST116 = not found — auto-register with pre-VIDF defaults
+  if (!record) {
     const sprint = new Date().toISOString().slice(0, 7)
-    const { data: created } = await supabase
+    const { data: created, error: upsertError } = await supabase
       .from('developer_experiments')
       .upsert({
         github_email: decodedEmail,
@@ -41,6 +48,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       })
       .select()
       .single()
+
+    if (upsertError) {
+      console.error('[VIDF] developer_experiments upsert error:', upsertError)
+      return NextResponse.json({ error: 'Failed to register developer' }, { status: 500 })
+    }
+
     record = created
   }
 
