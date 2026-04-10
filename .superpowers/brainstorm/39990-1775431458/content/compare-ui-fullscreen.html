@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compare UI — Recycling Engine v2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #010409; color: #c9d1d9; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Top bar */
+  .topbar { background: #0d1117; border-bottom: 1px solid #21262d; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .topbar-title { color: #e6edf3; font-weight: bold; font-size: 13px; }
+  .meta { display: flex; gap: 12px; font-size: 11px; }
+  .meta span { color: #8b949e; }
+  .meta code { color: #79c0ff; }
+  .topbar-right { display: flex; gap: 8px; align-items: center; }
+
+  /* Toolbar */
+  .toolbar { background: #161b22; border-bottom: 1px solid #21262d; padding: 8px 20px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  .toolbar-group { display: flex; gap: 4px; align-items: center; }
+  .toolbar-label { color: #8b949e; font-size: 10px; margin-right: 4px; }
+  .btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 3px 10px; font-size: 10px; cursor: pointer; font-family: inherit; }
+  .btn:hover { background: #30363d; }
+  .btn.active { background: #238636; color: #fff; border-color: #238636; }
+  .btn.danger { background: #3a0d0d; color: #f85149; border-color: #f85149; }
+  .divider { width: 1px; height: 20px; background: #30363d; }
+  .zoom-display { color: #58a6ff; font-size: 11px; min-width: 40px; text-align: center; }
+
+  /* Main canvas */
+  .canvas { flex: 1; overflow: auto; padding: 32px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* Comparison area */
+  .comparison { display: flex; gap: 24px; align-items: flex-start; }
+  .frame-wrap { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .frame-label { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-radius: 6px 6px 0 0; font-size: 11px; font-weight: bold; }
+  .frame-label.design { background: #8957e5; color: #fff; }
+  .frame-label.coded { background: #388bfd; color: #fff; }
+  .frame-body { border: 1px solid #30363d; border-top: none; border-radius: 0 0 8px 8px; padding: 32px; min-height: 500px; display: flex; align-items: center; justify-content: center; }
+  .frame-body.design-bg { background: #1a1030; }
+  .frame-body.coded-bg { background: #0d1f3c; }
+
+  /* Mock component — design */
+  .component-design { background: #2d1f5e; border-radius: 10px; padding: 24px; width: 320px; }
+  .comp-label { color: #8b949e; font-size: 10px; letter-spacing: 0.1em; margin-bottom: 12px; }
+  .comp-dropdown { background: #3d2d7a; height: 40px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; padding: 0 14px; color: #a78bfa; font-size: 12px; }
+  .comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .comp-card { background: #3d2d7a; border-radius: 6px; height: 90px; display: flex; align-items: center; justify-content: center; color: #8b949e; font-size: 10px; }
+  .comp-btn-design { background: #6d28d9; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 500; }
+  .comp-caption { font-size: 9px; color: #8957e5; text-align: center; margin-top: 8px; }
+
+  /* Mock component — coded */
+  .component-coded { background: #1a2f5a; border-radius: 10px; padding: 24px; width: 320px; }
+  .comp-dropdown-coded { background: #21386b; height: 40px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; padding: 0 14px; color: #58a6ff; font-size: 12px; }
+  .comp-card-coded { background: #21386b; border-radius: 6px; height: 90px; display: flex; align-items: center; justify-content: center; color: #8b949e; font-size: 10px; }
+  .comp-btn-coded { background: #1f6feb; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 500; }
+
+  /* Divergence annotation */
+  .divergence-bar { background: #1a0d0d; border: 1px solid #f0883e; border-radius: 8px; padding: 14px 20px; }
+  .div-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .div-title { color: #f0883e; font-weight: bold; font-size: 12px; }
+  .div-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .div-table th { color: #8b949e; font-size: 10px; font-weight: normal; padding: 4px 16px 8px 0; text-align: left; border-bottom: 1px solid #30363d; }
+  .div-table td { padding: 8px 16px 8px 0; border-bottom: 1px solid #21262d; vertical-align: middle; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+  .gate { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px 16px; margin-top: 12px; display: flex; gap: 12px; align-items: center; }
+  .gate-label { color: #e6edf3; font-size: 11px; flex: 1; }
+  .gate-sub { color: #8b949e; font-size: 10px; margin-top: 2px; }
+  .btn-path-a { background: #2d1b00; color: #f0883e; border: 1px solid #f0883e; border-radius: 4px; padding: 5px 14px; font-size: 10px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .btn-path-b { background: #238636; color: #fff; border: none; border-radius: 4px; padding: 5px 14px; font-size: 10px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">Compare UI ⟷</div>
+      <div class="meta">
+        <span>Branch: <code>feature/recycling-engine-v2</code></span>
+        <span>Commit: <code>a3f8c21</code></span>
+        <span>Source: <code style="color:#3fb950;">localhost:3000</code></span>
+        <span>Figma: <code>Viscap UI · 🔍 Review</code></span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn" onclick="window.close()">✕ Close tab</button>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <span class="toolbar-label">State:</span>
+      <button class="btn active">Default</button>
+      <button class="btn">Hover</button>
+      <button class="btn">Active</button>
+      <button class="btn">Disabled</button>
+      <button class="btn">Error</button>
+    </div>
+    <div class="divider"></div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Zoom:</span>
+      <button class="btn" onclick="zoom(-0.1)">−</button>
+      <span class="zoom-display" id="zoomVal">100%</span>
+      <button class="btn" onclick="zoom(0.1)">+</button>
+      <button class="btn" onclick="resetZoom()">Fit</button>
+    </div>
+    <div class="divider"></div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">View:</span>
+      <button class="btn active" id="btnSideBySide" onclick="setView('side')">Side by side</button>
+      <button class="btn" id="btnOverlay" onclick="setView('overlay')">Overlay</button>
+    </div>
+    <div class="divider"></div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Source:</span>
+      <button class="btn active">localhost</button>
+      <button class="btn">staging</button>
+      <button class="btn">production</button>
+    </div>
+    <div class="divider"></div>
+    <button class="btn" style="color:#58a6ff; border-color:#388bfd;">↺ Re-capture</button>
+    <button class="btn" style="color:#8957e5; border-color:#8957e5;">Export to ScribeHow ↗</button>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas" id="canvas">
+
+    <!-- Side by side view -->
+    <div class="comparison" id="sideBySide">
+
+      <div class="frame-wrap">
+        <div class="frame-label design">
+          <span>rec-engine-v2 · design</span>
+          <span style="font-size:10px; opacity:0.8;">Figma · Last updated 2d ago</span>
+        </div>
+        <div class="frame-body design-bg">
+          <div class="component-design">
+            <div class="comp-label">RECYCLING ENGINE</div>
+            <div class="comp-dropdown">Select asset type ▾</div>
+            <div class="comp-grid">
+              <div class="comp-card">Asset A</div>
+              <div class="comp-card">Asset B</div>
+            </div>
+            <div class="comp-btn-design">Recycle Selected</div>
+            <div class="comp-caption">Auto layout · 8px grid · Inter · #6d28d9</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="frame-wrap">
+        <div class="frame-label coded">
+          <span>rec-engine-v2 · coded</span>
+          <span style="font-size:10px; opacity:0.8;">a3f8c21 · feature/recycling-engine-v2</span>
+        </div>
+        <div class="frame-body coded-bg">
+          <div class="component-coded">
+            <div class="comp-label">RECYCLING ENGINE</div>
+            <div class="comp-dropdown-coded">Select asset type ▾</div>
+            <div class="comp-grid">
+              <div class="comp-card-coded">Asset A</div>
+              <div class="comp-card-coded">Asset B</div>
+            </div>
+            <div class="comp-btn-coded">Recycle Selected</div>
+            <div class="comp-caption" style="color:#388bfd;">Auto layout · 8px grid · Inter · <span style="color:#f0883e;">#1f6feb ← drift</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Divergence report -->
+    <div class="divergence-bar">
+      <div class="div-header">
+        <div class="div-title">⚠ 1 Divergence Found — Ready for QA blocked until resolved</div>
+        <button class="btn" style="color:#8b949e;">Export Fidelity Report (ScribeHow) ↗</button>
+      </div>
+      <table class="div-table">
+        <tr>
+          <th>Property</th><th>Design spec</th><th>Coded</th><th>Component</th><th>Severity</th>
+        </tr>
+        <tr>
+          <td style="color:#e6edf3;">Button background</td>
+          <td><span class="swatch" style="background:#6d28d9;"></span><code style="color:#c9d1d9;">#6d28d9</code></td>
+          <td><span class="swatch" style="background:#1f6feb;"></span><code style="color:#f0883e;">#1f6feb</code></td>
+          <td style="color:#8b949e;">RecycleButton</td>
+          <td><span style="color:#f0883e;">Visual · Medium</span></td>
+        </tr>
+        <tr>
+          <td style="color:#8b949e;">Layout / spacing</td>
+          <td style="color:#3fb950;">8px grid</td>
+          <td style="color:#3fb950;">8px grid ✓</td>
+          <td style="color:#8b949e;">All</td>
+          <td><span style="color:#3fb950;">✓ Match</span></td>
+        </tr>
+        <tr>
+          <td style="color:#8b949e; border-bottom:none;">Auto layout structure</td>
+          <td style="color:#3fb950; border-bottom:none;">Vertical stack</td>
+          <td style="color:#3fb950; border-bottom:none;">Vertical stack ✓</td>
+          <td style="color:#8b949e; border-bottom:none;">All</td>
+          <td style="border-bottom:none;"><span style="color:#3fb950;">✓ Match</span></td>
+        </tr>
+      </table>
+
+      <div class="gate">
+        <div>
+          <div class="gate-label">Action required to unblock Ready for QA</div>
+          <div class="gate-sub">Choose one path. Both write to the audit trail in the Vault spec.</div>
+        </div>
+        <button class="btn-path-a">Path A — Fix the code</button>
+        <button class="btn-path-b">Path B — Update Vault Spec</button>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+  let scale = 1;
+  function zoom(delta) {
+    scale = Math.min(2, Math.max(0.25, scale + delta));
+    document.getElementById('zoomVal').textContent = Math.round(scale * 100) + '%';
+    document.querySelectorAll('.component-design, .component-coded').forEach(el => {
+      el.style.transform = `scale(${scale})`;
+      el.style.transformOrigin = 'top center';
+    });
+  }
+  function resetZoom() {
+    scale = 1;
+    document.getElementById('zoomVal').textContent = '100%';
+    document.querySelectorAll('.component-design, .component-coded').forEach(el => {
+      el.style.transform = '';
+    });
+  }
+  function setView(v) {
+    const sbs = document.getElementById('sideBySide');
+    const btnSBS = document.getElementById('btnSideBySide');
+    const btnOV = document.getElementById('btnOverlay');
+    if (v === 'overlay') {
+      sbs.style.position = 'relative';
+      const coded = sbs.children[1];
+      coded.style.position = 'absolute';
+      coded.style.left = sbs.children[0].offsetLeft + 'px';
+      coded.style.opacity = '0.6';
+      coded.style.mixBlendMode = 'screen';
+      btnOV.classList.add('active');
+      btnSBS.classList.remove('active');
+    } else {
+      const coded = sbs.children[1];
+      coded.style.position = '';
+      coded.style.left = '';
+      coded.style.opacity = '';
+      coded.style.mixBlendMode = '';
+      sbs.style.position = '';
+      btnSBS.classList.add('active');
+      btnOV.classList.remove('active');
+    }
+  }
+</script>
+
+</body>
+</html>

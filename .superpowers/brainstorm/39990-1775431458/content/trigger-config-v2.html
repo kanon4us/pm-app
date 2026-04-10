@@ -1,0 +1,105 @@
+<h2>Trigger Config — Updated</h2>
+<p class="subtitle">Full status transition map including two new intermediate triggers</p>
+
+<div style="background:#0d1117; border-radius:8px; padding:16px; font-family:monospace; font-size:12px; color:#c9d1d9;">
+
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; color:#8b949e; font-size:10px; padding-bottom:8px; border-bottom:1px solid #21262d; margin-bottom:4px;">
+    <span>Status →</span><span>PM Agent Action</span><span>Write-backs</span><span>On Failure</span><span></span>
+  </div>
+
+  <!-- In Progress -->
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; padding:8px 0; border-bottom:1px solid #21262d; align-items:start;">
+    <span style="color:#e6edf3;">→ In Progress</span>
+    <div>
+      <div style="color:#58a6ff;">Start feature kickoff</div>
+      <div style="color:#8b949e; font-size:10px; margin-top:2px;">Vault branch · CLAUDE.md · User stories · Webflow stub · Figma page</div>
+    </div>
+    <span style="color:#3fb950;">CU · Docs · WF · Fig</span>
+    <span style="color:#8b949e;">continue</span>
+    <span style="color:#8b949e; cursor:pointer;">Edit</span>
+  </div>
+
+  <!-- Architecting — NEW -->
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; padding:8px 0; border-bottom:1px solid #21262d; border-left:2px solid #388bfd; padding-left:8px; align-items:start; background:#0d1f3c; border-radius:0 4px 4px 0; margin: 2px 0;">
+    <span style="color:#e6edf3;">→ Architecting</span>
+    <div>
+      <div style="color:#58a6ff;">Sync Engineering Plan</div>
+      <div style="color:#8b949e; font-size:10px; margin-top:2px;">Dev modified implementation plan in Superpowers → pull into vault spec to keep source of truth accurate</div>
+    </div>
+    <span style="color:#3fb950;">Docs</span>
+    <span style="color:#8b949e;">continue</span>
+    <span style="color:#8b949e; cursor:pointer;">Edit</span>
+  </div>
+
+  <!-- Ready for QA — NEW -->
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; padding:8px 0; border-bottom:1px solid #21262d; border-left:2px solid #388bfd; padding-left:8px; align-items:start; background:#0d1f3c; border-radius:0 4px 4px 0; margin: 2px 0;">
+    <span style="color:#e6edf3;">→ Ready for QA</span>
+    <div>
+      <div style="color:#58a6ff;">QA Logic Sync</div>
+      <div style="color:#8b949e; font-size:10px; margin-top:2px;">Compare code against Phase 1 User Stories → update stories to reflect reality → post as QA Checklist comment in ClickUp</div>
+    </div>
+    <span style="color:#3fb950;">Docs · CU</span>
+    <span style="color:#8b949e;">continue</span>
+    <span style="color:#8b949e; cursor:pointer;">Edit</span>
+  </div>
+
+  <!-- In Review / Deployed -->
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; padding:8px 0; border-bottom:1px solid #21262d; align-items:start;">
+    <span style="color:#e6edf3;">→ Deployed</span>
+    <div>
+      <div style="color:#58a6ff;">Deploy cleanup</div>
+      <div style="color:#8b949e; font-size:10px; margin-top:2px;">Strip CLAUDE.md · merge vault branch · archive spec · generate Webflow post</div>
+    </div>
+    <span style="color:#3fb950;">CU · Docs · WF</span>
+    <span style="color:#8b949e;">continue</span>
+    <span style="color:#8b949e; cursor:pointer;">Edit</span>
+  </div>
+
+  <!-- Archived -->
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; padding:8px 0; border-bottom:1px solid #21262d; align-items:start;">
+    <span style="color:#e6edf3;">→ Archived</span>
+    <div>
+      <div style="color:#58a6ff;">Kill feature</div>
+      <div style="color:#8b949e; font-size:10px; margin-top:2px;">Delete vault branch · remove CLAUDE.md</div>
+    </div>
+    <span style="color:#3fb950;">CU · Docs</span>
+    <span style="color:#8b949e;">stop</span>
+    <span style="color:#8b949e; cursor:pointer;">Edit</span>
+  </div>
+
+  <!-- Flag Lifted -->
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; padding:8px 0; border-bottom:1px solid #21262d; align-items:start;">
+    <span style="color:#e6edf3;">Flag Lifted ✦</span>
+    <div>
+      <div style="color:#58a6ff;">Upgrade Coming Soon stub</div>
+      <div style="color:#8b949e; font-size:10px; margin-top:2px;">Promote stub to full feature post on viscap.ai</div>
+    </div>
+    <span style="color:#3fb950;">WF</span>
+    <span style="color:#8b949e;">continue</span>
+    <span style="color:#8b949e; cursor:pointer;">Edit</span>
+  </div>
+
+  <!-- Sprint Close -->
+  <div style="display:grid; grid-template-columns: 140px 1fr 160px 80px 40px; gap:8px; padding:8px 0; align-items:start;">
+    <span style="color:#e6edf3;">Sprint Close ✦</span>
+    <div>
+      <div style="color:#58a6ff;">Generate release notes</div>
+      <div style="color:#8b949e; font-size:10px; margin-top:2px;">Batch from all features deployed in sprint</div>
+    </div>
+    <span style="color:#3fb950;">CU · WF</span>
+    <span style="color:#8b949e;">continue</span>
+    <span style="color:#8b949e; cursor:pointer;">Edit</span>
+  </div>
+
+  <div style="margin-top:12px; padding-top:8px; border-top:1px solid #21262d; display:flex; justify-content:space-between; align-items:center;">
+    <span style="color:#388bfd; cursor:pointer;">+ Add trigger rule</span>
+    <span style="color:#8b949e; font-size:10px;">✦ = custom trigger (not a standard ClickUp status)</span>
+  </div>
+
+</div>
+
+<div style="background:#0d1f3c; border:1px solid #388bfd; border-radius:6px; padding:12px; margin-top:12px; font-size:11px; color:#c9d1d9; font-family:monospace;">
+  <span style="color:#58a6ff; font-weight:bold;">New triggers (highlighted blue)</span><br><br>
+  <strong>→ Architecting / Sync Engineering Plan:</strong> Docs only. Fires each time the developer moves a task into Architecting status — could fire multiple times as the plan evolves. on_failure: continue so a docs sync issue never blocks the developer.<br><br>
+  <strong>→ Ready for QA / QA Logic Sync:</strong> Docs + ClickUp. Compares actual implementation against Phase 1 User Stories. Updated stories write back to vault spec (Docs). QA Checklist posts as a ClickUp comment so QA team sees it without leaving ClickUp.
+</div>

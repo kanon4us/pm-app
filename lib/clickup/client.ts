@@ -19,9 +19,15 @@ export interface ClickUpList {
   task_count: number
 }
 
+export interface ClickUpFolder {
+  id: string
+  name: string
+}
+
 export interface ClickUpTask {
   id: string
   name: string
+  description: string | null
   status: { status: string }
   custom_fields: Array<{ id: string; name: string; value: unknown }>
 }
@@ -43,6 +49,12 @@ export function buildClickUpClient(token: string) {
     getLists: (spaceId: string) =>
       clickupFetch<{ lists: ClickUpList[] }>(token, `/space/${spaceId}/list?archived=false`).then((r) => r.lists),
 
+    getList: (listId: string) =>
+      clickupFetch<{ id: string; name: string }>(token, `/list/${listId}`),
+
+    getFolders: (spaceId: string) =>
+      clickupFetch<{ folders: ClickUpFolder[] }>(token, `/space/${spaceId}/folder?archived=false`).then((r) => r.folders),
+
     getFolderLists: (folderId: string) =>
       clickupFetch<{ lists: ClickUpList[] }>(token, `/folder/${folderId}/list?archived=false`).then((r) => r.lists),
 
@@ -52,6 +64,9 @@ export function buildClickUpClient(token: string) {
     getTasks: (listId: string) =>
       clickupFetch<{ tasks: ClickUpTask[] }>(token, `/list/${listId}/task?archived=false`).then((r) => r.tasks),
 
+    getTask: (taskId: string) =>
+      clickupFetch<ClickUpTask>(token, `/task/${taskId}`),
+
     createWebhook: (teamId: string, endpoint: string, secret: string) =>
       clickupFetch<{ id: string; webhook: { id: string } }>(token, `/team/${teamId}/webhook`, {
         method: 'POST',
@@ -60,6 +75,12 @@ export function buildClickUpClient(token: string) {
           events: ['taskStatusUpdated'],
           secret,
         }),
+      }),
+
+    updateTask: (taskId: string, body: { description?: string; name?: string }) =>
+      clickupFetch<ClickUpTask>(token, `/task/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
       }),
 
     deleteWebhook: (webhookId: string) =>

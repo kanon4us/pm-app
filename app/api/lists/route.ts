@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 
-// GET /api/lists — returns all available ClickUp lists for the signed-in user
-export async function GET() {
+// GET /api/lists?spaceId=xxx — returns all lists in a space (including folder lists)
+export async function GET(request: NextRequest) {
+  const spaceId = request.nextUrl.searchParams.get('spaceId')
+  if (!spaceId) return NextResponse.json({ error: 'spaceId is required' }, { status: 400 })
+
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -17,16 +20,20 @@ export async function GET() {
   if (!token) return NextResponse.json({ error: 'ClickUp not connected' }, { status: 400 })
 
   const client = buildClickUpClient(token.access_token)
-  const teams = await client.getTeams()
-  const allLists: Array<{ id: string; name: string; spaceName: string; teamId: string }> = []
 
-  for (const team of teams) {
-    const spaces = await client.getSpaces(team.id)
-    for (const space of spaces) {
-      const lists = await client.getLists(space.id)
-      allLists.push(...lists.map((l) => ({ id: l.id, name: l.name, spaceName: space.name, teamId: team.id })))
-    }
-  }
+  // Fetch lists directly in the space and lists inside folders in parallel
+  const [spaceLists, folders] = await Promise.all([
+    client.getLists(spaceId),
+    client.getFolders(spaceId),
+  ])
 
-  return NextResponse.json({ lists: allLists, teamId: teams[0]?.id })
+  const folderListArrays = await Promise.all(folders.map((f) => client.getFolderLists(f.id)))
+  const folderLists = folderListArrays.flat()
+
+  const lists = [
+    ...spaceLists.map((l) => ({ id: l.id, name: l.name, folder: null })),
+    ...folderLists.map((l) => ({ id: l.id, name: l.name, folder: l.folder?.name ?? null })),
+  ]
+
+  return NextResponse.json({ lists })
 }

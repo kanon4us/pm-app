@@ -1,0 +1,77 @@
+<h2>System Architecture — v4</h2>
+<p class="subtitle">Full picture including bidirectional Figma sync via MCP</p>
+
+<div style="font-family: monospace; font-size: 13px; line-height: 1.6; background: #0d1117; color: #c9d1d9; border-radius: 8px; padding: 24px; margin: 16px 0;">
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── CLICKUP ─────────────────────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">OAuth 2.0 → user auth  |  REST API → task import  |  Webhooks → status events</div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── NEXT.JS APP (Vercel) ────────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">Webhook receiver → Supabase trigger queue → Realtime dashboard</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">Developer approves trigger → fires PM Agent run</div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── SUPABASE ────────────────────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">tables: tasks, trigger_queue, trigger_configs, agent_runs</div>
+<div style="padding-left: 16px; margin-bottom: 4px;"><span style="color: #8b949e;">+ oauth_tokens (ClickUp + Figma tokens per user, encrypted)</span></div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼  on approval</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── CLAUDE API + FIGMA MCP ──────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">Model: claude-opus-4-6</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">System prompt: PM Agent SKILL + task context + workflow phase</div>
+<div style="padding-left: 16px; margin-bottom: 4px;"><span style="color: #79c0ff;">MCP tools available to agent during run:</span></div>
+<div style="padding-left: 32px; margin-bottom: 2px;">figma.create_page(file_id, feature_slug)</div>
+<div style="padding-left: 32px; margin-bottom: 2px;">figma.push_frames(selection, target_page)   ← Code → Canvas</div>
+<div style="padding-left: 32px; margin-bottom: 2px;">figma.get_component(link)                   ← Canvas → Code</div>
+<div style="padding-left: 32px; margin-bottom: 2px;">figma.push_master_design(page, label)       ← QA approved</div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼  structured output fans out</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── WRITE-BACK TARGETS ──────────────────────────────────────────</div>
+
+<div style="padding-left: 16px; margin-bottom: 6px;"><span style="color: #3fb950;">① ClickUp</span>  — comment + description + custom fields</div>
+<div style="padding-left: 16px; margin-bottom: 6px;"><span style="color: #3fb950;">② Docs Repo</span> — feature/[slug] branch, spec + CLAUDE.md (unmerged until ROI validated)</div>
+<div style="padding-left: 16px; margin-bottom: 6px;"><span style="color: #3fb950;">③ Webflow</span>  — draft post / Coming Soon stub (published: false)</div>
+<div style="padding-left: 16px; margin-bottom: 12px;"><span style="color: #3fb950;">④ Figma</span>    — bidirectional via MCP (see phase map below)</div>
+
+</div>
+
+<div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin: 16px 0;">
+  <div style="color: #58a6ff; font-weight: bold; margin-bottom: 12px; font-size: 13px;">FIGMA × WORKFLOW PHASE MAP</div>
+  <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: monospace;">
+    <tr style="color: #8b949e; border-bottom: 1px solid #30363d;">
+      <td style="padding: 6px 12px 6px 0; font-weight: bold;">Phase</td>
+      <td style="padding: 6px 0;">Figma Action</td>
+      <td style="padding: 6px 0; padding-left: 12px;">Direction</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #21262d;">
+      <td style="padding: 6px 12px 6px 0; color: #e6edf3;">UI/UX Design</td>
+      <td style="padding: 6px 0; color: #c9d1d9;">PM Agent generates coded mockup → push to Figma as starting point</td>
+      <td style="padding: 6px 0; padding-left: 12px; color: #3fb950;">Code → Canvas</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #21262d;">
+      <td style="padding: 6px 12px 6px 0; color: #e6edf3;">UI/UX Review</td>
+      <td style="padding: 6px 0; color: #c9d1d9;">Send current build to Figma review file, highlight discrepancies</td>
+      <td style="padding: 6px 0; padding-left: 12px; color: #3fb950;">Code → Canvas</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #21262d;">
+      <td style="padding: 6px 12px 6px 0; color: #e6edf3;">Architecting</td>
+      <td style="padding: 6px 0; color: #c9d1d9;">Designer updates component → PM Agent pulls spec → updates code</td>
+      <td style="padding: 6px 0; padding-left: 12px; color: #f0883e;">Canvas → Code</td>
+    </tr>
+    <tr>
+      <td style="padding: 6px 12px 6px 0; color: #e6edf3;">QA Approved</td>
+      <td style="padding: 6px 0; color: #c9d1d9;">Push Master Design to Figma — visual docs match what shipped</td>
+      <td style="padding: 6px 0; padding-left: 12px; color: #3fb950;">Code → Canvas</td>
+    </tr>
+  </table>
+</div>
+
+<div style="background: #2d1b00; border: 1px solid #f0883e; border-radius: 6px; padding: 14px; margin-top: 12px; font-size: 12px; font-family: monospace; color: #c9d1d9;">
+  <span style="color: #f0883e; font-weight: bold;">⚠ SCOPE FLAG</span><br><br>
+  "Code → Canvas" requires running the app locally (localhost) so the agent can preview the UI before pushing frames to Figma. This only works when the developer triggers it from their local machine — it cannot run automatically from Vercel's server. This is a <strong>Phase 2</strong> capability. Phase 1 ships Canvas → Code and the Figma page/frame creation without the localhost requirement.
+</div>

@@ -1,0 +1,151 @@
+<h2>Compare UI ⟷ — v3</h2>
+<p class="subtitle">Inline panel with per-frame "open in new window" links</p>
+
+<div style="font-family: monospace; font-size: 12px; color: #c9d1d9;">
+
+  <!-- Source context bar -->
+  <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; font-size:11px;">
+    <div style="display:flex; gap:20px;">
+      <span><span style="color:#8b949e;">Branch:</span> <span style="color:#79c0ff;">feature/recycling-engine-v2</span></span>
+      <span><span style="color:#8b949e;">Commit:</span> <span style="color:#79c0ff;">a3f8c21</span></span>
+      <span><span style="color:#8b949e;">Source:</span> <span style="color:#3fb950;">localhost:3000</span></span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <span style="background:#21262d; color:#8b949e; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer;">State: Default ▾</span>
+      <span style="background:#21262d; color:#58a6ff; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer;">↺ Re-capture</span>
+    </div>
+  </div>
+
+  <!-- Side-by-side comparison -->
+  <div class="split" style="margin-bottom:12px;">
+
+    <!-- Designer mockup -->
+    <div class="mockup">
+      <div class="mockup-header" style="background:#8957e5; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+        <span>rec-engine-v2 · design</span>
+        <a href="#" onclick="openDesign('design')" style="color:#fff; font-size:10px; opacity:0.85; text-decoration:none; background:rgba(255,255,255,0.15); padding:2px 8px; border-radius:3px;">↗ Open</a>
+      </div>
+      <div class="mockup-body" style="background:#1a1030; padding:24px; display:flex; align-items:center; justify-content:center;">
+        <div style="background:#2d1f5e; border-radius:10px; padding:20px; width:100%; max-width:280px;">
+          <div style="color:#8b949e; font-size:9px; margin-bottom:10px; letter-spacing:0.1em;">RECYCLING ENGINE</div>
+          <div style="background:#3d2d7a; height:36px; border-radius:6px; margin-bottom:10px; display:flex; align-items:center; padding:0 12px; color:#a78bfa; font-size:11px;">Select asset type ▾</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+            <div style="background:#3d2d7a; height:72px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#8b949e; font-size:9px;">Asset A</div>
+            <div style="background:#3d2d7a; height:72px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#8b949e; font-size:9px;">Asset B</div>
+          </div>
+          <div style="background:#6d28d9; height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:500;">Recycle Selected</div>
+          <div style="font-size:9px; color:#8957e5; text-align:center; margin-top:8px;">#6d28d9 · 8px grid · Inter</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coded version -->
+    <div class="mockup">
+      <div class="mockup-header" style="background:#388bfd; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+        <span>rec-engine-v2 · coded</span>
+        <a href="#" onclick="openDesign('coded')" style="color:#fff; font-size:10px; opacity:0.85; text-decoration:none; background:rgba(255,255,255,0.15); padding:2px 8px; border-radius:3px;">↗ Open</a>
+      </div>
+      <div class="mockup-body" style="background:#0d1f3c; padding:24px; display:flex; align-items:center; justify-content:center;">
+        <div style="background:#1a2f5a; border-radius:10px; padding:20px; width:100%; max-width:280px;">
+          <div style="color:#8b949e; font-size:9px; margin-bottom:10px; letter-spacing:0.1em;">RECYCLING ENGINE</div>
+          <div style="background:#21386b; height:36px; border-radius:6px; margin-bottom:10px; display:flex; align-items:center; padding:0 12px; color:#58a6ff; font-size:11px;">Select asset type ▾</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+            <div style="background:#21386b; height:72px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#8b949e; font-size:9px;">Asset A</div>
+            <div style="background:#21386b; height:72px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#8b949e; font-size:9px;">Asset B</div>
+          </div>
+          <div style="background:#1f6feb; height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:500;">Recycle Selected</div>
+          <div style="font-size:9px; color:#388bfd; text-align:center; margin-top:8px;"><span style="color:#f0883e;">#1f6feb ← drift</span> · 8px grid · Inter</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Divergence report -->
+  <div style="background:#1a0d0d; border:1px solid #f0883e; border-radius:8px; padding:14px; margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div style="color:#f0883e; font-weight:bold;">⚠ 1 Divergence Found — Ready for QA blocked</div>
+      <span style="background:#21262d; color:#8b949e; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer;">Export Fidelity Report ↗</span>
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:12px;">
+      <tr style="color:#8b949e; border-bottom:1px solid #30363d; font-size:10px;">
+        <td style="padding:4px 12px 4px 0;">Property</td>
+        <td style="padding:4px 12px 4px 0;">Design spec</td>
+        <td style="padding:4px 12px 4px 0;">Coded</td>
+        <td style="padding:4px 0;">Severity</td>
+      </tr>
+      <tr style="border-bottom:1px solid #21262d;">
+        <td style="padding:7px 12px 7px 0; color:#e6edf3;">Button background</td>
+        <td style="padding:7px 12px 7px 0;"><span style="background:#6d28d9; color:#fff; padding:1px 8px; border-radius:3px; font-size:10px;">#6d28d9</span></td>
+        <td style="padding:7px 12px 7px 0;"><span style="background:#1f6feb; color:#fff; padding:1px 8px; border-radius:3px; font-size:10px;">#1f6feb</span></td>
+        <td style="padding:7px 0; color:#f0883e; font-size:10px;">Visual · Medium</td>
+      </tr>
+      <tr style="border-bottom:1px solid #21262d;">
+        <td style="padding:7px 12px 7px 0; color:#8b949e;">Layout / spacing</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px;">8px grid ✓</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px;">8px grid ✓</td>
+        <td style="padding:7px 0; color:#3fb950; font-size:10px;">✓ Match</td>
+      </tr>
+      <tr>
+        <td style="padding:7px 12px 7px 0; color:#8b949e; border-bottom:none;">Auto layout</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px; border-bottom:none;">Vertical ✓</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px; border-bottom:none;">Vertical ✓</td>
+        <td style="padding:7px 0; color:#3fb950; font-size:10px; border-bottom:none;">✓ Match</td>
+      </tr>
+    </table>
+    <div style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <div style="color:#e6edf3; font-size:11px; font-weight:bold;">Action required to unblock Ready for QA</div>
+        <div style="color:#8b949e; font-size:10px; margin-top:2px;">Both paths write to the audit trail in the Vault spec.</div>
+      </div>
+      <span style="background:#2d1b00; color:#f0883e; border:1px solid #f0883e; padding:5px 14px; border-radius:4px; font-size:10px; cursor:pointer; white-space:nowrap;">Path A — Fix the code</span>
+      <span style="background:#238636; color:#fff; padding:5px 14px; border-radius:4px; font-size:10px; cursor:pointer; white-space:nowrap;">Path B — Update Vault Spec</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function openDesign(type) {
+  const designs = {
+    design: {
+      bg: '#1a1030', cardBg: '#2d1f5e', dropBg: '#3d2d7a', cardItemBg: '#3d2d7a',
+      btnBg: '#6d28d9', dropColor: '#a78bfa', label: 'rec-engine-v2 · design',
+      caption: '#6d28d9 · 8px grid · Inter', captionColor: '#8957e5'
+    },
+    coded: {
+      bg: '#0d1f3c', cardBg: '#1a2f5a', dropBg: '#21386b', cardItemBg: '#21386b',
+      btnBg: '#1f6feb', dropColor: '#58a6ff', label: 'rec-engine-v2 · coded',
+      caption: '#1f6feb (drift from #6d28d9)', captionColor: '#f0883e'
+    }
+  };
+  const d = designs[type];
+  const w = window.open('', '_blank', 'width=600,height=700');
+  w.document.write(`<!DOCTYPE html><html><head><title>${d.label}</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:${d.bg}; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; font-family:'SF Mono','Fira Code',monospace; }
+    .label { color:#8b949e; font-size:11px; margin-bottom:20px; letter-spacing:0.05em; }
+    .card { background:${d.cardBg}; border-radius:12px; padding:28px; width:360px; }
+    .comp-label { color:#8b949e; font-size:10px; letter-spacing:0.1em; margin-bottom:14px; }
+    .dropdown { background:${d.dropBg}; height:42px; border-radius:7px; margin-bottom:14px; display:flex; align-items:center; padding:0 16px; color:${d.dropColor}; font-size:13px; font-family:inherit; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+    .grid-item { background:${d.cardItemBg}; height:100px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#8b949e; font-size:11px; }
+    .btn { background:${d.btnBg}; height:42px; border-radius:7px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:500; }
+    .caption { font-size:10px; color:${d.captionColor}; text-align:center; margin-top:10px; }
+  </style></head><body>
+  <div class="label">${d.label}</div>
+  <div class="card">
+    <div class="comp-label">RECYCLING ENGINE</div>
+    <div class="dropdown">Select asset type ▾</div>
+    <div class="grid">
+      <div class="grid-item">Asset A</div>
+      <div class="grid-item">Asset B</div>
+    </div>
+    <div class="btn">Recycle Selected</div>
+    <div class="caption">${d.caption}</div>
+  </div>
+  </body></html>`);
+  w.document.close();
+}
+</script>

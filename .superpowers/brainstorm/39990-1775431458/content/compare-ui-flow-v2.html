@@ -1,0 +1,135 @@
+<h2>Compare UI ⟷ — v2</h2>
+<p class="subtitle">With metadata audit trail · state toggles · vault sync · divergence gate · ScribeHow export</p>
+
+<div style="font-family: monospace; font-size: 12px; color: #c9d1d9;">
+
+  <!-- Source context bar -->
+  <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; font-size:11px;">
+    <div style="display:flex; gap:20px;">
+      <span><span style="color:#8b949e;">Branch:</span> <span style="color:#79c0ff;">feature/recycling-engine-v2</span></span>
+      <span><span style="color:#8b949e;">Commit:</span> <span style="color:#79c0ff;">a3f8c21</span> <span style="color:#8b949e;">"implement asset type selector"</span></span>
+      <span><span style="color:#8b949e;">Source:</span> <span style="color:#3fb950;">localhost:3000</span></span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span style="color:#8b949e; font-size:10px;">Compare against:</span>
+      <span style="background:#21262d; color:#58a6ff; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer;">localhost:3000 ✓</span>
+      <span style="background:#21262d; color:#8b949e; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer;">staging</span>
+      <span style="background:#21262d; color:#8b949e; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer;">production</span>
+    </div>
+  </div>
+
+  <!-- State toggles -->
+  <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; font-size:11px;">
+    <span style="color:#8b949e;">Component state:</span>
+    <span style="background:#238636; color:#fff; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Default ✓</span>
+    <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Hover</span>
+    <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Active</span>
+    <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Disabled</span>
+    <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Error</span>
+  </div>
+
+  <!-- Side-by-side comparison -->
+  <div class="split" style="margin-bottom:12px;">
+
+    <!-- Designer mockup -->
+    <div class="mockup">
+      <div class="mockup-header" style="background:#8957e5; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+        <span>rec-engine-v2 · design</span>
+        <span style="font-size:10px; opacity:0.8;">Figma · Last updated 2d ago</span>
+      </div>
+      <div class="mockup-body" style="background:#1a1030; padding:16px;">
+        <div style="background:#2d1f5e; border-radius:6px; padding:10px; font-size:11px; color:#c9d1d9;">
+          <div style="color:#8b949e; font-size:9px; margin-bottom:4px;">RECYCLING ENGINE</div>
+          <div style="background:#3d2d7a; height:32px; border-radius:4px; margin-bottom:6px; display:flex; align-items:center; padding:0 10px; color:#a78bfa; font-size:11px;">Select asset type ▾</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+            <div style="background:#3d2d7a; height:60px; border-radius:4px;"></div>
+            <div style="background:#3d2d7a; height:60px; border-radius:4px;"></div>
+          </div>
+          <div style="background:#6d28d9; height:28px; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px;">Recycle Selected</div>
+        </div>
+        <div style="font-size:9px; color:#8957e5; text-align:center; margin-top:6px;">Auto layout · 8px grid · Inter</div>
+      </div>
+    </div>
+
+    <!-- Coded version -->
+    <div class="mockup">
+      <div class="mockup-header" style="background:#388bfd; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+        <span>rec-engine-v2 · coded</span>
+        <span style="font-size:10px; opacity:0.8;">a3f8c21 · localhost</span>
+      </div>
+      <div class="mockup-body" style="background:#0d1f3c; padding:16px;">
+        <div style="background:#1a2f5a; border-radius:6px; padding:10px; font-size:11px; color:#c9d1d9;">
+          <div style="color:#8b949e; font-size:9px; margin-bottom:4px;">RECYCLING ENGINE</div>
+          <div style="background:#21386b; height:32px; border-radius:4px; margin-bottom:6px; display:flex; align-items:center; padding:0 10px; color:#58a6ff; font-size:11px;">Select asset type ▾</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+            <div style="background:#21386b; height:60px; border-radius:4px;"></div>
+            <div style="background:#21386b; height:60px; border-radius:4px;"></div>
+          </div>
+          <div style="background:#1f6feb; height:28px; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px;">Recycle Selected</div>
+        </div>
+        <div style="font-size:9px; color:#388bfd; text-align:center; margin-top:6px;">branch: feature/recycling-engine-v2</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Divergence report -->
+  <div style="background:#1a0d0d; border:1px solid #f0883e; border-radius:8px; padding:14px; margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div style="color:#f0883e; font-weight:bold;">⚠ 1 Divergence Found — Ready for QA blocked</div>
+      <span style="background:#21262d; color:#8b949e; padding:2px 8px; border-radius:4px; font-size:10px; cursor:pointer;">Export Fidelity Report (ScribeHow) ↗</span>
+    </div>
+
+    <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:12px;">
+      <tr style="color:#8b949e; border-bottom:1px solid #30363d; font-size:10px;">
+        <td style="padding:4px 12px 4px 0;">Property</td>
+        <td style="padding:4px 12px 4px 0;">Design spec</td>
+        <td style="padding:4px 12px 4px 0;">Coded</td>
+        <td style="padding:4px 0;">Severity</td>
+      </tr>
+      <tr style="border-bottom:1px solid #21262d;">
+        <td style="padding:7px 12px 7px 0; color:#e6edf3;">Button background</td>
+        <td style="padding:7px 12px 7px 0;"><span style="background:#6d28d9; color:#fff; padding:1px 8px; border-radius:3px; font-size:10px;">#6d28d9</span></td>
+        <td style="padding:7px 12px 7px 0;"><span style="background:#1f6feb; color:#fff; padding:1px 8px; border-radius:3px; font-size:10px;">#1f6feb</span></td>
+        <td style="padding:7px 0; color:#f0883e; font-size:10px;">Visual · Medium</td>
+      </tr>
+      <tr style="border-bottom:1px solid #21262d;">
+        <td style="padding:7px 12px 7px 0; color:#8b949e;">Layout / spacing</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px;">8px grid</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px;">8px grid ✓</td>
+        <td style="padding:7px 0; color:#3fb950; font-size:10px;">✓ Match</td>
+      </tr>
+      <tr>
+        <td style="padding:7px 12px 7px 0; color:#8b949e;">Auto layout structure</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px;">Vertical stack</td>
+        <td style="padding:7px 12px 7px 0; color:#3fb950; font-size:10px;">Vertical stack ✓</td>
+        <td style="padding:7px 0; color:#3fb950; font-size:10px;">✓ Match</td>
+      </tr>
+    </table>
+
+    <!-- Soft block gate — requires one action -->
+    <div style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:12px;">
+      <div style="color:#e6edf3; font-weight:bold; margin-bottom:4px; font-size:11px;">Action required to unblock Ready for QA</div>
+      <div style="color:#8b949e; font-size:10px; margin-bottom:10px;">Choose one path. Both create an audit trail in the Vault spec.</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <div style="background:#1a1500; border:1px solid #f0883e; border-radius:6px; padding:10px; flex:1; min-width:200px;">
+          <div style="color:#f0883e; font-weight:bold; margin-bottom:4px; font-size:11px;">Path A — Fix the code</div>
+          <div style="color:#8b949e; font-size:10px; margin-bottom:8px;">Update button color to match Figma spec (#6d28d9). Re-run Compare UI to clear divergence.</div>
+          <span style="background:#21262d; color:#f0883e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer; display:inline-block;">Mark as fixing →</span>
+        </div>
+        <div style="background:#0d1a1a; border:1px solid #3fb950; border-radius:6px; padding:10px; flex:1; min-width:200px;">
+          <div style="color:#3fb950; font-weight:bold; margin-bottom:4px; font-size:11px;">Path B — Update Vault Spec</div>
+          <div style="color:#8b949e; font-size:10px; margin-bottom:8px;">Accept #1f6feb as the new design decision. PM Agent updates [slug].md Acceptance Criteria and logs rationale.</div>
+          <span style="background:#238636; color:#fff; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer; display:inline-block;">Update Vault Spec →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ScribeHow note -->
+  <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px 14px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+    <div><span style="color:#8b949e;">ScribeHow Fidelity Report</span> — step-by-step visual guide generated from this comparison for the QA team. Includes screenshots, divergence annotations, and test steps.</div>
+    <span style="background:#21262d; color:#58a6ff; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer; white-space:nowrap; margin-left:12px;">Generate Report ↗</span>
+  </div>
+
+</div>

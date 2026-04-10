@@ -1,3 +1,5 @@
+'use client'
+
 import { Typography, Layout } from 'antd'
 import { TriggerQueue } from '@/components/TriggerQueue'
 

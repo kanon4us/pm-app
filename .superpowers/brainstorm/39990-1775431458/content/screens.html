@@ -1,0 +1,137 @@
+<h2>App Screens — Layout Overview</h2>
+<p class="subtitle">4 primary views. Click to select any you want to discuss or revise.</p>
+
+<div class="options" data-multiselect>
+
+  <div class="option" data-choice="queue" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Trigger Queue — Main Dashboard <span style="font-size:11px; color:#3fb950; font-weight:normal;">/ (home)</span></h3>
+      <div style="background:#0d1117; border-radius:6px; padding:12px; margin:8px 0; font-family:monospace; font-size:11px; color:#c9d1d9;">
+        <div style="display:flex; gap:12px; margin-bottom:8px;">
+          <span style="background:#388bfd22; color:#58a6ff; padding:2px 8px; border-radius:4px;">3 Pending</span>
+          <span style="background:#3fb95022; color:#3fb950; padding:2px 8px; border-radius:4px;">1 Running</span>
+          <span style="background:#8b949e22; color:#8b949e; padding:2px 8px; border-radius:4px;">12 Done</span>
+        </div>
+        <div style="border:1px solid #388bfd; border-radius:6px; padding:10px; margin-bottom:6px; background:#0d1117;">
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:#e6edf3; font-weight:bold;">Recycling Engine v2</span>
+            <span style="color:#8b949e;">→ In Progress</span>
+          </div>
+          <div style="color:#8b949e; font-size:10px; margin:4px 0;">Action: Start feature kickoff · FVI: 4.2 · Risk: Standard</div>
+          <div style="color:#8b949e; font-size:10px;">Write-backs: ClickUp · Docs branch · Webflow stub · Figma page</div>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <span style="background:#238636; color:#fff; padding:3px 10px; border-radius:4px; font-size:10px;">✓ Approve</span>
+            <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px;">✕ Dismiss</span>
+            <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px;">Preview prompt</span>
+          </div>
+        </div>
+        <div style="border:1px solid #30363d; border-radius:6px; padding:10px; margin-bottom:6px; background:#0d1117; opacity:0.7;">
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:#e6edf3;">XML Export Polish</span>
+            <span style="color:#8b949e;">→ Deployed</span>
+          </div>
+          <div style="color:#8b949e; font-size:10px; margin-top:4px;">Action: Deploy cleanup · 2 min ago</div>
+        </div>
+        <div style="border:1px solid #30363d; border-radius:6px; padding:10px; background:#0d1117; opacity:0.7;">
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:#e6edf3;">Idea Bank Filters</span>
+            <span style="color:#8b949e;">→ In Progress</span>
+          </div>
+          <div style="color:#8b949e; font-size:10px; margin-top:4px;">Action: Start feature kickoff · 8 min ago</div>
+        </div>
+      </div>
+      <p>Real-time feed of pending triggers. Approve, dismiss, or preview the PM Agent prompt before firing.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="sprint" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Sprint Planner <span style="font-size:11px; color:#3fb950; font-weight:normal;">/sprint</span></h3>
+      <div style="background:#0d1117; border-radius:6px; padding:12px; margin:8px 0; font-family:monospace; font-size:11px; color:#c9d1d9;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span style="color:#e6edf3; font-weight:bold;">Sprint 14 — Active</span>
+          <span style="color:#f0883e;">Cost: 38.4 / 50 budget</span>
+        </div>
+        <div style="background:#21262d; border-radius:4px; height:8px; margin-bottom:12px;">
+          <div style="background:#f0883e; width:76%; height:100%; border-radius:4px;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #21262d;">
+          <span style="color:#c9d1d9;">Recycling Engine v2</span>
+          <span style="color:#58a6ff;">FVI 4.2 · cost 12.0</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #21262d;">
+          <span style="color:#c9d1d9;">XML Export Polish</span>
+          <span style="color:#58a6ff;">FVI 3.8 · cost 8.4</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; opacity:0.5;">
+          <span style="color:#f0883e;">⚠ Idea Bank Filters</span>
+          <span style="color:#f0883e;">FVI 2.1 · cost 18.0 — over budget</span>
+        </div>
+        <div style="color:#8b949e; font-size:10px; margin-top:8px;">PM Agent suggestion: Move "Idea Bank Filters" to Sprint 15. Remaining capacity: 11.6 units.</div>
+      </div>
+      <p>FVI-ranked task list for the active sprint. Shows cost budget usage, flags overage, and surfaces PM Agent suggestions for rebalancing.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="setup" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Setup <span style="font-size:11px; color:#3fb950; font-weight:normal;">/setup</span></h3>
+      <div style="background:#0d1117; border-radius:6px; padding:12px; margin:8px 0; font-family:monospace; font-size:11px; color:#c9d1d9;">
+        <div style="margin-bottom:10px;">
+          <div style="color:#8b949e; font-size:10px; margin-bottom:4px;">CONNECTIONS</div>
+          <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>ClickUp</span><span style="color:#3fb950;">✓ Connected</span></div>
+          <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>GitHub</span><span style="color:#3fb950;">✓ Connected</span></div>
+          <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>Figma</span><span style="color:#f0883e;">Connect →</span></div>
+          <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>Webflow</span><span style="color:#f0883e;">Connect →</span></div>
+        </div>
+        <div>
+          <div style="color:#8b949e; font-size:10px; margin-bottom:4px;">SUBSCRIBED LISTS (4 / 10)</div>
+          <div style="padding:3px 0; color:#c9d1d9;">✓ Viscap Dev — Feature Backlog</div>
+          <div style="padding:3px 0; color:#c9d1d9;">✓ Viscap Dev — In Progress</div>
+          <div style="padding:3px 0; color:#c9d1d9;">✓ Viscap QA</div>
+          <div style="padding:3px 0; color:#c9d1d9;">✓ Viscap — Deployed</div>
+          <div style="padding:3px 0; color:#8b949e;">+ Add list...</div>
+        </div>
+      </div>
+      <p>One-time configuration: connect all four OAuth providers, select up to 10 ClickUp lists to monitor. Revisit anytime to add/remove lists or reconnect a provider.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="config" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Trigger Config <span style="font-size:11px; color:#3fb950; font-weight:normal;">/triggers/config</span></h3>
+      <div style="background:#0d1117; border-radius:6px; padding:12px; margin:8px 0; font-family:monospace; font-size:11px; color:#c9d1d9;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:4px; color:#8b949e; font-size:10px; padding-bottom:4px; border-bottom:1px solid #21262d; margin-bottom:6px;">
+          <span>When status →</span><span>PM Agent action</span><span>Write-backs</span><span></span>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:4px; padding:4px 0; border-bottom:1px solid #21262d;">
+          <span style="color:#e6edf3;">→ In Progress</span>
+          <span style="color:#58a6ff;">Start feature</span>
+          <span style="color:#3fb950;">CU · Docs · WF · Fig</span>
+          <span style="color:#8b949e;">Edit</span>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:4px; padding:4px 0; border-bottom:1px solid #21262d;">
+          <span style="color:#e6edf3;">→ Deployed</span>
+          <span style="color:#58a6ff;">Deploy cleanup</span>
+          <span style="color:#3fb950;">CU · Docs · WF</span>
+          <span style="color:#8b949e;">Edit</span>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:4px; padding:4px 0;">
+          <span style="color:#e6edf3;">→ Archived</span>
+          <span style="color:#58a6ff;">Kill feature</span>
+          <span style="color:#3fb950;">CU · Docs</span>
+          <span style="color:#8b949e;">Edit</span>
+        </div>
+        <div style="margin-top:8px; color:#8b949e; font-size:10px;">+ Add trigger rule</div>
+      </div>
+      <p>Map ClickUp status transitions to PM Agent actions. Configure write-back targets and failure behavior per rule.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Click any screen to flag it for discussion. Or just let me know what looks right or needs changing.</p>

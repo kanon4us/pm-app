@@ -26,14 +26,23 @@ export async function POST(req: NextRequest) {
   const results: Array<{ listId: string; taskCount: number }> = []
 
   for (const listId of listIds) {
-    // Register ClickUp webhook
-    const webhook = await client.createWebhook(teamId, webhookEndpoint, process.env.CLICKUP_WEBHOOK_SECRET!)
+    // Fetch real list name from ClickUp
+    const listDetails = await client.getList(listId)
+
+    // Register ClickUp webhook (best-effort — fails on localhost)
+    let webhookId: string | null = null
+    try {
+      const webhook = await client.createWebhook(teamId, webhookEndpoint, process.env.CLICKUP_WEBHOOK_SECRET!)
+      webhookId = webhook.webhook.id
+    } catch {
+      console.warn(`Webhook registration skipped for list ${listId} (endpoint may not be publicly accessible)`)
+    }
 
     // Upsert list record
     const { data: list } = await supabase
       .from('lists')
       .upsert(
-        { user_id: user.id, clickup_list_id: listId, name: listId, webhook_id: webhook.webhook.id, synced_at: new Date().toISOString() },
+        { user_id: user.id, clickup_list_id: listId, name: listDetails.name, webhook_id: webhookId, synced_at: new Date().toISOString() },
         { onConflict: 'user_id,clickup_list_id' }
       )
       .select('id')

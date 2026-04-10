@@ -1,0 +1,164 @@
+<h2>Data Model — Full Schema</h2>
+<p class="subtitle">9 tables. Scroll down for notes on priority, OAuth tokens, and write-back ordering.</p>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0;">
+
+  <!-- oauth_tokens -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">oauth_tokens</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">One row per user per provider. Replaces token columns on users.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">user_id</td><td style="color:#c9d1d9;">fk → users</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">provider</td><td style="color:#c9d1d9;">enum: clickup|figma|webflow|github</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">access_token</td><td style="color:#c9d1d9;">text (encrypted)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">refresh_token</td><td style="color:#c9d1d9;">text (encrypted)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">token_expires_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">scopes</td><td style="color:#c9d1d9;">text[]</td></tr>
+    </table>
+  </div>
+
+  <!-- users -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">users</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Identity only — tokens live in oauth_tokens.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">email</td><td style="color:#c9d1d9;">text unique</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">clickup_workspace_id</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">created_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+    </table>
+  </div>
+
+  <!-- lists -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">lists</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Up to 10 subscribed ClickUp lists per user.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">user_id</td><td style="color:#c9d1d9;">fk → users</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">clickup_list_id</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">name</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">webhook_id</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">synced_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+    </table>
+  </div>
+
+  <!-- tasks -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">tasks</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Imported task snapshot + FVI fields.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">clickup_task_id</td><td style="color:#c9d1d9;">text unique</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">list_id</td><td style="color:#c9d1d9;">fk → lists</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">name</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">status</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">custom_fields</td><td style="color:#c9d1d9;">jsonb</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">fvi_score</td><td style="color:#c9d1d9;">float</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">cost_effort</td><td style="color:#c9d1d9;">float</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">cost_risk</td><td style="color:#c9d1d9;">float</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">inverted_influence</td><td style="color:#c9d1d9;">float</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">git_branch</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">is_feature_flagged</td><td style="color:#c9d1d9;">boolean default false</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">synced_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+    </table>
+  </div>
+
+  <!-- trigger_configs -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">trigger_configs</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Status transition → PM Agent action mapping.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">list_id</td><td style="color:#c9d1d9;">fk → lists</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">from_status</td><td style="color:#c9d1d9;">text (null = any)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">to_status</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">pm_agent_action</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">write_back_order</td><td style="color:#c9d1d9;">text[] e.g. [clickup, docs, webflow, figma]</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">write_back_config</td><td style="color:#c9d1d9;">jsonb { figma_file_key, webflow_collection_id, ... }</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">on_failure</td><td style="color:#c9d1d9;">enum: continue|stop</td></tr>
+    </table>
+  </div>
+
+  <!-- trigger_queue -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">trigger_queue</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Live queue. Realtime subscription drives the dashboard.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">task_id</td><td style="color:#c9d1d9;">fk → tasks</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">config_id</td><td style="color:#c9d1d9;">fk → trigger_configs</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">status</td><td style="color:#c9d1d9;">enum: pending|approved|dismissed|running|done|failed</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">approved_by</td><td style="color:#c9d1d9;">fk → users</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">agent_output</td><td style="color:#c9d1d9;">jsonb</td></tr>
+      <tr><td style="color:#f0883e; padding: 2px 8px 2px 0;">error_details</td><td style="color:#c9d1d9;">jsonb</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">created_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+    </table>
+  </div>
+
+  <!-- objective_assessments -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">objective_assessments</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">FVI numerator: 7 objective scores per task.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">task_id</td><td style="color:#c9d1d9;">fk → tasks</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">objective_id</td><td style="color:#c9d1d9;">int (1–7)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">score</td><td style="color:#c9d1d9;">int (-5 to +5)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">reasoning</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">assessed_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+    </table>
+  </div>
+
+  <!-- skills_library -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">skills_library</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Maps role influence scores → SKILL.md for User Story drafting.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">role_slug</td><td style="color:#c9d1d9;">text (e.g. creative-strategist)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">skill_path</td><td style="color:#c9d1d9;">text (vault path)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">content_snapshot</td><td style="color:#c9d1d9;">text (cached SKILL.md content)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">updated_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+    </table>
+  </div>
+
+  <!-- repo_registry -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">repo_registry</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Dynamic version of vault's Repo-Registry.md for Cross-Repo Scan.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">repo_name</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">domain</td><td style="color:#c9d1d9;">text[] (auth, billing, etc.)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">readme_url</td><td style="color:#c9d1d9;">text</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">is_active</td><td style="color:#c9d1d9;">boolean default true</td></tr>
+    </table>
+  </div>
+
+  <!-- sync_logs -->
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px;">
+    <div style="color: #58a6ff; font-weight: bold; font-family: monospace; margin-bottom: 8px;">sync_logs</div>
+    <div style="color: #8b949e; font-size: 11px; margin-bottom: 10px;">Tracks last sync per integration — ensures MindStudio reads fresh docs.</div>
+    <table style="width:100%; font-size: 11px; font-family: monospace; border-collapse: collapse;">
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">id</td><td style="color:#c9d1d9;">uuid pk</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">integration</td><td style="color:#c9d1d9;">enum: webflow|figma|github|clickup</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">entity_id</td><td style="color:#c9d1d9;">text (task_id, list_id, etc.)</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">status</td><td style="color:#c9d1d9;">enum: success|failed</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">details</td><td style="color:#c9d1d9;">jsonb</td></tr>
+      <tr><td style="color:#3fb950; padding: 2px 8px 2px 0;">synced_at</td><td style="color:#c9d1d9;">timestamptz</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-top: 8px; font-size: 12px; font-family: monospace; color: #c9d1d9;">
+  <span style="color: #f0883e; font-weight: bold;">RE: Priority question</span><br><br>
+  <code>trigger_configs.write_back_order</code> (text[]) defines execution sequence — e.g. <code>["clickup", "docs", "webflow", "figma"]</code>.<br><br>
+  <code>trigger_configs.on_failure</code> (enum: continue|stop) controls behavior when a target fails:<br>
+  &nbsp;&nbsp;<strong>continue</strong> — log error to <code>trigger_queue.error_details</code>, keep writing to remaining targets<br>
+  &nbsp;&nbsp;<strong>stop</strong> — halt the run, surface in dashboard for developer review<br><br>
+  Default: <strong>continue</strong> — ClickUp comment always lands even if Figma API limit is hit.
+  <span style="color: #8b949e; display: block; margin-top: 8px;">Orange fields = additions from your review. Green = original schema.</span>
+</div>

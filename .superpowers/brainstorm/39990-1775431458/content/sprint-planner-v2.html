@@ -1,0 +1,138 @@
+<h2>Sprint Planner — Updated</h2>
+<p class="subtitle">Reflects live FVI recalculation, Budget Watch alerts, Iron Law status, and Path A/B differentiation</p>
+
+<div style="font-family: monospace; font-size: 12px; color: #c9d1d9;">
+
+  <!-- Sprint header -->
+  <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:16px; margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div>
+        <span style="color:#e6edf3; font-weight:bold; font-size:14px;">Sprint 14</span>
+        <span style="background:#238636; color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; margin-left:8px;">Active</span>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#f0883e; font-weight:bold;">54.4 / 50 units ⚠️ Over budget</div>
+        <div style="color:#8b949e; font-size:10px;">Budget Alert fired 12 min ago — Recycling Engine v2 cost updated during Architecting</div>
+      </div>
+    </div>
+    <!-- Budget bar — over -->
+    <div style="background:#21262d; border-radius:4px; height:10px; margin-bottom:4px; position:relative; overflow:visible;">
+      <div style="background:#f0883e; width:100%; height:100%; border-radius:4px;"></div>
+      <div style="position:absolute; right:-2px; top:-2px; width:4px; height:14px; background:#f85149; border-radius:2px;"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:10px; color:#8b949e;">
+      <span>0</span><span style="color:#3fb950;">50 cap</span><span style="color:#f0883e;">54.4 current</span>
+    </div>
+  </div>
+
+  <!-- PM Agent suggestion banner -->
+  <div style="background:#1a2332; border:1px solid #388bfd; border-radius:6px; padding:12px; margin-bottom:12px; font-size:11px;">
+    <div style="color:#58a6ff; font-weight:bold; margin-bottom:6px;">🤖 PM Agent — Budget Rebalance Suggestion</div>
+    <div style="color:#c9d1d9;">Move <strong>Idea Bank Filters</strong> (cost 18.0) to Sprint 15. Remaining capacity after move: <span style="color:#3fb950;">13.6 units</span>. Alternatively, split Recycling Engine v2 into two sub-tasks to reduce per-sprint cost.</div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <span style="background:#238636; color:#fff; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Approve move to Sprint 15</span>
+      <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Dismiss</span>
+      <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">View in queue</span>
+    </div>
+  </div>
+
+  <!-- Task list header -->
+  <div style="display:grid; grid-template-columns:1fr 80px 80px 80px 120px 80px; gap:8px; color:#8b949e; font-size:10px; padding:6px 0; border-bottom:1px solid #21262d; margin-bottom:4px;">
+    <span>Feature</span><span>FVI</span><span>Cost</span><span>Risk</span><span>Status</span><span>Branch</span>
+  </div>
+
+  <!-- Recycling Engine v2 — over budget, architecting, cost updated -->
+  <div style="display:grid; grid-template-columns:1fr 80px 80px 80px 120px 80px; gap:8px; padding:10px 0; border-bottom:1px solid #21262d; align-items:start; background:#1a1500; border-radius:4px; padding-left:8px; margin:2px 0;">
+    <div>
+      <div style="color:#e6edf3; font-weight:bold;">Recycling Engine v2</div>
+      <div style="font-size:10px; color:#8b949e; margin-top:2px;">Figma sync pending · Engineering plan updated 12 min ago</div>
+    </div>
+    <span style="color:#58a6ff;">4.2</span>
+    <div>
+      <span style="color:#f0883e; text-decoration:line-through; font-size:10px;">12.0</span>
+      <span style="color:#f0883e; font-weight:bold; margin-left:4px;">16.4</span>
+      <div style="color:#f0883e; font-size:9px;">↑ updated</div>
+    </div>
+    <span style="color:#c9d1d9;">1.5x</span>
+    <div>
+      <span style="background:#5a3e00; color:#f0883e; padding:2px 6px; border-radius:3px; font-size:10px;">Architecting</span>
+    </div>
+    <span style="color:#58a6ff; font-size:10px;">feat/rec-v2</span>
+  </div>
+
+  <!-- XML Export — ready for QA, iron law blocked -->
+  <div style="display:grid; grid-template-columns:1fr 80px 80px 80px 120px 80px; gap:8px; padding:10px 0; border-bottom:1px solid #21262d; align-items:start; background:#1a0d0d; border-radius:4px; padding-left:8px; margin:2px 0;">
+    <div>
+      <div style="color:#e6edf3; font-weight:bold;">XML Export Polish</div>
+      <div style="font-size:10px; color:#f85149; margin-top:2px;">⚠️ BLOCKED: Missing Test Coverage — QA cannot start</div>
+    </div>
+    <span style="color:#58a6ff;">3.8</span>
+    <span style="color:#c9d1d9;">8.4</span>
+    <span style="color:#c9d1d9;">1.2x</span>
+    <div>
+      <span style="background:#3a0d0d; color:#f85149; padding:2px 6px; border-radius:3px; font-size:10px;">⚠️ Ready for QA</span>
+    </div>
+    <span style="color:#58a6ff; font-size:10px;">feat/xml-export</span>
+  </div>
+
+  <!-- Idea Bank Filters — flagged for move -->
+  <div style="display:grid; grid-template-columns:1fr 80px 80px 80px 120px 80px; gap:8px; padding:10px 0; border-bottom:1px solid #21262d; align-items:start; opacity:0.6; border-left:2px dashed #388bfd; padding-left:8px; margin:2px 0;">
+    <div>
+      <div style="color:#e6edf3;">Idea Bank Filters</div>
+      <div style="font-size:10px; color:#388bfd; margin-top:2px;">Suggested: move to Sprint 15</div>
+    </div>
+    <span style="color:#58a6ff;">2.1</span>
+    <span style="color:#f0883e;">18.0</span>
+    <span style="color:#c9d1d9;">2.0x</span>
+    <div>
+      <span style="background:#21262d; color:#8b949e; padding:2px 6px; border-radius:3px; font-size:10px;">In Progress</span>
+    </div>
+    <span style="color:#58a6ff; font-size:10px;">feat/idea-bank</span>
+  </div>
+
+  <!-- Copy Generator — shipped (Path A) -->
+  <div style="display:grid; grid-template-columns:1fr 80px 80px 80px 120px 80px; gap:8px; padding:10px 0; border-bottom:1px solid #21262d; align-items:start; opacity:0.45;">
+    <div>
+      <div style="color:#e6edf3;">Copy Generator v2</div>
+      <div style="font-size:10px; color:#3fb950; margin-top:2px;">✓ Path A — Shipped · branch merged</div>
+    </div>
+    <span style="color:#58a6ff;">5.1</span>
+    <span style="color:#c9d1d9;">9.6</span>
+    <span style="color:#c9d1d9;">1.0x</span>
+    <div>
+      <span style="background:#0d2a14; color:#3fb950; padding:2px 6px; border-radius:3px; font-size:10px;">Shipped</span>
+    </div>
+    <span style="color:#8b949e; font-size:10px;">merged</span>
+  </div>
+
+  <!-- Casting Session Bulk — killed (Path B) -->
+  <div style="display:grid; grid-template-columns:1fr 80px 80px 80px 120px 80px; gap:8px; padding:10px 0; align-items:start; opacity:0.35;">
+    <div>
+      <div style="color:#e6edf3; text-decoration:line-through;">Casting Session Bulk Invite</div>
+      <div style="font-size:10px; color:#8b949e; margin-top:2px;">✗ Path B — Killed · FVI 0.3 &lt; 0.5 · reasoning archived</div>
+    </div>
+    <span style="color:#8b949e;">0.3</span>
+    <span style="color:#8b949e;">22.0</span>
+    <span style="color:#8b949e;">2.5x</span>
+    <div>
+      <span style="background:#1a0d0d; color:#8b949e; padding:2px 6px; border-radius:3px; font-size:10px;">Killed</span>
+    </div>
+    <span style="color:#8b949e; font-size:10px;">deleted</span>
+  </div>
+
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:14px; font-size:11px; font-family:monospace;">
+  <div style="background:#1a1500; border:1px solid #f0883e; border-radius:6px; padding:10px;">
+    <div style="color:#f0883e; font-weight:bold; margin-bottom:4px;">FVI Cost Updated</div>
+    <div style="color:#8b949e;">Cost column shows previous → current when a plan changes during Architecting. Row highlights amber until Budget Watch resolves.</div>
+  </div>
+  <div style="background:#1a0d0d; border:1px solid #f85149; border-radius:6px; padding:10px;">
+    <div style="color:#f85149; font-weight:bold; margin-bottom:4px;">⚠️ Iron Law Block</div>
+    <div style="color:#8b949e;">Red row = QA blocked by missing tests. Persists until developer adds test files and re-triggers QA Logic Sync.</div>
+  </div>
+  <div style="background:#161b22; border:1px solid #388bfd; border-radius:6px; padding:10px;">
+    <div style="color:#388bfd; font-weight:bold; margin-bottom:4px;">Path A / Path B</div>
+    <div style="color:#8b949e;">Shipped tasks dim + show "merged". Killed tasks show strikethrough + FVI score that triggered mandatory reasoning.</div>
+  </div>
+</div>

@@ -1,0 +1,46 @@
+<h2>System Architecture</h2>
+<p class="subtitle">How the five layers connect — from ClickUp to PM Agent to write-back</p>
+
+<div style="font-family: monospace; font-size: 13px; line-height: 1.6; background: #0d1117; color: #c9d1d9; border-radius: 8px; padding: 24px; margin: 16px 0;">
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── CLICKUP ─────────────────────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">OAuth 2.0 → user signs in with their ClickUp account</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">REST API → import tasks from up to 10 selected lists</div>
+<div style="padding-left: 16px; margin-bottom: 16px;">Webhooks → ClickUp POSTs status-change events to our endpoint</div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼  webhook POST  /  REST calls</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── NEXT.JS APP (Vercel) ────────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;"><span style="color: #79c0ff;">API Routes</span></div>
+<div style="padding-left: 32px; margin-bottom: 4px;">POST /api/webhooks/clickup   → receives status-change events</div>
+<div style="padding-left: 32px; margin-bottom: 4px;">POST /api/triggers/approve   → developer approves a queued trigger</div>
+<div style="padding-left: 32px; margin-bottom: 4px;">POST /api/triggers/dismiss   → developer dismisses a trigger</div>
+<div style="padding-left: 32px; margin-bottom: 16px;">GET  /api/lists              → fetch available ClickUp lists</div>
+<div style="padding-left: 16px; margin-bottom: 4px;"><span style="color: #79c0ff;">Pages</span></div>
+<div style="padding-left: 32px; margin-bottom: 4px;">/                → Trigger Queue dashboard (main view)</div>
+<div style="padding-left: 32px; margin-bottom: 4px;">/setup           → ClickUp auth + list selection</div>
+<div style="padding-left: 32px; margin-bottom: 16px;">/triggers/config → Configure which status changes fire which PM Agent action</div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼  reads/writes  /  realtime subscription</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── SUPABASE (Postgres + Realtime) ──────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">tables: tasks, trigger_queue, trigger_configs, agent_runs</div>
+<div style="padding-left: 16px; margin-bottom: 16px;">Realtime channel → dashboard sees new triggers instantly (no polling)</div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼  on developer approval</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── CLAUDE API ──────────────────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">Server-side call from Next.js API route</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">System prompt = PM Agent SKILL.md + task context</div>
+<div style="padding-left: 16px; margin-bottom: 16px;">Model: claude-opus-4-6 (per Viscap AI Tools policy)</div>
+
+<div style="color: #f0883e; margin: 8px 0; padding-left: 8px;">▼  result</div>
+
+<div style="color: #58a6ff; font-weight: bold; margin-bottom: 8px;">── CLICKUP WRITE-BACK ──────────────────────────────────────────</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">Post as comment   → always (audit trail)</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">Update description → for kickoff / spec output</div>
+<div style="padding-left: 16px; margin-bottom: 4px;">Update custom fields → for structured PM data (slug, risk level, etc.)</div>
+
+</div>
+
+<p class="subtitle" style="margin-top: 16px;">Does this architecture look right? Any components missing or need rethinking?</p>

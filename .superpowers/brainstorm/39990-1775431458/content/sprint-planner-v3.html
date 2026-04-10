@@ -1,0 +1,231 @@
+<h2>Sprint Planner — v3</h2>
+<p class="subtitle">SDLC progress bar · Doc-Drift protection · Figma fidelity check · Kickoff checklist</p>
+
+<div style="font-family: monospace; font-size: 12px; color: #c9d1d9;">
+
+  <!-- ═══ SPRINT HEADER ═══ -->
+  <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:16px; margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div>
+        <span style="color:#e6edf3; font-weight:bold; font-size:14px;">Sprint 14</span>
+        <span style="background:#238636; color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; margin-left:8px;">Active</span>
+        <span style="color:#8b949e; font-size:10px; margin-left:12px;">5 tasks · Apr 1 – Apr 14</span>
+      </div>
+      <div style="text-align:right; font-size:11px;">
+        <div style="color:#f0883e; font-weight:bold;">54.4 / 50 units ⚠️</div>
+        <div style="color:#8b949e; font-size:10px;">FVI budget</div>
+      </div>
+    </div>
+
+    <!-- SDLC Flow Progress Bar -->
+    <div style="margin-bottom:6px;">
+      <div style="display:flex; justify-content:space-between; font-size:9px; color:#8b949e; margin-bottom:4px;">
+        <span>SDLC FLOW — Sprint Progress: 41%</span>
+        <span style="color:#8b949e;">formula: (Σ stages completed / n×8) × 100</span>
+      </div>
+      <!-- 8-segment bar -->
+      <div style="display:flex; height:14px; border-radius:6px; overflow:hidden; gap:1px;">
+        <div style="flex:1; background:#238636;" title="Ready for Dev — 5/5 tasks"></div>
+        <div style="flex:1; background:#2ea043;" title="In Progress — 4/5 tasks">
+          <div style="background:#21262d; width:20%; height:100%; float:right;"></div>
+        </div>
+        <div style="flex:1; background:#f0883e;" title="Architecting — 3/5 tasks">
+          <div style="background:#21262d; width:40%; height:100%; float:right;"></div>
+        </div>
+        <div style="flex:1; background:#d4622a;" title="Dev Implement — 2/5 tasks">
+          <div style="background:#21262d; width:60%; height:100%; float:right;"></div>
+        </div>
+        <div style="flex:1; background:#388bfd;" title="Code Review — 1/5 tasks">
+          <div style="background:#21262d; width:60%; height:100%; float:right;"></div>
+        </div>
+        <div style="flex:1; background:#1f6feb;" title="Ready for QA — 1/5 tasks">
+          <div style="background:#21262d; width:60%; height:100%; float:right;"></div>
+        </div>
+        <div style="flex:1; background:#8957e5;" title="QA — 0/5 tasks">
+          <div style="background:#21262d; width:100%; height:100%; float:right;"></div>
+        </div>
+        <div style="flex:1; background:#21262d;" title="Deployed — 0/5 tasks"></div>
+      </div>
+      <!-- Legend -->
+      <div style="display:flex; gap:12px; margin-top:5px; font-size:9px; flex-wrap:wrap;">
+        <span><span style="color:#238636;">█</span> Ready for Dev</span>
+        <span><span style="color:#f0883e;">█</span> Architecting</span>
+        <span><span style="color:#d4622a;">█</span> Dev Implement</span>
+        <span><span style="color:#388bfd;">█</span> Code Review</span>
+        <span><span style="color:#1f6feb;">█</span> Ready for QA</span>
+        <span><span style="color:#8957e5;">█</span> QA</span>
+        <span><span style="color:#3fb950;">█</span> Deployed</span>
+        <span style="color:#8b949e;">⚠ Bottleneck visible at Code Review — 2 tasks stalled</span>
+      </div>
+    </div>
+
+    <!-- Budget bar -->
+    <div style="margin-top:10px;">
+      <div style="font-size:9px; color:#8b949e; margin-bottom:3px;">FVI COST BUDGET</div>
+      <div style="background:#21262d; border-radius:4px; height:6px; position:relative; overflow:hidden;">
+        <div style="background:#f0883e; width:100%; height:100%; border-radius:4px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PM AGENT BANNER ═══ -->
+  <div style="background:#1a2332; border:1px solid #388bfd; border-radius:6px; padding:10px 12px; margin-bottom:12px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+    <div><span style="color:#58a6ff; font-weight:bold;">🤖 Budget Alert:</span> <span style="color:#c9d1d9;">Move Idea Bank Filters (18.0) to Sprint 15 → remaining capacity: 13.6 units</span></div>
+    <div style="display:flex; gap:6px;">
+      <span style="background:#238636; color:#fff; padding:2px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Approve</span>
+      <span style="background:#21262d; color:#8b949e; padding:2px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Dismiss</span>
+    </div>
+  </div>
+
+  <!-- ═══ TASK TABLE ═══ -->
+  <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; overflow:hidden;">
+
+    <!-- Column headers -->
+    <div style="display:grid; grid-template-columns:24px 1fr 60px 60px 130px 90px 90px; gap:6px; padding:8px 12px; background:#161b22; font-size:10px; color:#8b949e; border-bottom:1px solid #30363d;">
+      <span title="Sync Pulse">⬤</span>
+      <span>Feature</span>
+      <span>FVI</span>
+      <span>Cost</span>
+      <span>SDLC Status</span>
+      <span>Kickoff ✓</span>
+      <span>Actions</span>
+    </div>
+
+    <!-- ── Recycling Engine v2 — Architecting, budget updated, stale doc ── -->
+    <div style="display:grid; grid-template-columns:24px 1fr 60px 60px 130px 90px 90px; gap:6px; padding:10px 12px; border-bottom:1px solid #21262d; align-items:start; background:#1a1500;">
+      <div title="Doc-Drift: spec not updated since last code commit" style="color:#f0883e; font-size:14px; margin-top:2px; cursor:help;">⬤</div>
+      <div>
+        <div style="color:#e6edf3; font-weight:bold;">Recycling Engine v2</div>
+        <div style="font-size:10px; color:#f0883e; margin-top:2px;">⚠ Doc-Drift: spec stale since last commit</div>
+        <div style="font-size:10px; color:#8b949e; margin-top:1px;">Figma sync pending · Engineering plan updated 12m ago</div>
+      </div>
+      <span style="color:#58a6ff;">4.2</span>
+      <div>
+        <div style="color:#f0883e; text-decoration:line-through; font-size:10px;">12.0</div>
+        <div style="color:#f0883e; font-weight:bold;">16.4 ↑</div>
+      </div>
+      <div>
+        <span style="background:#5a3e00; color:#f0883e; padding:2px 6px; border-radius:3px; font-size:10px; display:inline-block;">Architecting</span>
+        <div style="font-size:9px; color:#8b949e; margin-top:3px;">Stage 3 of 8</div>
+      </div>
+      <div style="font-size:10px;">
+        <div style="color:#3fb950;">✓ Branch</div>
+        <div style="color:#3fb950;">✓ SKILLs</div>
+        <div style="color:#f0883e;">✗ Figma link</div>
+        <div style="color:#f0883e;">✗ Tests</div>
+      </div>
+      <div style="font-size:10px; display:flex; flex-direction:column; gap:4px;">
+        <span style="background:#21262d; color:#58a6ff; padding:2px 6px; border-radius:3px; cursor:pointer; display:inline-block;">Compare UI ⟷</span>
+        <span style="color:#8b949e; cursor:pointer;">View spec</span>
+      </div>
+    </div>
+
+    <!-- ── XML Export — Ready for QA, Iron Law BLOCKED ── -->
+    <div style="display:grid; grid-template-columns:24px 1fr 60px 60px 130px 90px 90px; gap:6px; padding:10px 12px; border-bottom:1px solid #21262d; align-items:start; background:#1a0d0d;">
+      <div title="Spec in sync" style="color:#3fb950; font-size:14px; margin-top:2px; cursor:help;">⬤</div>
+      <div>
+        <div style="color:#e6edf3; font-weight:bold;">XML Export Polish</div>
+        <div style="font-size:10px; color:#f85149; margin-top:2px; font-weight:bold;">⚠️ BLOCKED: Missing Test Coverage</div>
+        <div style="font-size:10px; color:#8b949e; margin-top:1px;">QA cannot start until tests are added</div>
+      </div>
+      <span style="color:#58a6ff;">3.8</span>
+      <span style="color:#c9d1d9;">8.4</span>
+      <div>
+        <span style="background:#3a0d0d; color:#f85149; padding:2px 6px; border-radius:3px; font-size:10px; display:inline-block;">⚠ Ready for QA</span>
+        <div style="font-size:9px; color:#8b949e; margin-top:3px;">Stage 5 of 8</div>
+      </div>
+      <div style="font-size:10px;">
+        <div style="color:#3fb950;">✓ Branch</div>
+        <div style="color:#3fb950;">✓ SKILLs</div>
+        <div style="color:#3fb950;">✓ Figma link</div>
+        <div style="color:#f85149; font-weight:bold;">✗ Tests ← BLOCKED</div>
+      </div>
+      <div style="font-size:10px; display:flex; flex-direction:column; gap:4px;">
+        <span style="background:#21262d; color:#58a6ff; padding:2px 6px; border-radius:3px; cursor:pointer; display:inline-block;">Compare UI ⟷</span>
+        <span style="color:#8b949e; cursor:pointer;">View spec</span>
+      </div>
+    </div>
+
+    <!-- ── Idea Bank — In Progress, flagged for move ── -->
+    <div style="display:grid; grid-template-columns:24px 1fr 60px 60px 130px 90px 90px; gap:6px; padding:10px 12px; border-bottom:1px solid #21262d; align-items:start; opacity:0.65; border-left:2px dashed #388bfd;">
+      <div title="Spec in sync" style="color:#3fb950; font-size:14px; margin-top:2px;">⬤</div>
+      <div>
+        <div style="color:#e6edf3;">Idea Bank Filters</div>
+        <div style="font-size:10px; color:#388bfd; margin-top:2px;">→ Suggested: move to Sprint 15</div>
+      </div>
+      <span style="color:#58a6ff;">2.1</span>
+      <span style="color:#f0883e;">18.0</span>
+      <div>
+        <span style="background:#21262d; color:#c9d1d9; padding:2px 6px; border-radius:3px; font-size:10px; display:inline-block;">In Progress</span>
+        <div style="font-size:9px; color:#8b949e; margin-top:3px;">Stage 2 of 8</div>
+      </div>
+      <div style="font-size:10px; color:#3fb950;">
+        <div>✓ Branch</div><div>✓ SKILLs</div><div>✓ Figma link</div><div>✓ Tests</div>
+      </div>
+      <div style="font-size:10px;">
+        <span style="background:#21262d; color:#58a6ff; padding:2px 6px; border-radius:3px; cursor:pointer; display:inline-block;">Compare UI ⟷</span>
+      </div>
+    </div>
+
+    <!-- ── Copy Generator — Shipped Path A ── -->
+    <div style="display:grid; grid-template-columns:24px 1fr 60px 60px 130px 90px 90px; gap:6px; padding:8px 12px; border-bottom:1px solid #21262d; align-items:center; opacity:0.4;">
+      <div style="color:#3fb950; font-size:14px;">⬤</div>
+      <div><div style="color:#e6edf3;">Copy Generator v2</div><div style="font-size:10px; color:#3fb950;">✓ Path A — Shipped · branch merged</div></div>
+      <span style="color:#8b949e;">5.1</span><span style="color:#8b949e;">9.6</span>
+      <span style="background:#0d2a14; color:#3fb950; padding:2px 6px; border-radius:3px; font-size:10px; display:inline-block;">Deployed</span>
+      <span style="color:#3fb950; font-size:10px;">All ✓</span>
+      <span style="color:#8b949e; font-size:10px;">—</span>
+    </div>
+
+    <!-- ── Casting Session Bulk — Killed Path B ── -->
+    <div style="display:grid; grid-template-columns:24px 1fr 60px 60px 130px 90px 90px; gap:6px; padding:8px 12px; align-items:center; opacity:0.3;">
+      <div style="color:#8b949e; font-size:14px;">⬤</div>
+      <div><div style="color:#8b949e; text-decoration:line-through;">Casting Session Bulk Invite</div><div style="font-size:10px; color:#8b949e;">✗ Path B — Killed · FVI 0.3 · reasoning archived</div></div>
+      <span style="color:#8b949e;">0.3</span><span style="color:#8b949e;">22.0</span>
+      <span style="background:#1a0d0d; color:#8b949e; padding:2px 6px; border-radius:3px; font-size:10px; display:inline-block;">Killed</span>
+      <span style="color:#8b949e; font-size:10px;">—</span>
+      <span style="color:#8b949e; font-size:10px;">—</span>
+    </div>
+
+  </div>
+
+  <!-- ═══ AUTOMATED ASSET DELIVERY TABLE ═══ -->
+  <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:14px; margin-top:12px;">
+    <div style="color:#8b949e; font-size:10px; font-weight:bold; margin-bottom:10px; letter-spacing:0.05em;">AUTOMATED ASSET DELIVERY BY STATUS</div>
+    <table style="width:100%; border-collapse:collapse; font-size:11px;">
+      <tr style="color:#8b949e; border-bottom:1px solid #21262d;">
+        <td style="padding:4px 12px 4px 0; font-size:10px;">Status</td>
+        <td style="padding:4px 0; font-size:10px;">PM Agent delivers automatically</td>
+      </tr>
+      <tr style="border-bottom:1px solid #21262d;">
+        <td style="padding:7px 12px 7px 0;"><span style="color:#f0883e;">Architecting</span></td>
+        <td style="padding:7px 0; color:#c9d1d9;">Syncs updated Engineering Plan → Vault spec · Re-calculates FVI + sprint cost · Pulls Figma component updates into Acceptance Criteria · Budget Alert if > 50 units</td>
+      </tr>
+      <tr style="border-bottom:1px solid #21262d;">
+        <td style="padding:7px 12px 7px 0;"><span style="color:#1f6feb;">Ready for QA</span></td>
+        <td style="padding:7px 0; color:#c9d1d9;">Iron Law Gate (blocks if tests missing) · Compares implementation to User Stories · Generates Divergence Report · Posts QA Checklist + ScribeHow steps as ClickUp comment</td>
+      </tr>
+      <tr>
+        <td style="padding:7px 12px 7px 0;"><span style="color:#3fb950;">Deployed</span></td>
+        <td style="padding:7px 0; color:#c9d1d9;">Merges Vault branch · Archives spec (status: shipped) · Strips CLAUDE.md · Publishes Webflow post · Updates "Coming Soon" stub to live · Pushes Master Design to Figma</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══ LEGEND ═══ -->
+  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; font-size:10px;">
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px;">
+      <div style="font-weight:bold; margin-bottom:4px;"><span style="color:#3fb950;">⬤</span> <span style="color:#f0883e;">⬤</span> Sync Pulse</div>
+      <div style="color:#8b949e;"><span style="color:#3fb950;">Green</span> = spec updated in same commit as code. <span style="color:#f0883e;">Orange</span> = Doc-Drift detected — spec not updated since last push. Blocks Code Review transition.</div>
+    </div>
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px;">
+      <div style="font-weight:bold; margin-bottom:4px; color:#58a6ff;">Compare UI ⟷</div>
+      <div style="color:#8b949e;">Runs local branch via localhost, captures current UI, sends to Figma Review Frame. Requires local dev server running. Phase 2 feature.</div>
+    </div>
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px;">
+      <div style="font-weight:bold; margin-bottom:4px; color:#e6edf3;">Kickoff ✓ Checklist</div>
+      <div style="color:#8b949e;">4 gates verified before Architecting: Vault branch · SKILLs in CLAUDE.md · Figma selection link · Baseline tests. Task cannot enter Architecting until all 4 are green.</div>
+    </div>
+  </div>
+
+</div>

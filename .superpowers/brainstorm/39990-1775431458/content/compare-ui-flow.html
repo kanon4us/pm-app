@@ -1,0 +1,144 @@
+<h2>Compare UI ⟷ — What Happens</h2>
+<p class="subtitle">Four-step flow from button click to Figma side-by-side comparison</p>
+
+<div style="font-family: monospace; font-size: 12px; color: #c9d1d9;">
+
+  <!-- Step flow connector -->
+  <div style="display:grid; grid-template-columns:1fr 24px 1fr 24px 1fr 24px 1fr; gap:0; align-items:start; margin-bottom:20px;">
+
+    <!-- Step 1 -->
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px;">
+      <div style="color:#8b949e; font-size:10px; margin-bottom:6px;">STEP 1 — CLICK</div>
+      <div style="color:#58a6ff; font-weight:bold; margin-bottom:8px;">Check local server</div>
+      <div style="background:#0d1117; border-radius:6px; padding:10px; font-size:11px;">
+        <div style="color:#8b949e; margin-bottom:6px;">Modal appears:</div>
+        <div style="border:1px solid #30363d; border-radius:6px; padding:10px; background:#0d1117;">
+          <div style="color:#e6edf3; font-weight:bold; margin-bottom:6px; font-size:12px;">Compare UI — Recycling Engine v2</div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <div style="width:8px; height:8px; border-radius:50%; background:#f0883e; animation:pulse 1s infinite;"></div>
+            <span style="color:#c9d1d9; font-size:11px;">Checking localhost:3000...</span>
+          </div>
+          <div style="background:#21262d; border-radius:4px; padding:8px; font-size:10px; color:#8b949e;">
+            <div>Dev server not detected.</div>
+            <div style="margin-top:4px; color:#f0883e;">Run <code style="color:#79c0ff;">npm run dev</code> and retry.</div>
+          </div>
+          <div style="margin-top:8px; display:flex; gap:6px;">
+            <span style="background:#21262d; color:#58a6ff; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Retry</span>
+            <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Cancel</span>
+          </div>
+        </div>
+        <div style="margin-top:8px; color:#8b949e; font-size:10px;">If server found → proceeds to Step 2.</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:center; font-size:18px; color:#388bfd; padding-top:40px;">→</div>
+
+    <!-- Step 2 -->
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px;">
+      <div style="color:#8b949e; font-size:10px; margin-bottom:6px;">STEP 2 — CAPTURE</div>
+      <div style="color:#58a6ff; font-weight:bold; margin-bottom:8px;">PM Agent captures UI</div>
+      <div style="background:#0d1117; border-radius:6px; padding:10px; font-size:11px;">
+        <div style="color:#8b949e; margin-bottom:6px;">Modal updates:</div>
+        <div style="border:1px solid #388bfd; border-radius:6px; padding:10px; background:#0d1f3c;">
+          <div style="color:#e6edf3; font-weight:bold; margin-bottom:8px; font-size:12px;">Capturing UI...</div>
+          <div style="font-size:10px; color:#8b949e; line-height:1.8;">
+            <div style="color:#3fb950;">✓ Connected to localhost:3000</div>
+            <div style="color:#3fb950;">✓ Navigated to /features/recycling-engine</div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:6px; height:6px; border-radius:50%; background:#58a6ff;"></div>
+              <span style="color:#58a6ff;">Extracting component tree + layout...</span>
+            </div>
+            <div style="color:#8b949e; margin-top:2px;">Building Figma-compatible frames with auto layout</div>
+          </div>
+        </div>
+        <div style="margin-top:8px; color:#8b949e; font-size:10px;">Not a screenshot — PM Agent builds real Figma layers from the DOM structure.</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:center; font-size:18px; color:#388bfd; padding-top:40px;">→</div>
+
+    <!-- Step 3 -->
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px;">
+      <div style="color:#8b949e; font-size:10px; margin-bottom:6px;">STEP 3 — SEND</div>
+      <div style="color:#58a6ff; font-weight:bold; margin-bottom:8px;">Push to Figma Review Frame</div>
+      <div style="background:#0d1117; border-radius:6px; padding:10px; font-size:11px;">
+        <div style="color:#8b949e; margin-bottom:6px;">Figma MCP call:</div>
+        <div style="background:#0d1117; border:1px solid #30363d; border-radius:4px; padding:8px; font-size:10px; color:#79c0ff;">
+          figma.push_frames(<br>
+          &nbsp;&nbsp;source: "localhost:3000/...",<br>
+          &nbsp;&nbsp;target_file: "Viscap UI",<br>
+          &nbsp;&nbsp;target_page: "🔍 Review",<br>
+          &nbsp;&nbsp;label: "rec-engine-v2 · coded"<br>
+          )
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:#8b949e;">Places frame <strong>next to</strong> the designer's existing mockup on the Review page. Does not overwrite anything.</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:center; font-size:18px; color:#388bfd; padding-top:40px;">→</div>
+
+    <!-- Step 4 -->
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px;">
+      <div style="color:#8b949e; font-size:10px; margin-bottom:6px;">STEP 4 — RESULT</div>
+      <div style="color:#3fb950; font-weight:bold; margin-bottom:8px;">Open in Figma</div>
+      <div style="background:#0d1117; border-radius:6px; padding:10px; font-size:11px;">
+        <div style="border:1px solid #3fb950; border-radius:6px; padding:10px; background:#0d2a14;">
+          <div style="color:#3fb950; font-weight:bold; margin-bottom:8px; font-size:12px;">✓ Sent to Figma</div>
+          <div style="font-size:10px; color:#c9d1d9; line-height:1.8;">
+            <div>Page: <span style="color:#79c0ff;">🔍 Review</span></div>
+            <div>Frame: <span style="color:#79c0ff;">rec-engine-v2 · coded</span></div>
+            <div>Placed next to: <span style="color:#79c0ff;">rec-engine-v2 · design</span></div>
+          </div>
+          <div style="margin-top:8px; display:flex; gap:6px;">
+            <span style="background:#238636; color:#fff; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Open in Figma ↗</span>
+            <span style="background:#21262d; color:#8b949e; padding:3px 10px; border-radius:4px; font-size:10px; cursor:pointer;">Close</span>
+          </div>
+        </div>
+        <div style="margin-top:8px; color:#8b949e; font-size:10px;">Figma opens directly to the Review page. Designer mockup and coded version are side by side.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- What it looks like in Figma -->
+  <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:16px;">
+    <div style="color:#8b949e; font-size:10px; font-weight:bold; margin-bottom:12px; letter-spacing:0.05em;">WHAT THE "🔍 REVIEW" PAGE LOOKS LIKE IN FIGMA</div>
+    <div class="split">
+      <div class="mockup">
+        <div class="mockup-header" style="background:#8957e5; color:#fff;">rec-engine-v2 · design <span style="opacity:0.7; font-size:10px;">← designer's mockup</span></div>
+        <div class="mockup-body" style="background:#1a1030; padding:16px;">
+          <div style="background:#2d1f5e; border-radius:6px; padding:10px; margin-bottom:8px; font-size:11px; color:#c9d1d9;">
+            <div style="color:#8b949e; font-size:9px; margin-bottom:4px;">RECYCLING ENGINE</div>
+            <div style="background:#3d2d7a; height:32px; border-radius:4px; margin-bottom:6px; display:flex; align-items:center; padding:0 10px; color:#a78bfa; font-size:11px;">Select asset type ▾</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <div style="background:#3d2d7a; height:60px; border-radius:4px;"></div>
+              <div style="background:#3d2d7a; height:60px; border-radius:4px;"></div>
+            </div>
+            <div style="background:#6d28d9; height:28px; border-radius:4px; margin-top:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px;">Recycle Selected</div>
+          </div>
+          <div style="font-size:9px; color:#8957e5; text-align:center;">Auto layout · 8px grid · Inter font</div>
+        </div>
+      </div>
+      <div class="mockup">
+        <div class="mockup-header" style="background:#388bfd; color:#fff;">rec-engine-v2 · coded <span style="opacity:0.7; font-size:10px;">← pushed from localhost</span></div>
+        <div class="mockup-body" style="background:#0d1f3c; padding:16px;">
+          <div style="background:#1a2f5a; border-radius:6px; padding:10px; margin-bottom:8px; font-size:11px; color:#c9d1d9;">
+            <div style="color:#8b949e; font-size:9px; margin-bottom:4px;">RECYCLING ENGINE</div>
+            <div style="background:#21386b; height:32px; border-radius:4px; margin-bottom:6px; display:flex; align-items:center; padding:0 10px; color:#58a6ff; font-size:11px;">Select asset type ▾</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <div style="background:#21386b; height:60px; border-radius:4px;"></div>
+              <div style="background:#21386b; height:60px; border-radius:4px;"></div>
+            </div>
+            <div style="background:#1f6feb; height:28px; border-radius:4px; margin-top:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px;">Recycle Selected</div>
+          </div>
+          <div style="font-size:9px; color:#388bfd; text-align:center;">⚠ Button color drift detected · spacing matches</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:10px; background:#2d1b00; border:1px solid #f0883e; border-radius:6px; padding:10px; font-size:11px;">
+      <span style="color:#f0883e; font-weight:bold;">PM Agent auto-annotates discrepancies:</span>
+      <span style="color:#c9d1d9; margin-left:8px;">Button background #6d28d9 (design) vs #1f6feb (coded) — 1 divergence found. Spacing and layout: ✓ match.</span>
+    </div>
+  </div>
+
+</div>
