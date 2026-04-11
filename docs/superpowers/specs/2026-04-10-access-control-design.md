@@ -26,7 +26,7 @@ The following routes bypass the auth check entirely:
 | `/api/clickup/callback` | Completes ClickUp OAuth and sets the session cookie |
 | `/api/github/connect` | Initiates GitHub OAuth |
 | `/api/github/callback` | Completes GitHub OAuth |
-| `/api/webhooks/clickup` | Receives ClickUp webhook events — called by ClickUp servers, uses HMAC secret auth |
+| `/api/webhooks/clickup` | Receives ClickUp webhook events — called by ClickUp servers, uses HMAC secret auth (already verified inside the route via `verifyClickUpSignature()`) |
 
 ## Session Check
 
@@ -37,32 +37,56 @@ Uses `decode()` from `@auth/core/jwt` to cryptographically verify the NextAuth s
 
 The `salt` matches what the ClickUp callback sets, so existing sessions remain valid across the change.
 
+**Token expiration:** `decode()` returns null for expired tokens. Expired sessions redirect to `/setup` for re-login. No silent refresh — ClickUp's OAuth flow does not issue refresh tokens.
+
 ## Response Behavior
 
 | Request type | Unauthenticated response |
 |---|---|
-| Page request (non-`/api/`) | `302` redirect to `/setup` |
+| Page request (non-`/api/`) | `302` redirect to `/setup?callbackUrl=<encoded-path>` |
 | API request (`/api/…`) | `401 JSON { error: 'Unauthorized' }` |
+
+## callbackUrl Deep Linking
+
+When redirecting a page request to `/setup`, the proxy appends the original path as `?callbackUrl=<encoded-path>`. The ClickUp callback route reads this value (passed through as a cookie set before the OAuth redirect) and redirects the user there after a successful login instead of always landing on `/`.
+
+Flow:
+1. Unauthenticated user visits `/sprint`
+2. Proxy redirects to `/setup?callbackUrl=%2Fsprint`, also sets a `callbackUrl` cookie
+3. User completes ClickUp OAuth
+4. Callback route reads `callbackUrl` cookie → redirects to `/sprint`
 
 ## Execution Order in proxy.ts
 
 1. Public allowlist check → `next()` if matched
 2. ClickUp OAuth redirect (`/?code=…`) → forward to `/api/clickup/callback`
-3. Session decode → redirect or 401 if invalid
+3. Session decode → redirect (with callbackUrl) or 401 if invalid
 4. `next()` — authenticated, proceed
 
 ## Matcher
 
 ```ts
 export const config = {
-  matcher: '/((?!_next/static|_next/image|favicon.ico).*)',
+  matcher: '/((?!_next/static|_next/image|favicon.ico|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.ico$).*)',
 }
 ```
 
-Expanded from `'/'` to cover all routes. Static assets are excluded to avoid unnecessary overhead.
+Expanded from `'/'` to cover all routes. Static assets (Next.js internals and public folder files like SVGs) are excluded to avoid unnecessary overhead and incorrect auth redirects.
+
+## Future: Service Account / Agent Auth
+
+When AI agents or service accounts need to call Viscap PM APIs, add a header-based check in the proxy before the session cookie check:
+
+```ts
+// TODO: add header-based auth for service accounts
+// const apiKey = request.headers.get('Authorization')
+// if (apiKey && isValidApiKey(apiKey)) return NextResponse.next()
+```
+
+This is out of scope for the current implementation.
 
 ## No Changes Required
 
 - `lib/auth.ts` — unchanged
 - Individual pages — no per-page auth checks needed
-- ClickUp OAuth callback — continues to create session cookies as before
+- Webhook route — HMAC verification already in place inside the route
