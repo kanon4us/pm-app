@@ -48,45 +48,78 @@ The `salt` matches what the ClickUp callback sets, so existing sessions remain v
 
 ## callbackUrl Deep Linking
 
-When redirecting a page request to `/setup`, the proxy appends the original path as `?callbackUrl=<encoded-path>`. The ClickUp callback route reads this value (passed through as a cookie set before the OAuth redirect) and redirects the user there after a successful login instead of always landing on `/`.
+When redirecting a page request to `/setup`, the proxy appends the original path as `?callbackUrl=<encoded-path>`. The ClickUp callback route reads a `callbackUrl` cookie (set before the OAuth redirect) and redirects the user there after successful login.
+
+**Open redirect protection:** The callbackUrl is validated before use — it must start with `/` and must not start with `//` or contain `://`. Any invalid value falls back to `/`. This prevents an attacker from crafting a link like `?callbackUrl=https://malicious-site.com`.
+
+```ts
+function isSafeRedirect(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//') && !url.includes('://')
+}
+```
 
 Flow:
 1. Unauthenticated user visits `/sprint`
-2. Proxy redirects to `/setup?callbackUrl=%2Fsprint`, also sets a `callbackUrl` cookie
+2. Proxy redirects to `/setup?callbackUrl=%2Fsprint`, also sets a short-lived `callbackUrl` cookie
 3. User completes ClickUp OAuth
-4. Callback route reads `callbackUrl` cookie → redirects to `/sprint`
+4. Callback route reads `callbackUrl` cookie → validates it → redirects to `/sprint`
+
+## Frontend 401 Handling
+
+No fetch wrapper currently exists — all client-side fetches are raw `fetch()` calls (e.g., in `app/sprint/page.tsx`). Without handling, a 401 from an expired session will cause silent data fetch failures and infinite loading states.
+
+A thin `lib/fetch.ts` wrapper will be added that checks the response status and performs a hard redirect to `/setup` on 401:
+
+```ts
+export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init)
+  if (res.status === 401) {
+    window.location.href = '/setup'
+    return res // unreachable but satisfies types
+  }
+  return res
+}
+```
+
+All client-side `fetch()` calls in page components are updated to use `apiFetch()`.
 
 ## Execution Order in proxy.ts
 
 1. Public allowlist check → `next()` if matched
 2. ClickUp OAuth redirect (`/?code=…`) → forward to `/api/clickup/callback`
-3. Session decode → redirect (with callbackUrl) or 401 if invalid
+3. Session decode → redirect (with validated callbackUrl) or 401 if invalid
 4. `next()` — authenticated, proceed
 
 ## Matcher
 
 ```ts
 export const config = {
-  matcher: '/((?!_next/static|_next/image|favicon.ico|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.ico$).*)',
+  matcher: ['/((?!_next/static|_next/image|_next/data|favicon.ico|.*\\.svg$|.*\\.png$|.*\\.ico$).*)'],
 }
 ```
 
-Expanded from `'/'` to cover all routes. Static assets (Next.js internals and public folder files like SVGs) are excluded to avoid unnecessary overhead and incorrect auth redirects.
+Excludes Next.js internals and common static file extensions from the public folder. Extension-based exclusions are kept minimal — only types that actually exist in `public/` (`.svg`, `.png`, `.ico`). New static asset types should be added here when introduced.
 
 ## Future: Service Account / Agent Auth
 
-When AI agents or service accounts need to call Viscap PM APIs, add a header-based check in the proxy before the session cookie check:
+When AI agents or service accounts need to call Viscap PM APIs, add a `Authorization: Bearer <token>` header check in the proxy before the session cookie check:
 
 ```ts
-// TODO: add header-based auth for service accounts
-// const apiKey = request.headers.get('Authorization')
-// if (apiKey && isValidApiKey(apiKey)) return NextResponse.next()
+// TODO: service account / AI agent auth
+// const authHeader = request.headers.get('Authorization')
+// if (authHeader?.startsWith('Bearer ')) {
+//   const token = authHeader.slice(7)
+//   if (await isValidServiceToken(token)) return NextResponse.next()
+// }
 ```
 
-This is out of scope for the current implementation.
+Standard JWT Bearer tokens are the target format. This is out of scope for the current implementation.
 
-## No Changes Required
+## Files Changed
 
-- `lib/auth.ts` — unchanged
-- Individual pages — no per-page auth checks needed
-- Webhook route — HMAC verification already in place inside the route
+| File | Change |
+|---|---|
+| `proxy.ts` | Add auth gate, expand matcher, validate callbackUrl |
+| `app/api/clickup/callback/route.ts` | Read `callbackUrl` cookie, validate, redirect after login |
+| `lib/fetch.ts` | New: thin fetch wrapper with 401 → `/setup` redirect |
+| `app/sprint/page.tsx` | Swap `fetch()` → `apiFetch()` |
