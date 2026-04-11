@@ -26,9 +26,9 @@ export interface Database {
         Relationships: []
       }
       lists: {
-        Row: { id: string; user_id: string; clickup_list_id: string; name: string; webhook_id: string | null; synced_at: string | null; created_at: string }
-        Insert: { id?: string; user_id: string; clickup_list_id: string; name: string; webhook_id?: string | null }
-        Update: { name?: string; webhook_id?: string | null; synced_at?: string | null }
+        Row: { id: string; user_id: string; clickup_list_id: string; name: string; webhook_id: string | null; synced_at: string | null; created_at: string; repo_registry_id: string | null }
+        Insert: { id?: string; user_id: string; clickup_list_id: string; name: string; webhook_id?: string | null; repo_registry_id?: string | null }
+        Update: { name?: string; webhook_id?: string | null; synced_at?: string | null; repo_registry_id?: string | null }
         Relationships: []
       }
       tasks: {
@@ -37,9 +37,10 @@ export interface Database {
           name: string; status: string; custom_fields: Json; fvi_score: number | null
           cost_effort: number | null; cost_risk: number | null; inverted_influence: number | null
           git_branch: string | null; is_feature_flagged: boolean; synced_at: string | null; created_at: string
+          kickoff_gate_overrides: Json | null
         }
-        Insert: { id?: string; clickup_task_id: string; list_id: string; name: string; status?: string; custom_fields?: Json }
-        Update: { status?: string; custom_fields?: Json; fvi_score?: number | null; cost_effort?: number | null; cost_risk?: number | null; inverted_influence?: number | null; git_branch?: string | null; is_feature_flagged?: boolean; sprint_id?: string | null; synced_at?: string | null }
+        Insert: { id?: string; clickup_task_id: string; list_id: string; name: string; status?: string; custom_fields?: Json; kickoff_gate_overrides?: Json | null }
+        Update: { status?: string; custom_fields?: Json; fvi_score?: number | null; cost_effort?: number | null; cost_risk?: number | null; inverted_influence?: number | null; git_branch?: string | null; is_feature_flagged?: boolean; sprint_id?: string | null; synced_at?: string | null; kickoff_gate_overrides?: Json | null }
         Relationships: []
       }
       sprints: {
@@ -73,9 +74,9 @@ export interface Database {
         Relationships: []
       }
       repo_registry: {
-        Row: { id: string; repo_name: string; domain: string[]; readme_url: string | null; is_active: boolean; created_at: string }
-        Insert: { id?: string; repo_name: string; domain?: string[]; readme_url?: string | null }
-        Update: { domain?: string[]; readme_url?: string | null; is_active?: boolean }
+        Row: { id: string; repo_name: string; github_repo_full_name: string | null; domain: string[]; readme_url: string | null; is_active: boolean; created_at: string }
+        Insert: { id?: string; repo_name: string; github_repo_full_name?: string | null; domain?: string[]; readme_url?: string | null }
+        Update: { github_repo_full_name?: string | null; domain?: string[]; readme_url?: string | null; is_active?: boolean }
         Relationships: []
       }
       sync_logs: {

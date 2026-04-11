@@ -32,9 +32,10 @@ export interface VaultSearchResult {
   score: number
 }
 
-/** Read a single file from the vault by path */
-export async function readVaultFile(token: string, path: string): Promise<VaultFile | null> {
-  const res = await fetch(`${GITHUB_API}/repos/${VAULT_REPO}/contents/${encodeURIComponent(path)}`, {
+/** Read a single file from the vault by path, optionally from a specific branch */
+export async function readVaultFile(token: string, path: string, branch?: string): Promise<VaultFile | null> {
+  const url = `${GITHUB_API}/repos/${VAULT_REPO}/contents/${encodeURIComponent(path)}${branch ? `?ref=${encodeURIComponent(branch)}` : ''}`
+  const res = await fetch(url, {
     headers: headers(token),
   })
   if (!res.ok) return null
@@ -124,9 +125,9 @@ export async function writeVaultFile(
   commitMessage: string,
   branch = 'main'
 ): Promise<{ sha: string; url: string } | null> {
-  // Check if file exists to get SHA
+  // Check if file exists on the target branch to get its SHA
   let existingSha: string | undefined
-  const existing = await readVaultFile(token, path)
+  const existing = await readVaultFile(token, path, branch)
   if (existing) existingSha = existing.sha
 
   const body: Record<string, string> = {
@@ -144,6 +145,55 @@ export async function writeVaultFile(
   if (!res.ok) return null
   const data = await res.json()
   return { sha: data.content?.sha ?? '', url: data.content?.html_url ?? '' }
+}
+
+// ── Branches ──────────────────────────────────────────────────────────────────
+
+/** Return the HEAD commit SHA of a branch, or null if the branch does not exist */
+export async function getBranchSha(token: string, branch: string): Promise<string | null> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${VAULT_REPO}/git/ref/heads/${encodeURIComponent(branch)}`,
+    { headers: headers(token) }
+  )
+  if (!res.ok) return null
+  const data = await res.json()
+  return data.object?.sha ?? null
+}
+
+/**
+ * Create a new branch in the vault repo.
+ * Returns true on success or if the branch already exists (idempotent).
+ */
+export async function createBranch(
+  token: string,
+  branch: string,
+  baseBranch = 'main'
+): Promise<boolean> {
+  const sha = await getBranchSha(token, baseBranch)
+  if (!sha) return false
+
+  const res = await fetch(`${GITHUB_API}/repos/${VAULT_REPO}/git/refs`, {
+    method: 'POST',
+    headers: headers(token),
+    body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
+  })
+
+  // 422 = ref already exists — treat as success
+  return res.ok || res.status === 422
+}
+
+/**
+ * Ensure the vault feature branch for a task exists, creating it from main if needed.
+ * Returns the branch name so callers can pass it straight to writeVaultFile.
+ */
+export async function createVaultBranch(
+  token: string,
+  clickupTaskId: string,
+  taskName: string
+): Promise<string> {
+  const branch = vaultBranchName(clickupTaskId, taskName)
+  await createBranch(token, branch)
+  return branch
 }
 
 /** Extract search keywords from a task name (strips common stop words) */
