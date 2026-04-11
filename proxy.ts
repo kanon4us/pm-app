@@ -19,7 +19,7 @@ export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
   // 1. Public paths — no auth required
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
     return NextResponse.next()
   }
 
@@ -33,11 +33,16 @@ export async function proxy(request: NextRequest) {
   // 3. Session check
   const isSecure = request.url.startsWith('https://')
   const cookieName = isSecure ? '__Secure-authjs.session-token' : 'authjs.session-token'
-  const token = await decode({
-    token: request.cookies.get(cookieName)?.value,
-    secret: process.env.NEXTAUTH_SECRET!,
-    salt: cookieName,
-  })
+  let token = null
+  try {
+    token = await decode({
+      token: request.cookies.get(cookieName)?.value,
+      secret: process.env.NEXTAUTH_SECRET!,
+      salt: cookieName,
+    })
+  } catch {
+    token = null
+  }
 
   if (!token) {
     // API requests get 401 JSON
@@ -55,21 +60,16 @@ export async function proxy(request: NextRequest) {
         sameSite: 'lax',
         path: '/',
         maxAge: 10 * 60, // 10 minutes
+        secure: isSecure,
       })
     }
     return response
   }
 
   // 4. Authenticated — proceed
-  // TODO: service account / AI agent auth
-  // const authHeader = request.headers.get('Authorization')
-  // if (authHeader?.startsWith('Bearer ')) {
-  //   const apiToken = authHeader.slice(7)
-  //   if (await isValidServiceToken(apiToken)) return NextResponse.next()
-  // }
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|_next/data|favicon.ico|.*\\.svg$|.*\\.png$|.*\\.ico$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.svg$|.*\\.png$|.*\\.ico$).*)'],
 }

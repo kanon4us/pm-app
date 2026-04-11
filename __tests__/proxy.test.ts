@@ -64,6 +64,19 @@ describe('proxy — ClickUp OAuth redirect', () => {
 describe('proxy — unauthenticated requests', () => {
   beforeEach(() => mockDecode.mockResolvedValue(null))
 
+  it('redirects to /setup when decode throws', async () => {
+    mockDecode.mockRejectedValue(new Error('decryption failed'))
+    const res = await proxy(makeRequest('http://localhost/sprint'))
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toContain('/setup')
+  })
+
+  it('returns 401 when decode throws on API request', async () => {
+    mockDecode.mockRejectedValue(new Error('decryption failed'))
+    const res = await proxy(makeRequest('http://localhost/api/sprint'))
+    expect(res.status).toBe(401)
+  })
+
   it('redirects unauthenticated page request to /setup', async () => {
     const res = await proxy(makeRequest('http://localhost/sprint'))
     expect(res.status).toBe(307)
