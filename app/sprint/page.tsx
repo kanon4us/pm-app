@@ -7,6 +7,7 @@ import {
 } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 import { SearchOutlined, SettingOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { apiFetch } from '@/lib/fetch'
 
 // ── Assessment types ──────────────────────────────────────────────────────────
 
@@ -219,8 +220,8 @@ export default function SprintPage() {
 
   async function load() {
     const [tasksRes, sprintsRes] = await Promise.all([
-      fetch('/api/sprint/tasks').then((r) => r.json()),
-      fetch('/api/sprint').then((r) => r.json()),
+      apiFetch('/api/sprint/tasks').then((r) => r.json()),
+      apiFetch('/api/sprint').then((r) => r.json()),
     ])
     setTasks(tasksRes.tasks ?? [])
     setSprints(sprintsRes.sprints ?? [])
@@ -236,7 +237,7 @@ export default function SprintPage() {
     setDescription('')
     setDescLoading(true)
     try {
-      const res = await fetch(`/api/sprint/tasks/${task.id}`)
+      const res = await apiFetch(`/api/sprint/tasks/${task.id}`)
       const data = await res.json()
       setDescription(data.description ?? '')
       // Use fresh ClickUp fields — includes fields that were empty at import time
@@ -262,7 +263,7 @@ export default function SprintPage() {
     for (const [name, cfg] of Object.entries(fieldConfig)) {
       if (cfg.dbField) mappings[name] = cfg.dbField
     }
-    await fetch(`/api/sprint/tasks/${detailTask.id}`, {
+    await apiFetch(`/api/sprint/tasks/${detailTask.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customFields: editedFields, mappings }),
@@ -294,7 +295,7 @@ export default function SprintPage() {
     for (const [name, cfg] of Object.entries(fieldConfig)) {
       if (cfg.dbField) mappings[name] = cfg.dbField
     }
-    const res = await fetch('/api/sprint/tasks/apply-mappings', {
+    const res = await apiFetch('/api/sprint/tasks/apply-mappings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mappings }),
@@ -318,7 +319,7 @@ export default function SprintPage() {
   async function initAssessment() {
     if (!detailTask) return
     try {
-      const res = await fetch(`/api/sprint/tasks/${detailTask.id}/assess/init`, { method: 'POST' })
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/init`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) { setAssessError(data.error ?? 'Assessment failed'); setAssessPhase('idle'); return }
 
@@ -364,7 +365,7 @@ export default function SprintPage() {
     setAssessPhase('loading')
     setCurrentAnswer('')
     try {
-      const res = await fetch(`/api/sprint/tasks/${detailTask!.id}/assess/${conversation.conversationId}/reply`, {
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask!.id}/assess/${conversation.conversationId}/reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answer: currentAnswer, objectiveId: q.objectiveId }),
@@ -449,7 +450,7 @@ export default function SprintPage() {
       }))
       const selectedRoles = roleSelections.filter((r) => r.usageFrequency > 0)
 
-      const res = await fetch(`/api/sprint/tasks/${detailTask.id}/assess/${conversation.conversationId}/confirm`, {
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/${conversation.conversationId}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -476,7 +477,7 @@ export default function SprintPage() {
     if (!selectedTaskIds.length || !assignTarget) return
     setAssigning(true)
     const sprintId = assignTarget === 'backlog' ? null : assignTarget
-    await fetch('/api/sprint/assign', {
+    await apiFetch('/api/sprint/assign', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ taskIds: selectedTaskIds, sprintId }),
@@ -490,7 +491,7 @@ export default function SprintPage() {
   async function handleCreateSprint(values: Record<string, unknown>) {
     setCreating(true)
     setCreateError('')
-    const res = await fetch('/api/sprint', {
+    const res = await apiFetch('/api/sprint', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
