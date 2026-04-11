@@ -61,7 +61,14 @@ export async function GET(request: NextRequest) {
     salt: cookieName,
   })
 
-  const response = NextResponse.redirect(new URL('/setup', request.url))
+  // Determine post-login redirect destination — validate callbackUrl to prevent open redirect
+  function isSafeRedirect(url: string): boolean {
+    return url.startsWith('/') && !url.startsWith('//') && !url.includes('://')
+  }
+  const callbackUrlCookie = request.cookies.get('callbackUrl')?.value ?? ''
+  const destination = isSafeRedirect(callbackUrlCookie) ? callbackUrlCookie : '/setup'
+
+  const response = NextResponse.redirect(new URL(destination, request.url))
   response.cookies.set(cookieName, sessionToken, {
     httpOnly: true,
     sameSite: 'lax',
@@ -69,5 +76,7 @@ export async function GET(request: NextRequest) {
     secure: isSecure,
     maxAge: 30 * 24 * 60 * 60,
   })
+  // Clear the callbackUrl cookie now that we've consumed it
+  response.cookies.delete('callbackUrl')
   return response
 }
