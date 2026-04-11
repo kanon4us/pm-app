@@ -1,38 +1,38 @@
-import { apiFetch } from '@/lib/fetch'
+import { apiFetch, navigate } from '@/lib/fetch'
 
 describe('apiFetch', () => {
+  let toSpy: jest.SpyInstance
+
   beforeEach(() => {
-    jest.clearAllMocks()
+    toSpy = jest.spyOn(navigate, 'to').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    toSpy.mockRestore()
   })
 
   it('returns the response for successful requests', async () => {
-    global.fetch = jest.fn().mockResolvedValue({ status: 200, ok: true })
+    global.fetch = jest.fn().mockResolvedValue({ status: 200 })
     const res = await apiFetch('/api/sprint')
     expect(res.status).toBe(200)
+    expect(toSpy).not.toHaveBeenCalled()
   })
 
   it('redirects to /setup on 401', async () => {
-    global.fetch = jest.fn().mockResolvedValue({ status: 401, ok: false })
-    // jsdom throws when attempting to navigate; we suppress it and verify navigation was attempted
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation()
+    global.fetch = jest.fn().mockResolvedValue({ status: 401 })
     await apiFetch('/api/sprint')
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'not implemented' })
-    )
-    errorSpy.mockRestore()
+    expect(toSpy).toHaveBeenCalledWith('/setup')
   })
 
   it('returns non-401 error responses without redirecting', async () => {
-    global.fetch = jest.fn().mockResolvedValue({ status: 500, ok: false })
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation()
+    global.fetch = jest.fn().mockResolvedValue({ status: 500 })
     const res = await apiFetch('/api/sprint')
     expect(res.status).toBe(500)
-    expect(errorSpy).not.toHaveBeenCalled()
-    errorSpy.mockRestore()
+    expect(toSpy).not.toHaveBeenCalled()
   })
 
   it('passes init options through to fetch', async () => {
-    global.fetch = jest.fn().mockResolvedValue({ status: 200, ok: true })
+    global.fetch = jest.fn().mockResolvedValue({ status: 200 })
     await apiFetch('/api/sprint', { method: 'POST', body: '{}' })
     expect(global.fetch).toHaveBeenCalledWith('/api/sprint', { method: 'POST', body: '{}' })
   })
