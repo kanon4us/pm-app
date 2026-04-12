@@ -4,6 +4,8 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { Json } from '@/lib/supabase/types'
 
+export const maxDuration = 300
+
 type Params = { params: Promise<{ id: string; conversationId: string }> }
 
 const CLAUDE_MODEL = 'claude-opus-4-6'
@@ -105,13 +107,20 @@ USER JUST ANSWERED (about Objective ${objectiveId}):
 Based on this answer, update the score for Objective ${objectiveId} and determine whether more questions are needed or you can finalize.`
 
   const anthropic = new Anthropic()
-  const response = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }],
-  })
+  let response: Awaited<ReturnType<typeof anthropic.messages.create>>
+  try {
+    response = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      thinking: { type: 'adaptive' },
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[assess:reply task=${id} conv=${conversationId}] Anthropic API error:`, err)
+    return NextResponse.json({ error: `Claude API error: ${msg}` }, { status: 500 })
+  }
 
   const textBlock = response.content.find((b) => b.type === 'text')
   if (!textBlock || textBlock.type !== 'text') {

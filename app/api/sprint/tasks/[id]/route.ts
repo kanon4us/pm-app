@@ -3,11 +3,14 @@ import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import type { Json } from '@/lib/supabase/types'
+import {
+  COLUMN_DB_FIELDS,
+  NUMERIC_MAPPED_FIELDS,
+  TEXT_MAPPED_FIELDS,
+  type ColumnDbField,
+} from '@/lib/field-config'
 
 type Params = { params: Promise<{ id: string }> }
-
-const DB_FIELDS = ['fvi_score', 'cost_effort', 'cost_risk', 'inverted_influence'] as const
-type DbField = typeof DB_FIELDS[number]
 
 // GET /api/sprint/tasks/[id] — fetch full task details including ClickUp description
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -67,18 +70,32 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const supabase = await getSupabaseServiceClient()
 
-  // Build the DB column updates from mappings
-  const dbUpdate: Record<string, number | null> = {}
+  // Build column + mapped_fields updates from mappings
+  const columnUpdate: Record<string, number | null> = {}
+  const mappedUpdate: Record<string, unknown> = {}
+
   for (const [fieldName, dbField] of Object.entries(mappings)) {
-    if (!DB_FIELDS.includes(dbField as DbField)) continue
     const field = customFields.find((f) => f.name === fieldName)
-    const num = field ? Number(field.value) : NaN
-    dbUpdate[dbField] = isNaN(num) ? null : num
+    const rawValue = field?.value ?? null
+
+    if (COLUMN_DB_FIELDS.includes(dbField as ColumnDbField)) {
+      const num = rawValue !== null ? Number(rawValue) : NaN
+      columnUpdate[dbField] = isNaN(num) ? null : num
+    } else if (NUMERIC_MAPPED_FIELDS.includes(dbField as typeof NUMERIC_MAPPED_FIELDS[number])) {
+      const num = rawValue !== null ? Number(rawValue) : NaN
+      mappedUpdate[dbField] = isNaN(num) ? null : num
+    } else if (TEXT_MAPPED_FIELDS.includes(dbField as typeof TEXT_MAPPED_FIELDS[number])) {
+      mappedUpdate[dbField] = rawValue !== null ? String(rawValue) : null
+    }
   }
+
+  // Merge mapped_fields with existing values
+  const { data: existing } = await supabase.from('tasks').select('mapped_fields').eq('id', id).single()
+  const mergedMapped = { ...(existing?.mapped_fields as Record<string, unknown> ?? {}), ...mappedUpdate }
 
   const { error } = await supabase
     .from('tasks')
-    .update({ custom_fields: customFields as unknown as Json, ...dbUpdate })
+    .update({ custom_fields: customFields as unknown as Json, ...columnUpdate, mapped_fields: mergedMapped as Json })
     .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

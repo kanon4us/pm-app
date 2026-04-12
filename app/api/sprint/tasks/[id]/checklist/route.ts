@@ -43,11 +43,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   // Fetch task, joining through list → repo_registry in one query
-  const { data: task } = await supabase
+  type ListRow = { repo_registry_id: string | null; repo_registry: { github_repo_full_name: string | null } | null }
+  type TaskRow = { id: string; name: string; clickup_task_id: string; git_branch: string | null; kickoff_gate_overrides: Record<string, unknown> | null; lists: ListRow }
+
+  const { data: task } = await (supabase
     .from('tasks')
     .select('id, name, clickup_task_id, git_branch, kickoff_gate_overrides, lists!inner(repo_registry_id, repo_registry(github_repo_full_name))')
     .eq('id', id)
-    .single()
+    .single() as unknown as Promise<{ data: TaskRow | null; error: unknown }>)
 
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
@@ -61,8 +64,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const slug = task.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40)
   const dir = branch ? `FeaturePlanning/_Active/${task.clickup_task_id}-${slug}` : null
 
-  type ListRow = { repo_registry_id: string | null; repo_registry: { github_repo_full_name: string | null } | null }
-  const list = (task as unknown as { lists: ListRow }).lists
+  const list = task.lists
   const codeRepo = list?.repo_registry?.github_repo_full_name ?? null
 
   const overrides = (task.kickoff_gate_overrides as Record<string, { acknowledgedAt: string; reason: string }> | null) ?? {}

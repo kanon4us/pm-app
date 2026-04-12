@@ -3,7 +3,12 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 export interface Database {
   public: {
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      apply_field_mappings: {
+        Args: { mappings: Record<string, string> }
+        Returns: number
+      }
+    }
     Tables: {
       users: {
         Row: { id: string; email: string; clickup_workspace_id: string | null; created_at: string }
@@ -37,10 +42,10 @@ export interface Database {
           name: string; status: string; custom_fields: Json; fvi_score: number | null
           cost_effort: number | null; cost_risk: number | null; inverted_influence: number | null
           git_branch: string | null; is_feature_flagged: boolean; synced_at: string | null; created_at: string
-          kickoff_gate_overrides: Json | null
+          kickoff_gate_overrides: Json | null; mapped_fields: Json
         }
-        Insert: { id?: string; clickup_task_id: string; list_id: string; name: string; status?: string; custom_fields?: Json; kickoff_gate_overrides?: Json | null }
-        Update: { status?: string; custom_fields?: Json; fvi_score?: number | null; cost_effort?: number | null; cost_risk?: number | null; inverted_influence?: number | null; git_branch?: string | null; is_feature_flagged?: boolean; sprint_id?: string | null; synced_at?: string | null; kickoff_gate_overrides?: Json | null }
+        Insert: { id?: string; clickup_task_id: string; list_id: string; name: string; status?: string; custom_fields?: Json; kickoff_gate_overrides?: Json | null; mapped_fields?: Json }
+        Update: { status?: string; custom_fields?: Json; fvi_score?: number | null; cost_effort?: number | null; cost_risk?: number | null; inverted_influence?: number | null; git_branch?: string | null; is_feature_flagged?: boolean; sprint_id?: string | null; synced_at?: string | null; kickoff_gate_overrides?: Json | null; mapped_fields?: Json }
         Relationships: []
       }
       sprints: {
@@ -98,9 +103,15 @@ export interface Database {
         Relationships: []
       }
       assessment_conversations: {
-        Row: { id: string; task_id: string; status: 'in_progress' | 'complete' | 'abandoned'; vault_context: Json | null; proposed_scores: Json | null; final_scores: Json | null; effort: number | null; risk: number | null; fvi_score: number | null; created_at: string; completed_at: string | null }
+        Row: { id: string; task_id: string; status: 'in_progress' | 'complete' | 'abandoned'; vault_context: Json | null; proposed_scores: Json | null; final_scores: Json | null; effort: number | null; risk: number | null; fvi_score: number | null; vault_spec_content: string | null; created_at: string; completed_at: string | null }
         Insert: { id?: string; task_id: string; status?: 'in_progress' | 'complete' | 'abandoned'; vault_context?: Json | null; proposed_scores?: Json | null }
-        Update: { status?: 'in_progress' | 'complete' | 'abandoned'; proposed_scores?: Json | null; final_scores?: Json | null; effort?: number | null; risk?: number | null; fvi_score?: number | null; completed_at?: string | null }
+        Update: { status?: 'in_progress' | 'complete' | 'abandoned'; proposed_scores?: Json | null; final_scores?: Json | null; effort?: number | null; risk?: number | null; fvi_score?: number | null; vault_spec_content?: string | null; completed_at?: string | null }
+        Relationships: []
+      }
+      bundle_generations: {
+        Row: { id: string; task_id: string; conversation_id: string; generated_by: string; vault_branch: string | null; vault_spec_url: string | null; files_written: string[]; clickup_fields_written: string[]; clickup_comment_posted: boolean; error_details: Json | null; created_at: string; completed_at: string | null }
+        Insert: { id?: string; task_id: string; conversation_id: string; generated_by: string; vault_branch?: string | null; vault_spec_url?: string | null; files_written?: string[]; clickup_fields_written?: string[]; clickup_comment_posted?: boolean; error_details?: Json | null }
+        Update: { vault_branch?: string | null; vault_spec_url?: string | null; files_written?: string[]; clickup_fields_written?: string[]; clickup_comment_posted?: boolean; error_details?: Json | null; completed_at?: string | null }
         Relationships: []
       }
       assessment_messages: {

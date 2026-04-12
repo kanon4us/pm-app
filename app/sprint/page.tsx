@@ -6,8 +6,9 @@ import {
   Switch, Tooltip, Divider, Slider, Progress,
 } from 'antd'
 import type { ColumnType } from 'antd/es/table'
-import { SearchOutlined, SettingOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { SearchOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
+import { loadFieldConfig, type FieldConfig } from '@/lib/field-config'
 
 // ── Assessment types ──────────────────────────────────────────────────────────
 
@@ -147,31 +148,6 @@ interface Sprint {
   status: 'planned' | 'active' | 'completed'
 }
 
-interface FieldConfig {
-  label: string
-  hidden: boolean
-  dbField: string // 'fvi_score' | 'cost_effort' | 'cost_risk' | 'inverted_influence' | ''
-}
-
-const DB_FIELD_OPTIONS = [
-  { label: 'None', value: '' },
-  { label: 'FVI Score', value: 'fvi_score' },
-  { label: 'Cost Effort', value: 'cost_effort' },
-  { label: 'Cost Risk', value: 'cost_risk' },
-  { label: 'Inverted Influence', value: 'inverted_influence' },
-]
-
-const FIELD_CONFIG_KEY = 'pm_field_config'
-
-function loadFieldConfig(): Record<string, FieldConfig> {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(FIELD_CONFIG_KEY) ?? '{}') } catch { return {} }
-}
-
-function saveFieldConfig(config: Record<string, FieldConfig>) {
-  localStorage.setItem(FIELD_CONFIG_KEY, JSON.stringify(config))
-}
-
 function isNumeric(value: unknown): boolean {
   if (value === null || value === undefined || value === '') return false
   return !isNaN(Number(value))
@@ -197,11 +173,8 @@ export default function SprintPage() {
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  // Field config
+  // Field config (read-only here — configured on the Setup page)
   const [fieldConfig, setFieldConfig] = useState<Record<string, FieldConfig>>({})
-  const [configOpen, setConfigOpen] = useState(false)
-  const [applying, setApplying] = useState(false)
-  const [applyResult, setApplyResult] = useState<string>('')
 
   // AI Assessment
   const [assessOpen, setAssessOpen] = useState(false)
@@ -213,6 +186,9 @@ export default function SprintPage() {
   const [confirmedEffort, setConfirmedEffort] = useState(3)
   const [confirmedRisk, setConfirmedRisk] = useState(1.2)
   const [confirmResult, setConfirmResult] = useState<ConfirmResult | null>(null)
+  const [bundleGenerating, setBundleGenerating] = useState(false)
+  const [bundleResult, setBundleResult] = useState<{ vaultBranch: string | null; filesWritten: string[]; clickupFieldsWritten: string[]; clickupCommentPosted: boolean; vaultSpecUrl: string | null } | null>(null)
+  const [bundleError, setBundleError] = useState('')
 
   const [form] = Form.useForm()
 
@@ -273,45 +249,14 @@ export default function SprintPage() {
     await load()
   }
 
-  function updateFieldConfig(name: string, patch: Partial<FieldConfig>) {
-    const next = {
-      ...fieldConfig,
-      [name]: {
-        label: fieldConfig[name]?.label ?? name,
-        hidden: fieldConfig[name]?.hidden ?? false,
-        dbField: fieldConfig[name]?.dbField ?? '',
-        ...patch,
-      },
-    }
-    setFieldConfig(next)
-    saveFieldConfig(next)
-    setApplyResult('')
-  }
-
-  async function handleApplyMappings() {
-    setApplying(true)
-    setApplyResult('')
-    const mappings: Record<string, string> = {}
-    for (const [name, cfg] of Object.entries(fieldConfig)) {
-      if (cfg.dbField) mappings[name] = cfg.dbField
-    }
-    const res = await apiFetch('/api/sprint/tasks/apply-mappings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mappings }),
-    })
-    const data = await res.json()
-    setApplyResult(`Updated ${data.updated} tasks`)
-    setApplying(false)
-    await load()
-  }
-
   function openAssess() {
     setAssessPhase('loading')
     setAssessError('')
     setConversation(null)
     setCurrentAnswer('')
     setConfirmResult(null)
+    setBundleResult(null)
+    setBundleError('')
     setAssessOpen(true)
     void initAssessment()
   }
@@ -473,6 +418,33 @@ export default function SprintPage() {
     }
   }
 
+  async function handleGenerateBundle() {
+    if (!conversation || !detailTask) return
+    setBundleGenerating(true)
+    setBundleError('')
+    setBundleResult(null)
+
+    const mappings: Record<string, string> = {}
+    for (const [name, cfg] of Object.entries(fieldConfig)) {
+      if (cfg.dbField) mappings[name] = cfg.dbField
+    }
+
+    try {
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/bundle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: conversation.conversationId, mappings }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setBundleError(data.error ?? 'Bundle generation failed'); setBundleGenerating(false); return }
+      setBundleResult(data)
+      await load()
+    } catch (e) {
+      setBundleError(e instanceof Error ? e.message : 'Bundle generation failed')
+    }
+    setBundleGenerating(false)
+  }
+
   async function handleAssign() {
     if (!selectedTaskIds.length || !assignTarget) return
     setAssigning(true)
@@ -508,16 +480,6 @@ export default function SprintPage() {
     setCreating(false)
     await load()
   }
-
-  const allCustomFields = useMemo(() => {
-    const seen = new Map<string, string>()
-    for (const task of tasks) {
-      for (const f of task.custom_fields ?? []) {
-        if (!seen.has(f.name)) seen.set(f.name, f.id)
-      }
-    }
-    return [...seen.entries()].map(([name, id]) => ({ id, name }))
-  }, [tasks])
 
   const statusOptions = useMemo(() =>
     [...new Set(tasks.map((t) => t.status).filter(Boolean))].map((s) => ({ text: s, value: s })),
@@ -641,14 +603,9 @@ export default function SprintPage() {
       {/* ── Task Detail Drawer ── */}
       <Drawer
         title={
-          <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-            <Typography.Text style={{ color: '#e6edf3', fontSize: 14, maxWidth: 340 }} ellipsis={{ tooltip: detailTask?.name }}>
-              {detailTask?.name}
-            </Typography.Text>
-            <Tooltip title="Configure field labels, visibility & DB mappings">
-              <Button size="small" icon={<SettingOutlined />} onClick={() => setConfigOpen(true)} />
-            </Tooltip>
-          </Space>
+          <Typography.Text style={{ color: '#e6edf3', fontSize: 14, maxWidth: 400 }} ellipsis={{ tooltip: detailTask?.name }}>
+            {detailTask?.name}
+          </Typography.Text>
         }
         open={!!detailTask}
         onClose={() => setDetailTask(null)}
@@ -730,60 +687,12 @@ export default function SprintPage() {
         )}
       </Drawer>
 
-      {/* ── Field Config Modal ── */}
-      <Modal
-        title="Configure Custom Fields"
-        open={configOpen}
-        onCancel={() => setConfigOpen(false)}
-        footer={
-          <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-            <Space>
-              <Button loading={applying} onClick={handleApplyMappings}>
-                Apply Mappings to All Tasks
-              </Button>
-              {applyResult && <Typography.Text style={{ color: '#3fb950' }}>{applyResult}</Typography.Text>}
-            </Space>
-            <Button type="primary" onClick={() => setConfigOpen(false)}>Done</Button>
-          </Space>
-        }
-        width={640}
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 48px', gap: 8, marginBottom: 8 }}>
-          {['ClickUp Field', 'Display Label', 'Maps to DB Field', 'Show'].map((h) => (
-            <Typography.Text key={h} style={{ color: '#8b949e', fontSize: 11 }}>{h}</Typography.Text>
-          ))}
-        </div>
-        <Space orientation="vertical" style={{ width: '100%' }}>
-          {allCustomFields.map((f) => {
-            const cfg = fieldConfig[f.name]
-            return (
-              <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 48px', gap: 8, alignItems: 'center' }}>
-                <Typography.Text style={{ color: '#e6edf3', fontSize: 12 }} ellipsis={{ tooltip: f.name }}>{f.name}</Typography.Text>
-                <Input
-                  size="small"
-                  value={cfg?.label ?? f.name}
-                  onChange={(e) => updateFieldConfig(f.name, { label: e.target.value })}
-                />
-                <Select
-                  size="small"
-                  value={cfg?.dbField || ''}
-                  onChange={(v) => updateFieldConfig(f.name, { dbField: v })}
-                  options={DB_FIELD_OPTIONS}
-                  style={{ width: '100%' }}
-                />
-                <Switch size="small" checked={!cfg?.hidden} onChange={(checked) => updateFieldConfig(f.name, { hidden: !checked })} />
-              </div>
-            )
-          })}
-        </Space>
-      </Modal>
-
       {/* ── AI Assessment Modal ── */}
       <Modal
         title={
-          <Space>
-            <ThunderboltOutlined style={{ color: '#f0883e' }} />
-            <Typography.Text style={{ color: '#e6edf3' }} ellipsis>PM Agent — {detailTask?.name}</Typography.Text>
+          <Space align="start" style={{ flexWrap: 'wrap' }}>
+            <ThunderboltOutlined style={{ color: '#f0883e', flexShrink: 0 }} />
+            <Typography.Text style={{ color: '#e6edf3', whiteSpace: 'normal', wordBreak: 'break-word' }}>PM Agent — {detailTask?.name}</Typography.Text>
           </Space>
         }
         open={assessOpen}
@@ -1086,13 +995,50 @@ export default function SprintPage() {
               ))}
             </Space>
 
-            {/* Vault spec link */}
-            {confirmResult.vaultSpecUrl && (
-              <Alert
-                type="success"
-                title={<>Spec written to vault — <a href={confirmResult.vaultSpecUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff' }}>view on GitHub ↗</a></>}
+            {/* Bundle generation */}
+            {bundleError && <Alert type="error" title={bundleError} style={{ marginTop: 8 }} />}
+
+            {bundleResult ? (
+              <div style={{ marginTop: 8, background: '#161b22', border: '1px solid #238636', borderRadius: 6, padding: '10px 12px' }}>
+                <Typography.Text style={{ color: '#3fb950', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                  Bundle generated
+                </Typography.Text>
+                {bundleResult.vaultBranch && (
+                  <Typography.Text style={{ color: '#8b949e', fontSize: 11, display: 'block' }}>
+                    Branch: <code style={{ color: '#58a6ff' }}>{bundleResult.vaultBranch}</code>
+                  </Typography.Text>
+                )}
+                {bundleResult.filesWritten.length > 0 && (
+                  <Typography.Text style={{ color: '#8b949e', fontSize: 11, display: 'block' }}>
+                    Files: {bundleResult.filesWritten.join(', ')}
+                  </Typography.Text>
+                )}
+                {bundleResult.clickupFieldsWritten.length > 0 && (
+                  <Typography.Text style={{ color: '#8b949e', fontSize: 11, display: 'block' }}>
+                    ClickUp fields updated: {bundleResult.clickupFieldsWritten.length}
+                  </Typography.Text>
+                )}
+                {bundleResult.clickupCommentPosted && (
+                  <Typography.Text style={{ color: '#8b949e', fontSize: 11, display: 'block' }}>
+                    Kickoff comment posted to ClickUp
+                  </Typography.Text>
+                )}
+                {bundleResult.vaultSpecUrl && (
+                  <a href={bundleResult.vaultSpecUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff', fontSize: 11 }}>
+                    View spec on GitHub ↗
+                  </a>
+                )}
+              </div>
+            ) : (
+              <Button
+                icon={<ThunderboltOutlined />}
+                loading={bundleGenerating}
+                onClick={handleGenerateBundle}
+                block
                 style={{ marginTop: 8 }}
-              />
+              >
+                Generate Bundle
+              </Button>
             )}
 
             <Space style={{ marginTop: 8, justifyContent: 'space-between', width: '100%' }}>

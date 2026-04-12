@@ -89,6 +89,12 @@ export function buildClickUpClient(token: string) {
         body: JSON.stringify({ comment_text: commentText, notify_all: false }),
       }),
 
+    setCustomField: (taskId: string, fieldId: string, value: unknown) =>
+      clickupFetch<{ id: string }>(token, `/task/${taskId}/field/${fieldId}`, {
+        method: 'POST',
+        body: JSON.stringify({ value }),
+      }),
+
     deleteWebhook: (webhookId: string) =>
       clickupFetch<void>(token, `/webhook/${webhookId}`, { method: 'DELETE' }),
   }

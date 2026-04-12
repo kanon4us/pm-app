@@ -21,7 +21,7 @@ export function TriggerQueue() {
       .select('*, tasks(name, status), trigger_configs(pm_agent_action, to_status, write_back_order)')
       .order('created_at', { ascending: false })
       .limit(50)
-    setTriggers((data as TriggerRow[]) ?? [])
+    setTriggers((data as unknown as TriggerRow[]) ?? [])
     setLoading(false)
   }
 
