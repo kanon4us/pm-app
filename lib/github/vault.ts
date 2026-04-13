@@ -247,5 +247,6 @@ export function vaultBranchName(clickupTaskId: string, taskName: string): string
     .trim()
     .replace(/\s+/g, '-')
     .slice(0, 40)
+    .replace(/-+$/, '')   // strip trailing hyphens from mid-word slice
   return `docs/feature/${clickupTaskId}-${slug}`
 }
