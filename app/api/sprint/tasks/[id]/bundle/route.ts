@@ -210,13 +210,13 @@ The Figma Selection Link is embedded in \`spec.md\` by the PM Agent when the des
 // Heavy step: fetches live ClickUp field IDs, writes all FVI scores to ClickUp custom fields,
 // creates vault branch, writes resource bundle, posts kickoff comment with branch name.
 // Call after /confirm has persisted scores and vault_spec_content.
-// Body: { conversationId: string, mappings: Record<fieldName, dbField> }
+// Body: { conversationId: string, mappings: Record<fieldName, dbField>, figmaLink?: string, designReview?: { steps: unknown[]; divergenceNotes: string | null } }
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { conversationId, mappings } = await req.json()
+  const { conversationId, mappings, figmaLink, designReview } = await req.json()
   if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 })
 
   const supabase = await getSupabaseServiceClient()
@@ -269,7 +269,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const fviResult = computeFullFVI(objectiveScores, roleAssessments, conv.effort, conv.risk)
 
   // ── Build the complete db-field → value map ───────────────────────────────────
-  const dbFieldValues: Record<string, number | null> = {
+  const dbFieldValues: Record<string, number | string | null> = {
     fvi_score: fviResult.fviScore,
     cost_effort: conv.effort,
     cost_risk: conv.risk,
@@ -280,6 +280,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   for (const s of objAssessments ?? []) {
     if (s.objective_id >= 1 && s.objective_id <= 7) {
       dbFieldValues[`obj_${s.objective_id}_score`] = s.score
+      if (s.reasoning) dbFieldValues[`obj_${s.objective_id}_desc`] = s.reasoning
     }
   }
 
@@ -384,6 +385,22 @@ export async function POST(req: NextRequest, { params }: Params) {
       await writeVaultFile(ghToken.access_token, `${dir}/claude-md-block.md`, buildClaudeMdBlock(task.name, task.clickup_task_id, vaultBranch, fviResult, roles), commit('CLAUDE.md injection'), vaultBranch)
         .then(() => filesWritten.push('claude-md-block.md'))
         .catch((err) => console.error(`[bundle task=${id}] claude-md-block.md failed:`, err))
+
+      // guided-tour.json — 8th bundle file (non-fatal)
+      if (designReview?.steps) {
+        const guidedTour = {
+          generatedAt: new Date().toISOString(),
+          figmaLink: figmaLink ?? null,
+          steps: designReview.steps,
+          divergenceNotes: designReview.divergenceNotes ?? null,
+        }
+        await writeVaultFile(ghToken.access_token, `${dir}/guided-tour.json`, JSON.stringify(guidedTour, null, 2), commit('guided tour'), vaultBranch)
+          .then(() => filesWritten.push('guided-tour.json'))
+          .catch((err) => {
+            console.error(`[bundle task=${id}] guided-tour.json failed:`, err)
+            errors.push('guided_tour_write_failed')
+          })
+      }
 
       // ── 3. ClickUp kickoff comment (with branch name) ───────────────────────
       if (cuToken?.access_token) {
