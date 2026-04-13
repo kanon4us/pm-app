@@ -216,7 +216,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { conversationId, mappings, figmaLink, designReview } = await req.json()
+  const { conversationId, mappings, figmaLink, designReview } = await req.json() as {
+    conversationId: string
+    mappings: Record<string, string>
+    figmaLink?: string
+    designReview?: { steps: unknown[]; divergenceNotes?: string | null }
+  }
   if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 })
 
   const supabase = await getSupabaseServiceClient()
@@ -387,7 +392,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         .catch((err) => console.error(`[bundle task=${id}] claude-md-block.md failed:`, err))
 
       // guided-tour.json — 8th bundle file (non-fatal)
-      if (designReview?.steps) {
+      if (Array.isArray(designReview?.steps) && designReview.steps.length > 0) {
         const guidedTour = {
           generatedAt: new Date().toISOString(),
           figmaLink: figmaLink ?? null,
