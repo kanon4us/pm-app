@@ -473,10 +473,10 @@ export default function SprintPage() {
       if (!res.ok) { setAssessError(data.error ?? 'Confirm failed'); setAssessPhase('roles'); return }
       setConfirmResult(data)
       setAssessPhase('results')
-      await load()
       if (conversation.figmaLink) {
-        handleDesignReview(conversation.figmaLink)
+        void handleDesignReview(conversation.figmaLink)
       }
+      await load()
     } catch (e) {
       setAssessError(e instanceof Error ? e.message : 'Confirm failed')
       setAssessPhase('roles')
@@ -1196,7 +1196,7 @@ export default function SprintPage() {
             {designReviewLoading && (
               <div style={{ marginTop: 16 }}>
                 <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>DESIGN REVIEW</Typography.Text>
-                {[1, 2, 3].map((i) => (
+                {[1, 2, 3, 4].map((i) => (
                   <div key={i} style={{ marginTop: 8, height: 56, background: '#161b22', borderRadius: 6, opacity: 0.5 }} />
                 ))}
               </div>
