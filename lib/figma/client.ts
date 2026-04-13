@@ -1,6 +1,7 @@
 // lib/figma/client.ts
 
 const FIGMA_API = 'https://api.figma.com'
+const MAX_FRAMES = 25
 
 export interface FigmaFrame {
   id: string
@@ -40,12 +41,16 @@ function figmaHeaders(token: string) {
  * Returns null if the Figma API is unavailable or the token is invalid.
  */
 export async function fetchFigmaCover(token: string, fileKey: string): Promise<string | null> {
-  const res = await fetch(`${FIGMA_API}/v1/files/${fileKey}?depth=1`, {
-    headers: figmaHeaders(token),
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  return (data.thumbnailUrl as string) ?? null
+  try {
+    const res = await fetch(`${FIGMA_API}/v1/files/${fileKey}?depth=1`, {
+      headers: figmaHeaders(token),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return (data.thumbnailUrl as string) ?? null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -80,11 +85,21 @@ export async function fetchFigmaFrames(
 ): Promise<{ frames: FigmaFrame[]; warnings: string[] }> {
   if (!nodeId) return { frames: [], warnings: ['no_node_id'] }
 
-  const res = await fetch(`${FIGMA_API}/v1/files/${fileKey}`, {
-    headers: figmaHeaders(token),
-  })
+  let res: Response
+  try {
+    res = await fetch(`${FIGMA_API}/v1/files/${fileKey}?depth=2`, {
+      headers: figmaHeaders(token),
+    })
+  } catch {
+    return { frames: [], warnings: ['figma_api_error'] }
+  }
   if (!res.ok) return { frames: [], warnings: ['figma_api_error'] }
-  const data = await res.json()
+  let data: { document?: { children?: FigmaNode[] } }
+  try {
+    data = await res.json()
+  } catch {
+    return { frames: [], warnings: ['figma_api_error'] }
+  }
 
   const pages: FigmaNode[] = data.document?.children ?? []
   let targetFrameIds: string[] = []
@@ -109,22 +124,28 @@ export async function fetchFigmaFrames(
 
   if (targetFrameIds.length === 0) return { frames: [], warnings: ['no_frames_found'] }
 
-  const MAX_FRAMES = 25
   const cappedWarnings: string[] = []
   if (targetFrameIds.length > MAX_FRAMES) {
     cappedWarnings.push('frames_capped_at_25')
     targetFrameIds = targetFrameIds.slice(0, MAX_FRAMES)
-    for (const id of Object.keys(frameNames)) {
-      if (!targetFrameIds.includes(id)) delete frameNames[id]
-    }
   }
 
-  const imgRes = await fetch(
-    `${FIGMA_API}/v1/images/${fileKey}?ids=${encodeURIComponent(targetFrameIds.join(','))}&format=png&scale=1`,
-    { headers: figmaHeaders(token) }
-  )
+  let imgRes: Response
+  try {
+    imgRes = await fetch(
+      `${FIGMA_API}/v1/images/${fileKey}?ids=${encodeURIComponent(targetFrameIds.join(','))}&format=png&scale=1`,
+      { headers: figmaHeaders(token) }
+    )
+  } catch {
+    return { frames: [], warnings: ['figma_api_error'] }
+  }
   if (!imgRes.ok) return { frames: [], warnings: ['figma_api_error'] }
-  const imgData = await imgRes.json()
+  let imgData: { images?: Record<string, string> }
+  try {
+    imgData = await imgRes.json()
+  } catch {
+    return { frames: [], warnings: ['figma_api_error'] }
+  }
   const images: Record<string, string> = imgData.images ?? {}
 
   const frames: FigmaFrame[] = targetFrameIds
