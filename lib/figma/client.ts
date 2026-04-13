@@ -123,7 +123,7 @@ export async function fetchFigmaFrames(
     `${FIGMA_API}/v1/images/${fileKey}?ids=${encodeURIComponent(targetFrameIds.join(','))}&format=png&scale=1`,
     { headers: figmaHeaders(token) }
   )
-  if (!imgRes.ok) return { frames: [], warnings: ['thumbnail_fetch_error'] }
+  if (!imgRes.ok) return { frames: [], warnings: ['figma_api_error'] }
   const imgData = await imgRes.json()
   const images: Record<string, string> = imgData.images ?? {}
 
