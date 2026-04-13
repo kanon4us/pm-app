@@ -40,8 +40,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { figmaLink } = body as { figmaLink?: string }
+  let body: { figmaLink?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const { figmaLink } = body
 
   const supabase = await getSupabaseServiceClient()
 
@@ -155,6 +160,10 @@ Return the JSON object.`,
 
     const rawText = response.content.find((b) => b.type === 'text')?.text ?? '{}'
     claudeResult = JSON.parse(rawText)
+    if (!Array.isArray(claudeResult?.steps) || typeof claudeResult?.divergenceNotes !== 'string') {
+      console.error(`[design-review task=${id} conv=${conversationId}] Claude returned invalid shape:`, rawText.slice(0, 200))
+      return NextResponse.json({ error: 'Tour generation failed' }, { status: 500 })
+    }
   } catch (err) {
     console.error(`[design-review task=${id} conv=${conversationId}] Claude error:`, err)
     return NextResponse.json({ error: 'Tour generation failed' }, { status: 500 })
