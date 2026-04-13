@@ -8,7 +8,7 @@ import {
 import type { ColumnType } from 'antd/es/table'
 import { SearchOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
-import { loadFieldConfig, type FieldConfig } from '@/lib/field-config'
+import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
 
 // ── Assessment types ──────────────────────────────────────────────────────────
 
@@ -90,6 +90,44 @@ interface ConfirmResult {
   risk: number
   vaultSpecUrl: string | null
 }
+
+interface TourStep {
+  stepNumber: number
+  title: string
+  userStoryText: string | null
+  figmaFrameId: string | null
+  figmaFrameName: string | null
+  type: 'mapped' | 'visual-only' | 'not-yet-designed'
+}
+
+interface DesignReview {
+  steps: TourStep[]
+  divergenceNotes: string
+  figmaFrames: Array<{ id: string; name: string; thumbnailUrl: string }>
+  warnings: string[]
+  cached: boolean
+}
+
+// ── Doc Review types ──────────────────────────────────────────────────────────
+
+interface DocReviewMessage {
+  role: 'assistant' | 'user'
+  content: string
+}
+
+interface DocProposal {
+  id: string
+  type: 'glossary_term' | 'feature_overview' | 'manual_section' | 'process_update'
+  targetPath: string
+  action: 'create' | 'update'
+  title: string
+  rationale: string
+  proposedContent: string
+  editedContent?: string
+  approved: boolean
+}
+
+type DocReviewPhase = 'loading' | 'questions' | 'proposals' | 'applying' | 'done'
 
 type AssessPhase = 'idle' | 'loading' | 'interview' | 'roles' | 'confirming' | 'results'
 
@@ -175,6 +213,7 @@ export default function SprintPage() {
 
   // Field config (read-only here — configured on the Setup page)
   const [fieldConfig, setFieldConfig] = useState<Record<string, FieldConfig>>({})
+  const [fieldOrder, setFieldOrder] = useState<string[]>([])
 
   // AI Assessment
   const [assessOpen, setAssessOpen] = useState(false)
@@ -189,19 +228,39 @@ export default function SprintPage() {
   const [bundleGenerating, setBundleGenerating] = useState(false)
   const [bundleResult, setBundleResult] = useState<{ vaultBranch: string | null; filesWritten: string[]; clickupFieldsWritten: string[]; clickupCommentPosted: boolean; vaultSpecUrl: string | null } | null>(null)
   const [bundleError, setBundleError] = useState('')
+  const [designReview, setDesignReview] = useState<DesignReview | null>(null)
+  const [designReviewLoading, setDesignReviewLoading] = useState(false)
+  const [divergenceOpen, setDivergenceOpen] = useState(false)
+
+  // Doc Review
+  const [docReviewOpen, setDocReviewOpen] = useState(false)
+  const [docReviewPhase, setDocReviewPhase] = useState<DocReviewPhase>('loading')
+  const [docReviewHistory, setDocReviewHistory] = useState<DocReviewMessage[]>([])
+  const [docReviewCurrentQ, setDocReviewCurrentQ] = useState<{ question: string; purpose: string; progress: string; gapsIdentified: string[] } | null>(null)
+  const [docReviewAnswer, setDocReviewAnswer] = useState('')
+  const [docReviewGaps, setDocReviewGaps] = useState<string[]>([])
+  const [docProposals, setDocProposals] = useState<DocProposal[]>([])
+  const [docApplyResults, setDocApplyResults] = useState<{ applied: string[]; errors: string[] } | null>(null)
+  const [docReviewError, setDocReviewError] = useState('')
 
   const [form] = Form.useForm()
 
-  useEffect(() => { setFieldConfig(loadFieldConfig()) }, [])
+  useEffect(() => { setFieldConfig(loadFieldConfig()); setFieldOrder(loadFieldOrder()) }, [])
 
   async function load() {
     const [tasksRes, sprintsRes] = await Promise.all([
       apiFetch('/api/sprint/tasks').then((r) => r.json()),
       apiFetch('/api/sprint').then((r) => r.json()),
     ])
-    setTasks(tasksRes.tasks ?? [])
+    const newTasks: Task[] = tasksRes.tasks ?? []
+    setTasks(newTasks)
     setSprints(sprintsRes.sprints ?? [])
     setLoading(false)
+    // Keep drawer in sync with refreshed task data (e.g. new fvi_score, git_branch)
+    setDetailTask((prev) => {
+      if (!prev) return prev
+      return newTasks.find((t) => t.id === prev.id) ?? prev
+    })
   }
 
   useEffect(() => { load() }, [])
@@ -257,6 +316,9 @@ export default function SprintPage() {
     setConfirmResult(null)
     setBundleResult(null)
     setBundleError('')
+    setDesignReview(null)
+    setDesignReviewLoading(false)
+    setDivergenceOpen(false)
     setAssessOpen(true)
     void initAssessment()
   }
@@ -412,10 +474,33 @@ export default function SprintPage() {
       setConfirmResult(data)
       setAssessPhase('results')
       await load()
+      if (conversation.figmaLink) {
+        handleDesignReview(conversation.figmaLink)
+      }
     } catch (e) {
       setAssessError(e instanceof Error ? e.message : 'Confirm failed')
       setAssessPhase('roles')
     }
+  }
+
+  async function handleDesignReview(figmaLink: string) {
+    if (!conversation || !detailTask) return
+    setDesignReviewLoading(true)
+    try {
+      const res = await apiFetch(
+        `/api/sprint/tasks/${detailTask.id}/assess/${conversation.conversationId}/design-review`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ figmaLink }),
+        }
+      )
+      const data = await res.json()
+      if (res.ok) setDesignReview(data)
+    } catch {
+      // non-fatal: design review is informational only
+    }
+    setDesignReviewLoading(false)
   }
 
   async function handleGenerateBundle() {
@@ -433,7 +518,12 @@ export default function SprintPage() {
       const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/bundle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: conversation.conversationId, mappings }),
+        body: JSON.stringify({
+          conversationId: conversation.conversationId,
+          mappings,
+          figmaLink: conversation.figmaLink || undefined,
+          designReview: designReview ? { steps: designReview.steps, divergenceNotes: designReview.divergenceNotes } : undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setBundleError(data.error ?? 'Bundle generation failed'); setBundleGenerating(false); return }
@@ -443,6 +533,87 @@ export default function SprintPage() {
       setBundleError(e instanceof Error ? e.message : 'Bundle generation failed')
     }
     setBundleGenerating(false)
+  }
+
+  async function callDocReview(history: DocReviewMessage[]) {
+    if (!detailTask) return
+    setDocReviewError('')
+    try {
+      const res = await apiFetch('/api/vault/doc-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: detailTask.id,
+          conversationId: conversation?.conversationId ?? null,
+          history,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setDocReviewError(data.error ?? 'Doc review failed'); setDocReviewPhase('questions'); return }
+
+      if (data.gapsIdentified) setDocReviewGaps(data.gapsIdentified)
+
+      if (data.type === 'question') {
+        setDocReviewCurrentQ({ question: data.question, purpose: data.purpose, progress: data.progress, gapsIdentified: data.gapsIdentified ?? [] })
+        setDocReviewPhase('questions')
+      } else {
+        setDocProposals((data.proposals ?? []).map((p: DocProposal) => ({ ...p, approved: true })))
+        setDocReviewPhase('proposals')
+      }
+    } catch (e) {
+      setDocReviewError(e instanceof Error ? e.message : 'Doc review failed')
+      setDocReviewPhase('questions')
+    }
+  }
+
+  function openDocReview() {
+    setDocReviewPhase('loading')
+    setDocReviewHistory([])
+    setDocReviewCurrentQ(null)
+    setDocReviewAnswer('')
+    setDocReviewGaps([])
+    setDocProposals([])
+    setDocApplyResults(null)
+    setDocReviewError('')
+    setDocReviewOpen(true)
+    void callDocReview([])
+  }
+
+  async function handleDocReviewAnswer() {
+    if (!docReviewCurrentQ || !docReviewAnswer.trim()) return
+    const newHistory: DocReviewMessage[] = [
+      ...docReviewHistory,
+      { role: 'assistant', content: docReviewCurrentQ.question },
+      { role: 'user', content: docReviewAnswer },
+    ]
+    setDocReviewHistory(newHistory)
+    setDocReviewAnswer('')
+    setDocReviewCurrentQ(null)
+    setDocReviewPhase('loading')
+    await callDocReview(newHistory)
+  }
+
+  function updateProposal(id: string, patch: Partial<DocProposal>) {
+    setDocProposals((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)))
+  }
+
+  async function handleApplyProposals() {
+    if (!detailTask) return
+    setDocReviewPhase('applying')
+    try {
+      const res = await apiFetch('/api/vault/doc-review/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: detailTask.id, proposals: docProposals }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setDocReviewError(data.error ?? 'Apply failed'); setDocReviewPhase('proposals'); return }
+      setDocApplyResults(data)
+      setDocReviewPhase('done')
+    } catch (e) {
+      setDocReviewError(e instanceof Error ? e.message : 'Apply failed')
+      setDocReviewPhase('proposals')
+    }
   }
 
   async function handleAssign() {
@@ -618,7 +789,22 @@ export default function SprintPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', marginBottom: 8 }}>
               <div><Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>STATUS</Typography.Text><br /><Tag>{detailTask.status || '—'}</Tag></div>
               <div><Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>LIST</Typography.Text><br /><Typography.Text style={{ color: '#e6edf3' }}>{detailTask.listName || '—'}</Typography.Text></div>
-              <div><Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>FVI SCORE</Typography.Text><br /><Typography.Text style={{ color: '#58a6ff' }}>{detailTask.fvi_score != null ? detailTask.fvi_score.toFixed(2) : '—'}</Typography.Text></div>
+              <div>
+                <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>FVI SCORE</Typography.Text><br />
+                <Typography.Text style={{ color: '#58a6ff' }}>{detailTask.fvi_score != null ? detailTask.fvi_score.toFixed(2) : '—'}</Typography.Text>
+                {detailTask.git_branch && (
+                  <div style={{ marginTop: 4 }}>
+                    <a
+                      href={`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'}/tree/${detailTask.git_branch}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#58a6ff', fontSize: 11 }}
+                    >
+                      📂 Vault branch ↗
+                    </a>
+                  </div>
+                )}
+              </div>
               <div><Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>CLICKUP ID</Typography.Text><br /><Typography.Text style={{ color: '#8b949e', fontSize: 12 }}>{detailTask.clickup_task_id}</Typography.Text></div>
             </div>
 
@@ -641,7 +827,15 @@ export default function SprintPage() {
             {/* Editable custom fields */}
             <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>CUSTOM FIELDS</Typography.Text>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', marginTop: 8 }}>
-              {editedFields
+              {[...editedFields]
+                .sort((a, b) => {
+                  const ai = fieldOrder.indexOf(a.name)
+                  const bi = fieldOrder.indexOf(b.name)
+                  if (ai === -1 && bi === -1) return 0
+                  if (ai === -1) return 1
+                  if (bi === -1) return -1
+                  return ai - bi
+                })
                 .filter((f) => !fieldConfig[f.name]?.hidden)
                 .map((f) => {
                   const label = fieldConfig[f.name]?.label || f.name
@@ -681,6 +875,9 @@ export default function SprintPage() {
               </Button>
               <Button icon={<ThunderboltOutlined />} onClick={openAssess} block>
                 AI Assessment
+              </Button>
+              <Button onClick={openDocReview} block>
+                Review Documentation
               </Button>
             </div>
           </Space>
@@ -995,6 +1192,81 @@ export default function SprintPage() {
               ))}
             </Space>
 
+            {/* Design Review Panel */}
+            {designReviewLoading && (
+              <div style={{ marginTop: 16 }}>
+                <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>DESIGN REVIEW</Typography.Text>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} style={{ marginTop: 8, height: 56, background: '#161b22', borderRadius: 6, opacity: 0.5 }} />
+                ))}
+              </div>
+            )}
+
+            {designReview && !designReviewLoading && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>DESIGN REVIEW</Typography.Text>
+                  {conversation.figmaLink && (
+                    <a href={conversation.figmaLink} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff', fontSize: 11 }}>
+                      Open in Figma ↗
+                    </a>
+                  )}
+                </div>
+
+                {designReview.warnings.includes('figma_unavailable') && (
+                  <Alert type="warning" title="Figma unavailable — showing user story steps only." style={{ marginBottom: 8 }} />
+                )}
+
+                <Space orientation="vertical" style={{ width: '100%' }}>
+                  {designReview.steps.map((step) => {
+                    const frame = designReview.figmaFrames.find((f) => f.id === step.figmaFrameId)
+                    const badgeColor = step.type === 'not-yet-designed' ? '#f0883e' : step.type === 'visual-only' ? '#8b949e' : '#3fb950'
+                    const badgeLabel = step.type === 'not-yet-designed' ? 'Not Yet Designed' : step.type === 'visual-only' ? 'Visual Only' : 'Designed'
+                    return (
+                      <div key={step.stepNumber} style={{ background: '#161b22', borderRadius: 6, padding: '10px 12px', border: '1px solid #21262d' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                          <Typography.Text style={{ color: '#e6edf3', fontSize: 13, fontWeight: 600 }}>
+                            {step.stepNumber}. {step.title}
+                          </Typography.Text>
+                          <span style={{ fontSize: 10, color: badgeColor, border: `1px solid ${badgeColor}`, borderRadius: 4, padding: '1px 6px', whiteSpace: 'nowrap' }}>
+                            {badgeLabel}
+                          </span>
+                        </div>
+                        {frame?.thumbnailUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={frame.thumbnailUrl}
+                            alt={frame.name}
+                            style={{ width: '100%', borderRadius: 4, marginBottom: 6, maxHeight: 160, objectFit: 'cover' }}
+                          />
+                        )}
+                        {step.userStoryText && (
+                          <Typography.Text style={{ color: '#8b949e', fontSize: 12 }}>{step.userStoryText}</Typography.Text>
+                        )}
+                      </div>
+                    )
+                  })}
+                </Space>
+
+                {designReview.divergenceNotes && (
+                  <div style={{ marginTop: 8, border: '1px solid #21262d', borderRadius: 6, overflow: 'hidden' }}>
+                    <button
+                      onClick={() => setDivergenceOpen((v) => !v)}
+                      style={{ width: '100%', background: '#161b22', border: 'none', padding: '8px 12px', cursor: 'pointer', textAlign: 'left', color: '#8b949e', fontSize: 11, display: 'flex', justifyContent: 'space-between' }}
+                    >
+                      <span>DIVERGENCE NOTES</span>
+                      <span>{divergenceOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {divergenceOpen && (
+                      <div style={{ padding: '8px 12px', background: '#0d1117' }}>
+                        <Typography.Text style={{ color: '#8b949e', fontSize: 12 }}>{designReview.divergenceNotes}</Typography.Text>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bundle generation */}
             {bundleError && <Alert type="error" title={bundleError} style={{ marginTop: 8 }} />}
 
@@ -1045,6 +1317,183 @@ export default function SprintPage() {
               <Button onClick={() => { setAssessPhase('idle'); openAssess() }}>Re-assess</Button>
               <Button type="primary" onClick={() => { setAssessOpen(false); setAssessPhase('idle') }}>Done</Button>
             </Space>
+          </Space>
+        )}
+      </Modal>
+
+      {/* ── Doc Review Modal ── */}
+      <Modal
+        title={
+          <Space align="start">
+            <Typography.Text style={{ color: '#e6edf3' }}>📝 Documentation Review — {detailTask?.name}</Typography.Text>
+          </Space>
+        }
+        open={docReviewOpen}
+        onCancel={() => setDocReviewOpen(false)}
+        footer={null}
+        width={760}
+        styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
+      >
+        {docReviewError && <Alert type="error" title={docReviewError} style={{ marginBottom: 12 }} />}
+
+        {/* Gaps identified banner */}
+        {docReviewGaps.length > 0 && (
+          <div style={{ background: '#161b22', border: '1px solid #f0883e', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
+            <Typography.Text style={{ color: '#f0883e', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>DOCUMENTATION GAPS IDENTIFIED</Typography.Text>
+            {docReviewGaps.map((gap, i) => (
+              <Typography.Text key={i} style={{ color: '#e6edf3', fontSize: 12, display: 'block' }}>· {gap}</Typography.Text>
+            ))}
+          </div>
+        )}
+
+        {/* Loading */}
+        {docReviewPhase === 'loading' && (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Spin size="large" />
+            <Typography.Paragraph style={{ color: '#8b949e', marginTop: 16 }}>
+              Scanning vault for documentation gaps…
+            </Typography.Paragraph>
+          </div>
+        )}
+
+        {/* Question phase */}
+        {docReviewPhase === 'questions' && docReviewCurrentQ && (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            <div style={{ background: '#0d1117', border: '1px solid #388bfd', borderRadius: 8, padding: '14px 16px' }}>
+              <Typography.Text style={{ color: '#8b949e', fontSize: 11, display: 'block', marginBottom: 4 }}>
+                {docReviewCurrentQ.progress} · For: {docReviewCurrentQ.purpose}
+              </Typography.Text>
+              <Typography.Paragraph style={{ color: '#e6edf3', fontWeight: 600, fontSize: 14, marginBottom: 10 }}>
+                {docReviewCurrentQ.question}
+              </Typography.Paragraph>
+              <Input.TextArea
+                rows={4}
+                value={docReviewAnswer}
+                onChange={(e) => setDocReviewAnswer(e.target.value)}
+                placeholder="Your answer…"
+                onPressEnter={(e) => { if (e.metaKey || e.ctrlKey) handleDocReviewAnswer() }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                <Button size="small" onClick={() => { setDocReviewPhase('loading'); void callDocReview([...docReviewHistory, { role: 'assistant', content: docReviewCurrentQ.question }, { role: 'user', content: '(skipped)' }]) }}>
+                  Skip →
+                </Button>
+                <Button type="primary" size="small" disabled={!docReviewAnswer.trim()} onClick={handleDocReviewAnswer}>
+                  Answer ↵
+                </Button>
+              </div>
+            </div>
+          </Space>
+        )}
+
+        {/* Applying */}
+        {docReviewPhase === 'applying' && (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Spin size="large" />
+            <Typography.Paragraph style={{ color: '#8b949e', marginTop: 16 }}>
+              Writing approved changes to main branch…
+            </Typography.Paragraph>
+          </div>
+        )}
+
+        {/* Proposals */}
+        {docReviewPhase === 'proposals' && (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Typography.Text style={{ color: '#e6edf3', fontWeight: 600 }}>
+                {docProposals.length} proposed change{docProposals.length !== 1 ? 's' : ''} — review, edit, then apply to main branch
+              </Typography.Text>
+              <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>
+                {docProposals.filter((p) => p.approved).length} of {docProposals.length} approved
+              </Typography.Text>
+            </div>
+
+            {docProposals.map((proposal) => (
+              <div
+                key={proposal.id}
+                style={{
+                  background: '#161b22',
+                  border: `1px solid ${proposal.approved ? '#238636' : '#30363d'}`,
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div>
+                    <Space>
+                      <Tag color={
+                        proposal.type === 'glossary_term' ? 'blue' :
+                        proposal.type === 'feature_overview' ? 'purple' :
+                        proposal.type === 'manual_section' ? 'orange' : 'default'
+                      } style={{ fontSize: 10 }}>
+                        {proposal.type.replace(/_/g, ' ')}
+                      </Tag>
+                      <Tag color={proposal.action === 'create' ? 'green' : 'gold'} style={{ fontSize: 10 }}>
+                        {proposal.action}
+                      </Tag>
+                      <Typography.Text style={{ color: '#e6edf3', fontWeight: 600 }}>{proposal.title}</Typography.Text>
+                    </Space>
+                    <Typography.Text style={{ color: '#8b949e', fontSize: 11, display: 'block', marginTop: 2 }}>
+                      {proposal.rationale}
+                    </Typography.Text>
+                    <Typography.Text style={{ color: '#58a6ff', fontSize: 11, fontFamily: 'monospace' }}>
+                      {proposal.targetPath}
+                    </Typography.Text>
+                  </div>
+                  <Switch
+                    checked={proposal.approved}
+                    onChange={(v) => updateProposal(proposal.id, { approved: v })}
+                    checkedChildren="Approved"
+                    unCheckedChildren="Skip"
+                    style={{ flexShrink: 0, marginLeft: 12 }}
+                  />
+                </div>
+                {proposal.approved && (
+                  <Input.TextArea
+                    rows={10}
+                    value={proposal.editedContent ?? proposal.proposedContent}
+                    onChange={(e) => updateProposal(proposal.id, { editedContent: e.target.value })}
+                    style={{ fontFamily: 'monospace', fontSize: 12, background: '#0d1117', borderColor: '#30363d', color: '#e6edf3' }}
+                  />
+                )}
+              </div>
+            ))}
+
+            <Button
+              type="primary"
+              onClick={handleApplyProposals}
+              disabled={docProposals.filter((p) => p.approved).length === 0}
+              block
+              style={{ marginTop: 8 }}
+            >
+              Apply {docProposals.filter((p) => p.approved).length} change{docProposals.filter((p) => p.approved).length !== 1 ? 's' : ''} to main branch
+            </Button>
+          </Space>
+        )}
+
+        {/* Done */}
+        {docReviewPhase === 'done' && docApplyResults && (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {docApplyResults.applied.length > 0 && (
+              <Alert
+                type="success"
+                title={`${docApplyResults.applied.length} file${docApplyResults.applied.length !== 1 ? 's' : ''} written to main branch`}
+                style={{ marginBottom: 8 }}
+              />
+            )}
+            {docApplyResults.applied.map((path) => (
+              <Typography.Text key={path} style={{ color: '#3fb950', fontSize: 12, display: 'block', fontFamily: 'monospace' }}>
+                ✓ {path}
+              </Typography.Text>
+            ))}
+            {docApplyResults.errors.map((err, i) => (
+              <Typography.Text key={i} style={{ color: '#f85149', fontSize: 12, display: 'block' }}>
+                ✗ {err}
+              </Typography.Text>
+            ))}
+            <Button type="primary" onClick={() => setDocReviewOpen(false)} block style={{ marginTop: 8 }}>
+              Done
+            </Button>
           </Space>
         )}
       </Modal>
