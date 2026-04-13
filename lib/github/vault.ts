@@ -111,6 +111,25 @@ export async function listActiveSpecs(token: string): Promise<string[]> {
   return data.filter((f: { type: string; name: string }) => f.type === 'file' && f.name.endsWith('.md')).map((f: { path: string }) => f.path)
 }
 
+/** List files and subdirectories at a vault path. Returns empty array if path does not exist. */
+export async function listVaultDirectory(
+  token: string,
+  path: string
+): Promise<Array<{ name: string; path: string; type: 'file' | 'dir' }>> {
+  const url = path
+    ? `${GITHUB_API}/repos/${VAULT_REPO}/contents/${encodeURIComponent(path)}`
+    : `${GITHUB_API}/repos/${VAULT_REPO}/contents`
+  const res = await fetch(url, { headers: headers(token) })
+  if (!res.ok) return []
+  const data = await res.json()
+  if (!Array.isArray(data)) return []
+  return data.map((item: { name: string; path: string; type: string }) => ({
+    name: item.name,
+    path: item.path,
+    type: item.type === 'dir' ? 'dir' as const : 'file' as const,
+  }))
+}
+
 // ── Write ─────────────────────────────────────────────────────────────────────
 
 /**

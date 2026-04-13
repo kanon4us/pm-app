@@ -85,13 +85,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   )
 
   // ── Merge computed scores into tasks.mapped_fields ────────────────────────────
-  const mappedUpdate: Record<string, number | null> = {
+  const mappedUpdate: Record<string, number | string | null> = {
     decision_maker_score: Math.round(fviResult.iDmNorm * 1000) / 1000,
     nondecision_maker_score: Math.round(fviResult.iNdmNorm * 1000) / 1000,
   }
-  for (const s of scores as Array<{ objectiveId: number; score: number }>) {
+  for (const s of scores as Array<{ objectiveId: number; score: number; reasoning?: string }>) {
     if (s.objectiveId >= 1 && s.objectiveId <= 7) {
       mappedUpdate[`obj_${s.objectiveId}_score`] = s.score
+      if (s.reasoning) mappedUpdate[`obj_${s.objectiveId}_desc`] = s.reasoning
     }
   }
   const { data: existingTask } = await supabase.from('tasks').select('mapped_fields').eq('id', id).single()
