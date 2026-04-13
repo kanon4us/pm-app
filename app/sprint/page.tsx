@@ -9,6 +9,7 @@ import type { ColumnType } from 'antd/es/table'
 import { SearchOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
+import { vaultBranchName } from '@/lib/github/vault'
 
 // ── Assessment types ──────────────────────────────────────────────────────────
 
@@ -797,10 +798,10 @@ export default function SprintPage() {
               <div>
                 <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>FVI SCORE</Typography.Text><br />
                 <Typography.Text style={{ color: '#58a6ff' }}>{detailTask.fvi_score != null ? detailTask.fvi_score.toFixed(2) : '—'}</Typography.Text>
-                {detailTask.git_branch && (
+                {detailTask.fvi_score != null && (
                   <div style={{ marginTop: 4 }}>
                     <a
-                      href={`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'}/tree/${detailTask.git_branch}`}
+                      href={`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'}/tree/${detailTask.git_branch ?? vaultBranchName(detailTask.clickup_task_id, detailTask.name)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: '#58a6ff', fontSize: 11 }}

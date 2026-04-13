@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
-import { writeVaultFile, createVaultBranch } from '@/lib/github/vault'
+import { writeVaultFile, createVaultBranch, vaultBranchName } from '@/lib/github/vault'
 import { computeFullFVI, RISK_LEVELS } from '@/lib/fvi'
 import type { Json } from '@/lib/supabase/types'
 
@@ -350,7 +350,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   // ── 2. Vault resource bundle ──────────────────────────────────────────────────
   if (ghToken?.access_token && conv.vault_spec_content) {
     try {
-      const slug = task.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40)
+      const slug = vaultBranchName(task.clickup_task_id, task.name).replace(`docs/feature/${task.clickup_task_id}-`, '')
       const dir = `FeaturePlanning/_Active/${task.clickup_task_id}-${slug}`
       const today = new Date().toISOString().slice(0, 10)
       const commit = (file: string) => `PM Agent: ${file} for ${task.name} (${today})`
