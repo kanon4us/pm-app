@@ -32,9 +32,17 @@ export interface VaultSearchResult {
   score: number
 }
 
+/** Encode a vault path for use in GitHub API URLs.
+ * Encodes each segment individually so forward slashes remain as path separators.
+ * e.g. "03_Glossary/my file.md" → "03_Glossary/my%20file.md"
+ */
+function encodePath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/')
+}
+
 /** Read a single file from the vault by path, optionally from a specific branch */
 export async function readVaultFile(token: string, path: string, branch?: string): Promise<VaultFile | null> {
-  const url = `${GITHUB_API}/repos/${VAULT_REPO}/contents/${encodeURIComponent(path)}${branch ? `?ref=${encodeURIComponent(branch)}` : ''}`
+  const url = `${GITHUB_API}/repos/${VAULT_REPO}/contents/${encodePath(path)}${branch ? `?ref=${encodeURIComponent(branch)}` : ''}`
   const res = await fetch(url, {
     headers: headers(token),
   })
@@ -156,12 +164,16 @@ export async function writeVaultFile(
   }
   if (existingSha) body.sha = existingSha
 
-  const res = await fetch(`${GITHUB_API}/repos/${VAULT_REPO}/contents/${encodeURIComponent(path)}`, {
+  const res = await fetch(`${GITHUB_API}/repos/${VAULT_REPO}/contents/${encodePath(path)}`, {
     method: 'PUT',
     headers: headers(token),
     body: JSON.stringify(body),
   })
-  if (!res.ok) return null
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    console.error(`[vault:writeVaultFile] PUT failed — path="${path}" branch="${branch}" status=${res.status} body=${errText.slice(0, 300)}`)
+    return null
+  }
   const data = await res.json()
   return { sha: data.content?.sha ?? '', url: data.content?.html_url ?? '' }
 }

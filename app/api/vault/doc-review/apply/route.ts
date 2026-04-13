@@ -57,10 +57,15 @@ export async function POST(req: NextRequest) {
   const applied: string[] = []
   const errors: string[] = []
 
-  // Sequential writes — GitHub's Contents API creates one commit per file.
-  // Parallel writes to the same branch fail because each commit updates the branch
-  // HEAD, invalidating concurrent requests that read the old HEAD SHA.
+  // Sequential writes with a short delay between each.
+  // GitHub's Contents API creates one commit per file write. Even with sequential
+  // requests, GitHub's backend may not have propagated the previous commit by the
+  // time the next request arrives, causing a conflict on the branch HEAD.
+  // A 750ms pause gives GitHub time to settle before the next write.
+  let isFirst = true
   for (const proposal of approved) {
+    if (!isFirst) await new Promise((resolve) => setTimeout(resolve, 750))
+    isFirst = false
     const content = proposal.editedContent ?? proposal.proposedContent
     const commitMessage = `docs: ${proposal.action === 'create' ? 'add' : 'update'} ${proposal.title} (via PM Agent, task ${task.clickup_task_id}, ${today})`
     try {
