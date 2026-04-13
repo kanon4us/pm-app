@@ -102,7 +102,7 @@ interface TourStep {
 
 interface DesignReview {
   steps: TourStep[]
-  divergenceNotes: string
+  divergenceNotes: string | null
   figmaFrames: Array<{ id: string; name: string; thumbnailUrl: string }>
   warnings: string[]
   cached: boolean
@@ -496,9 +496,14 @@ export default function SprintPage() {
         }
       )
       const data = await res.json()
-      if (res.ok) setDesignReview(data)
+      if (res.ok) {
+        setDesignReview(data)
+      } else {
+        setDesignReview({ steps: [], divergenceNotes: null, figmaFrames: [], warnings: ['figma_unavailable'], cached: false })
+      }
     } catch {
       // non-fatal: design review is informational only
+      setDesignReview({ steps: [], divergenceNotes: null, figmaFrames: [], warnings: ['figma_unavailable'], cached: false })
     }
     setDesignReviewLoading(false)
   }
@@ -1213,13 +1218,13 @@ export default function SprintPage() {
                   )}
                 </div>
 
-                {designReview.warnings.includes('figma_unavailable') && (
+                {(designReview.warnings ?? []).includes('figma_unavailable') && (
                   <Alert type="warning" title="Figma unavailable — showing user story steps only." style={{ marginBottom: 8 }} />
                 )}
 
                 <Space orientation="vertical" style={{ width: '100%' }}>
                   {designReview.steps.map((step) => {
-                    const frame = designReview.figmaFrames.find((f) => f.id === step.figmaFrameId)
+                    const frame = (designReview.figmaFrames ?? []).find((f) => f.id === step.figmaFrameId)
                     const badgeColor = step.type === 'not-yet-designed' ? '#f0883e' : step.type === 'visual-only' ? '#8b949e' : '#3fb950'
                     const badgeLabel = step.type === 'not-yet-designed' ? 'Not Yet Designed' : step.type === 'visual-only' ? 'Visual Only' : 'Designed'
                     return (
