@@ -55,12 +55,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   // ── Load conversation (check cache) ───────────────────────────────────────────
-  const { data: conv } = await supabase
+  // Cast required until migration 006 is applied and Supabase types are regenerated.
+  const { data: conv } = await (supabase
     .from('assessment_conversations')
     .select('id, task_id, design_review')
     .eq('id', conversationId)
     .eq('task_id', id)
-    .single()
+    .single() as unknown as Promise<{ data: { id: string; task_id: string; design_review: unknown } | null; error: unknown }>)
   if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
 
   // ── Return cached result if already generated ─────────────────────────────────
@@ -178,9 +179,11 @@ Return the JSON object.`,
     generatedAt: new Date().toISOString(),
   }
 
+  // Cast required until migration 006 is applied and Supabase types are regenerated.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: updateError } = await supabase
     .from('assessment_conversations')
-    .update({ design_review: result as unknown as Json })
+    .update({ design_review: result as unknown as Json } as any)
     .eq('id', conversationId)
 
   if (updateError) {
