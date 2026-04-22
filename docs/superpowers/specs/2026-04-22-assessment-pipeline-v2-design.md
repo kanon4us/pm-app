@@ -53,6 +53,9 @@ Claude reads the feature description and any existing 7 Objective notes. It then
 
 A `workflow_registry` reference document will be maintained in the docs repo to keep workflow names consistent across features.
 
+#### New Workflow Proposals
+If Claude identifies a workflow impact with no match in the existing manuals, it proposes a standardized title for a new Manual entry and adds it to `affected_workflows` with `registry_status: "proposed"`. The PM can accept the title, rename it, or merge it with an existing entry. Proposed entries appear in `workflow_registry` as drafts until a manual is written. Nothing blocks on this — the assessment continues with the proposed name.
+
 #### Impact Audit
 For every workflow identified, Claude must ask the user to confirm whether the change impacts:
 - **Internal SOPs** — team processes and operating procedures
@@ -71,7 +74,7 @@ The questions Claude asks are not these three verbatim — they are tailored to 
 #### If Objective Notes Do Not Exist
 If no 7 Objective notes exist for this task, Claude creates initial drafts before asking questions. The questions then refine those drafts.
 
-**Output stored:** `affected_workflows[]` with impact flags per workflow (`sop_impacted`, `education_impacted`, `scribehow_impacted`)
+**Output stored:** `affected_workflows[]` with impact flags per workflow (`sop_impacted`, `education_impacted`, `scribehow_impacted`, `registry_status: "existing" | "proposed"`)
 
 ---
 
