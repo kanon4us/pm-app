@@ -80,6 +80,53 @@ ${table(ndmRoles)}
 `
 }
 
+function buildSpecStub(
+  taskName: string,
+  clickupTaskId: string,
+  fvi: FVIResult,
+  effort: number,
+  risk: number,
+  scores: Array<{ objectiveId: number; score: number; objectiveName?: string; reasoning?: string }>
+): string {
+  const riskLabel = RISK_LEVELS.find((r) => r.multiplier === risk)?.label ?? `${risk}x`
+  const scoreLines = scores
+    .sort((a, b) => a.objectiveId - b.objectiveId)
+    .map((s) => `- **Obj ${s.objectiveId}${s.objectiveName ? ` — ${s.objectiveName}` : ''}:** ${s.score > 0 ? '+' : ''}${s.score}${s.reasoning ? `  \n  _${s.reasoning}_` : ''}`)
+    .join('\n')
+
+  return `# Feature Spec — ${taskName}
+
+> Auto-generated stub by PM Agent (assessment had no Q&A — all objectives scored from task context).
+> Fill in the sections below before moving to Architecting status.
+
+**ClickUp:** ${clickupTaskId}
+**FVI:** ${fvi.fviScore} — ${fvi.decision}
+**Effort:** ${effort} dev-day${effort !== 1 ? 's' : ''} | **Risk:** ${riskLabel} (${risk}x)
+
+---
+
+## Problem Statement
+
+_What user pain or business gap does this address? Who experiences it?_
+
+## Proposed Solution
+
+_High-level approach. What changes, what stays the same._
+
+## Acceptance Criteria
+
+- [ ] _Define done — measurable outcomes, not implementation steps_
+
+## Objective Scores
+
+${scoreLines}
+
+## Open Questions
+
+_List blockers or unknowns that must be resolved before Architecting._
+`
+}
+
 const DB_KEYWORDS_RE = /\b(index|migration|schema|database|db|query|table|column|foreign key|join)\b/i
 const FE_KEYWORDS_RE = /\b(component|drawer|modal|form|view|screen|ui|frontend|page|layout|button|input)\b/i
 const BE_KEYWORDS_RE = /\b(api|webhook|endpoint|route|server|database|migration|query|backend|worker|job|cron)\b/i
@@ -349,7 +396,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // ── 2. Vault resource bundle ──────────────────────────────────────────────────
-  if (ghAccessToken && conv.vault_spec_content) {
+  const specContent = conv.vault_spec_content ?? buildSpecStub(
+    task.name,
+    task.clickup_task_id,
+    fviResult,
+    conv.effort,
+    conv.risk,
+    (objAssessments ?? []).map((s) => ({ objectiveId: s.objective_id, score: s.score, reasoning: s.reasoning ?? undefined }))
+  )
+
+  if (ghAccessToken) {
     try {
       const slug = vaultBranchName(task.clickup_task_id, task.name).replace(`docs/feature/${task.clickup_task_id}-`, '')
       const dir = `FeaturePlanning/_Active/${task.clickup_task_id}-${slug}`
@@ -359,7 +415,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       vaultBranch = await createVaultBranch(ghAccessToken, task.clickup_task_id, task.name)
 
       // spec.md — gating write
-      const written = await writeVaultFile(ghAccessToken, `${dir}/spec.md`, conv.vault_spec_content, commit('FVI assessment'), vaultBranch)
+      const written = await writeVaultFile(ghAccessToken, `${dir}/spec.md`, specContent, commit('FVI assessment'), vaultBranch)
       if (!written) throw new Error('spec.md write returned null')
       vaultSpecUrl = written.url
       filesWritten.push('spec.md')
@@ -378,7 +434,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         .then(() => filesWritten.push('roles-affected.md'))
         .catch((err) => console.error(`[bundle task=${id}] roles-affected.md failed:`, err))
 
-      await writeVaultFile(ghAccessToken, `${dir}/plan-draft.md`, buildPlanDraft(task.name, task.clickup_task_id, fviResult, conv.effort, conv.risk, scoresWithReasoning, conv.vault_spec_content), commit('plan draft'), vaultBranch)
+      await writeVaultFile(ghAccessToken, `${dir}/plan-draft.md`, buildPlanDraft(task.name, task.clickup_task_id, fviResult, conv.effort, conv.risk, scoresWithReasoning, specContent), commit('plan draft'), vaultBranch)
         .then(() => filesWritten.push('plan-draft.md'))
         .catch((err) => console.error(`[bundle task=${id}] plan-draft.md failed:`, err))
 
