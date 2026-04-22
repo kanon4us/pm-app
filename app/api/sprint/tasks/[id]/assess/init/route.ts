@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
-import { searchFeatureSpecs, searchVault, extractKeywords, readVaultFile } from '@/lib/github/vault'
+import { searchFeatureSpecs, searchVault, extractKeywords, readVaultFile, readDevObjectives } from '@/lib/github/vault'
 import Anthropic from '@anthropic-ai/sdk'
 
 export const maxDuration = 300
@@ -90,29 +90,28 @@ export async function POST(_req: NextRequest, { params }: Params) {
   // ── Vault search ────────────────────────────────────────────────────────────
   const { data: ghToken } = await supabase.from('oauth_tokens').select('access_token').eq('user_id', user.id).eq('provider', 'github').single()
   const vaultConnected = !!ghToken?.access_token
+  const ghAccessToken = ghToken?.access_token ?? process.env.GITHUB_TOKEN
   const vaultFilesRead: string[] = []
   let vaultContext = ''
 
-  if (ghToken?.access_token) {
+  let devObjectivesContent = ''
+
+  if (ghAccessToken) {
     try {
       const keywords = extractKeywords(task.name)
-      const [specResults, broadResults] = await Promise.all([
-        searchFeatureSpecs(ghToken.access_token, keywords),
-        searchVault(ghToken.access_token, keywords, 3),
+      const [specResults, broadResults, devObjContent] = await Promise.all([
+        searchFeatureSpecs(ghAccessToken, keywords),
+        searchVault(ghAccessToken, keywords, 3),
+        readDevObjectives(ghAccessToken),
       ])
+      devObjectivesContent = devObjContent
+
       const allResults = [...specResults, ...broadResults].slice(0, 5)
       for (const r of allResults) {
         if (!vaultFilesRead.includes(r.path)) {
           vaultFilesRead.push(r.path)
           vaultContext += `\n\n---\nFile: ${r.path}\n${r.snippet}`
         }
-      }
-
-      // Always read FVI rubric for objective scoring reference
-      const rubric = await readVaultFile(ghToken.access_token, '00-Meta/FVI-Rubric.md')
-      if (rubric && !vaultFilesRead.includes(rubric.path)) {
-        vaultFilesRead.push(rubric.path)
-        vaultContext += `\n\n---\nFile: ${rubric.path}\n${rubric.content.slice(0, 1500)}`
       }
     } catch { /* non-fatal */ }
   }
@@ -138,9 +137,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
   }
 
   // ── Build Claude prompt ─────────────────────────────────────────────────────
-  const objectivesText = (objectives ?? []).map((o) =>
-    `Objective ${o.objective_id} — ${o.name} (Owner: ${o.owner_name})\nMandate: ${o.mandate}\nScore matrix: ${JSON.stringify(o.score_matrix)}`
-  ).join('\n\n')
+  // Use live DevObjectives files from the vault as the canonical source of truth.
+  // Fall back to DB-seeded data only when the vault is not connected.
+  const objectivesText = devObjectivesContent ||
+    (objectives ?? []).map((o) =>
+      `Objective ${o.objective_id} — ${o.name} (Owner: ${o.owner_name})\nMandate: ${o.mandate}\nScore matrix: ${JSON.stringify(o.score_matrix)}`
+    ).join('\n\n')
 
   const rolesText = (roles ?? []).map((r) =>
     `${r.role_name} (${r.team_domain}, ${r.influence_type}, weight ${r.weight})`
@@ -166,7 +168,7 @@ I_NDM_norm = sum(NDM_role_weight × usage_freq) / 224
 Usage frequency: 1=Access Default, 2=Access Sometimes, 3=Uses Sometimes, 4=Uses Every Day
 Risk levels: 1.0=Routine, 1.2=Standard, 1.5=Moderate, 2.0=High, 3.0=Critical
 
-THE 7 OBJECTIVES:
+THE 7 OBJECTIVES, SCORE MATRICES, AND RISK FRAMEWORK (${devObjectivesContent ? 'sourced live from ViscapMedia/documentation/DevObjectives — canonical source of truth' : 'fallback: DB-seeded data — vault not connected'}):
 ${objectivesText}
 
 AVAILABLE ROLES FOR INFLUENCE CALCULATION:

@@ -294,6 +294,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     supabase.from('oauth_tokens').select('access_token').eq('user_id', user.id).eq('provider', 'clickup').single(),
     supabase.from('oauth_tokens').select('access_token').eq('user_id', user.id).eq('provider', 'github').single(),
   ])
+  const ghAccessToken = ghToken?.access_token ?? process.env.GITHUB_TOKEN
 
   // ── Create bundle_generations record ──────────────────────────────────────────
   const { data: bundleGen } = await supabase.from('bundle_generations').insert({
@@ -348,17 +349,17 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // ── 2. Vault resource bundle ──────────────────────────────────────────────────
-  if (ghToken?.access_token && conv.vault_spec_content) {
+  if (ghAccessToken && conv.vault_spec_content) {
     try {
       const slug = vaultBranchName(task.clickup_task_id, task.name).replace(`docs/feature/${task.clickup_task_id}-`, '')
       const dir = `FeaturePlanning/_Active/${task.clickup_task_id}-${slug}`
       const today = new Date().toISOString().slice(0, 10)
       const commit = (file: string) => `PM Agent: ${file} for ${task.name} (${today})`
 
-      vaultBranch = await createVaultBranch(ghToken.access_token, task.clickup_task_id, task.name)
+      vaultBranch = await createVaultBranch(ghAccessToken, task.clickup_task_id, task.name)
 
       // spec.md — gating write
-      const written = await writeVaultFile(ghToken.access_token, `${dir}/spec.md`, conv.vault_spec_content, commit('FVI assessment'), vaultBranch)
+      const written = await writeVaultFile(ghAccessToken, `${dir}/spec.md`, conv.vault_spec_content, commit('FVI assessment'), vaultBranch)
       if (!written) throw new Error('spec.md write returned null')
       vaultSpecUrl = written.url
       filesWritten.push('spec.md')
@@ -373,21 +374,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       }))
 
       // Secondary files — each non-fatal
-      await writeVaultFile(ghToken.access_token, `${dir}/roles-affected.md`, buildRolesAffected(task.name, roles, fviResult), commit('roles affected'), vaultBranch)
+      await writeVaultFile(ghAccessToken, `${dir}/roles-affected.md`, buildRolesAffected(task.name, roles, fviResult), commit('roles affected'), vaultBranch)
         .then(() => filesWritten.push('roles-affected.md'))
         .catch((err) => console.error(`[bundle task=${id}] roles-affected.md failed:`, err))
 
-      await writeVaultFile(ghToken.access_token, `${dir}/plan-draft.md`, buildPlanDraft(task.name, task.clickup_task_id, fviResult, conv.effort, conv.risk, scoresWithReasoning, conv.vault_spec_content), commit('plan draft'), vaultBranch)
+      await writeVaultFile(ghAccessToken, `${dir}/plan-draft.md`, buildPlanDraft(task.name, task.clickup_task_id, fviResult, conv.effort, conv.risk, scoresWithReasoning, conv.vault_spec_content), commit('plan draft'), vaultBranch)
         .then(() => filesWritten.push('plan-draft.md'))
         .catch((err) => console.error(`[bundle task=${id}] plan-draft.md failed:`, err))
 
       const kickoffContent = buildKickoffPrompt(task.name, task.clickup_task_id, fviResult, conv.effort, conv.risk, vaultBranch)
 
-      await writeVaultFile(ghToken.access_token, `${dir}/kickoff-prompt.md`, kickoffContent, commit('kickoff prompt'), vaultBranch)
+      await writeVaultFile(ghAccessToken, `${dir}/kickoff-prompt.md`, kickoffContent, commit('kickoff prompt'), vaultBranch)
         .then(() => filesWritten.push('kickoff-prompt.md'))
         .catch((err) => console.error(`[bundle task=${id}] kickoff-prompt.md failed:`, err))
 
-      await writeVaultFile(ghToken.access_token, `${dir}/claude-md-block.md`, buildClaudeMdBlock(task.name, task.clickup_task_id, vaultBranch, fviResult, roles), commit('CLAUDE.md injection'), vaultBranch)
+      await writeVaultFile(ghAccessToken, `${dir}/claude-md-block.md`, buildClaudeMdBlock(task.name, task.clickup_task_id, vaultBranch, fviResult, roles), commit('CLAUDE.md injection'), vaultBranch)
         .then(() => filesWritten.push('claude-md-block.md'))
         .catch((err) => console.error(`[bundle task=${id}] claude-md-block.md failed:`, err))
 
@@ -399,7 +400,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           steps: designReview.steps,
           divergenceNotes: designReview.divergenceNotes ?? null,
         }
-        await writeVaultFile(ghToken.access_token, `${dir}/guided-tour.json`, JSON.stringify(guidedTour, null, 2), commit('guided tour'), vaultBranch)
+        await writeVaultFile(ghAccessToken, `${dir}/guided-tour.json`, JSON.stringify(guidedTour, null, 2), commit('guided tour'), vaultBranch)
           .then(() => filesWritten.push('guided-tour.json'))
           .catch((err) => {
             console.error(`[bundle task=${id}] guided-tour.json failed:`, err)

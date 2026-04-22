@@ -800,14 +800,20 @@ export default function SprintPage() {
                 <Typography.Text style={{ color: '#58a6ff' }}>{detailTask.fvi_score != null ? detailTask.fvi_score.toFixed(2) : '—'}</Typography.Text>
                 {detailTask.fvi_score != null && (
                   <div style={{ marginTop: 4 }}>
-                    <a
-                      href={`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'}/tree/${detailTask.git_branch ?? vaultBranchName(detailTask.clickup_task_id, detailTask.name)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: '#58a6ff', fontSize: 11 }}
-                    >
-                      📂 Vault branch ↗
-                    </a>
+                    {detailTask.git_branch ? (
+                      <a
+                        href={`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'}/tree/${detailTask.git_branch}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#58a6ff', fontSize: 11 }}
+                      >
+                        📂 Vault branch ↗
+                      </a>
+                    ) : (
+                      <Typography.Text style={{ color: '#484f58', fontSize: 11 }}>
+                        📂 Vault bundle not yet run
+                      </Typography.Text>
+                    )}
                   </div>
                 )}
               </div>

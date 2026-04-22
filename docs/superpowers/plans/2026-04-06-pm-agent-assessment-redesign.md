@@ -509,13 +509,13 @@ Do not start Part N+1 until Part N is complete and tested.
 
 ---
 
-## Open Questions Before Implementation
+## Open Questions — RESOLVED (2026-04-13)
 
-1. **Vault repo name on GitHub:** Is it `ViscapMedia/documentation`? (Confirm before adding env var)
-2. **Figma custom field name in ClickUp:** What is the exact name of the field that stores the Figma link? (Needed for field lookup during init)
-3. **Effort unit:** The vault says `E = Days × Devs`. Should the interview ask "how many days" + "how many devs" separately, or just total dev-days?
-4. **Spec stub naming:** The vault template suggests `YYYY-MM-DD-[clickup-id]-[feature-slug].md`. Should we use the ClickUp task ID as part of the filename for traceability?
-5. **Who sets Risk (R)?** The vault says Risk is owned by Obj 6 (Quality / Standard Bearer). In the interview, should Claude propose a risk level and the user confirms, or is it always user-entered?
+1. **Vault repo name on GitHub:** ✅ `ViscapMedia/documentation` — confirmed. Use as `GITHUB_VAULT_REPO` env var.
+2. **Figma custom field name in ClickUp:** ✅ The field is a link to the Figma project. Look for any URL custom field containing `figma.com`. Note: Figma project organization needs a separate game plan (future work).
+3. **Effort unit:** ✅ Total dev-days only (`E = Days × Devs` computed by the PM before entering). Claude asks for a single number, not days + devs separately.
+4. **Spec stub naming:** ✅ Include the ClickUp task ID: `YYYY-MM-DD-[clickup-id]-[feature-slug].md`. This prevents overwrites when merging to main and keeps files traceable.
+5. **Who sets Risk (R)?** ✅ Claude proposes the risk level based on the Risk Matrix in `documentation/DevObjectives/How Conflicts are Resolved.md` (Routine 1.0×, Standard 1.2×, Moderate 1.5×, High 2.0×, Critical 3.0×) and the Risk Checklist. The user confirms or overrides. The canonical source for all objective scoring breakdowns and the Risk Checklist is `ViscapMedia/documentation/DevObjectives/`.
 
 ---
 

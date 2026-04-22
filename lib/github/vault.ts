@@ -227,6 +227,41 @@ export async function createVaultBranch(
   return branch
 }
 
+/**
+ * Read all DevObjectives files from the vault.
+ * Returns combined content for use in Claude system prompts.
+ * Strips embedded base64 images and caps per-file content to stay within token budget.
+ */
+export async function readDevObjectives(token: string): Promise<string> {
+  const FILES = [
+    'DevObjectives/Data-Backed Decisions.md',
+    'DevObjectives/Modular Content Creation (Background Process).md',
+    'DevObjectives/User Success.md',
+    'DevObjectives/Optimized Onboarding.md',
+    'DevObjectives/Third-Party Integrations.md',
+    'DevObjectives/Quality Control.md',
+    'DevObjectives/Planning.md',
+    'DevObjectives/How Conflicts are Resolved.md',
+  ]
+
+  const results = await Promise.all(
+    FILES.map(async (path) => {
+      const file = await readVaultFile(token, path)
+      if (!file) return null
+      // Strip embedded base64 image data (How Conflicts are Resolved.md contains these)
+      const clean = file.content
+        .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=\n]+/g, '[image]')
+        .replace(/!\[.*?\]\([^)]*\)/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+      const label = path.replace('DevObjectives/', '').replace('.md', '')
+      return `\n\n=== ${label} ===\n${clean.slice(0, 2500)}`
+    })
+  )
+
+  return results.filter(Boolean).join('')
+}
+
 /** Extract search keywords from a task name (strips common stop words) */
 export function extractKeywords(taskName: string): string {
   const stopWords = new Set(['a', 'an', 'the', 'to', 'for', 'in', 'on', 'at', 'with', 'and', 'or', 'of', 'is', 'are', 'be', 'as'])
