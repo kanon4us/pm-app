@@ -19,7 +19,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { answer, objectiveId } = await req.json()
+  const body = await req.json() as {
+    answer?: string
+    objectiveId?: number
+    critiqueMode?: boolean
+    critiqueText?: string
+    currentScores?: Array<{ objectiveId: number; score: number; reasoning: string }>
+  }
+  const { answer, objectiveId, critiqueMode, critiqueText, currentScores } = body
 
   const supabase = await getSupabaseServiceClient()
 
@@ -42,13 +49,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
 
-  // Save user answer
-  await supabase.from('assessment_messages').insert({
-    conversation_id: conversationId,
-    role: 'user',
-    content: answer,
-    objective_id: objectiveId,
-  })
+  // Save user answer (skip in critique mode — no new Q&A message to record)
+  if (!critiqueMode && answer !== undefined && objectiveId !== undefined) {
+    await supabase.from('assessment_messages').insert({
+      conversation_id: conversationId,
+      role: 'user',
+      content: answer,
+      objective_id: objectiveId,
+    })
+  }
 
   // Load objectives and roles for context
   const { data: objectives } = await supabase.from('objectives_registry').select('*').order('objective_id')
@@ -65,7 +74,46 @@ export async function POST(req: NextRequest, { params }: Params) {
     `Obj ${o.objective_id} — ${o.name} (Owner: ${o.owner_name}): ${o.mandate}`
   ).join('\n')
 
-  const systemPrompt = `You are the Viscap PM Agent continuing an FVI assessment interview.
+  let systemPrompt: string
+  let userMessage: string
+
+  if (critiqueMode) {
+    const scoresText = (currentScores ?? [])
+      .map((s) => `Obj ${s.objectiveId}: score=${s.score} | reasoning: ${s.reasoning}`)
+      .join('\n')
+
+    systemPrompt = `You are the Viscap PM Agent re-evaluating FVI objective scores based on PM feedback.
+
+THE 7 OBJECTIVES:
+${objectivesText}
+
+CURRENT PROPOSED SCORES:
+${scoresText}
+
+The PM has reviewed these scores and provided feedback. You must:
+1. Re-evaluate ALL 7 objectives in light of the feedback — not just the one mentioned.
+2. Explain the ripple effect: how adjusting the primary score influenced the other objectives and why.
+3. The PM must approve the full modified set before proceeding.
+
+Your response MUST be valid JSON — no markdown, no text outside JSON:
+{
+  "type": "finalize",
+  "updatedScore": {"objectiveId":<primary objective mentioned in feedback>,"score":<-5 to 5>,"confidence":"high","reasoning":"<updated reasoning>"},
+  "allScores": [{"objectiveId":<1-7>,"objectiveName":"...","objectiveOwner":"...","score":<-5 to 5>,"reasoning":"<1-2 sentences>"}],
+  "proposedRoles": [{"roleName":"...","teamDomain":"agency|brand","influenceType":"DM|NDM","weight":<number>,"usageFrequency":<1-4>,"reasoning":"..."}],
+  "proposedEffort": {"days":<number>,"reasoning":"..."},
+  "proposedRisk": {"level":"Routine|Standard|Moderate|High|Critical","multiplier":<1.0|1.2|1.5|2.0|3.0>,"reasoning":"..."},
+  "vaultSpecContent": "<full markdown for vault spec stub>",
+  "rippleEffect": "<2-4 sentences explaining how the primary score change influenced the other 6 objectives>"
+}`
+
+    userMessage = `PM FEEDBACK ON SCORES:
+"${critiqueText ?? ''}"
+
+Re-evaluate all 7 objectives and explain the ripple effect.`
+
+  } else {
+    systemPrompt = `You are the Viscap PM Agent continuing an FVI assessment interview.
 
 You have proposed scores for all 7 objectives. The user has just answered a question about one objective. Your job is to:
 1. Update the score for the objective the question was about, based on the answer.
@@ -96,16 +144,18 @@ IF ready to finalize (no more questions needed):
   "proposedRoles": [{"roleName":"...","teamDomain":"agency|brand","influenceType":"DM|NDM","weight":<number>,"usageFrequency":<1-4>,"reasoning":"..."}],
   "proposedEffort": {"days":<number>,"reasoning":"..."},
   "proposedRisk": {"level":"Routine|Standard|Moderate|High|Critical","multiplier":<1.0|1.2|1.5|2.0|3.0>,"reasoning":"..."},
-  "vaultSpecContent": "<full markdown content for the vault spec stub, following Feature-Spec-Template.md format>"
+  "vaultSpecContent": "<full markdown content for the vault spec stub, following Feature-Spec-Template.md format>",
+  "rippleEffect": null
 }`
 
-  const userMessage = `ASSESSMENT HISTORY:
+    userMessage = `ASSESSMENT HISTORY:
 ${historyText}
 
-USER JUST ANSWERED (about Objective ${objectiveId}):
-"${answer}"
+USER JUST ANSWERED (about Objective ${objectiveId ?? '?'}):
+"${answer ?? ''}"
 
-Based on this answer, update the score for Objective ${objectiveId} and determine whether more questions are needed or you can finalize.`
+Based on this answer, update the score for Objective ${objectiveId ?? '?'} and determine whether more questions are needed or you can finalize.`
+  }
 
   const anthropic = new Anthropic()
   let response: Awaited<ReturnType<typeof anthropic.messages.create>>
