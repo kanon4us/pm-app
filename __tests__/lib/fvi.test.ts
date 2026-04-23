@@ -88,6 +88,9 @@ describe('fviDecision', () => {
   test('negative → kill-immediately', () => expect(fviDecision(-1)).toBe('kill-immediately'))
   test('exactly 5 → build-this-sprint', () => expect(fviDecision(5.0)).toBe('build-this-sprint'))
   test('exactly 0.5 → backlog', () => expect(fviDecision(0.5)).toBe('backlog'))
+  it('returns build-next-sprint at exactly 2.0', () => {
+    expect(fviDecision(2.0)).toBe('build-next-sprint')
+  })
 })
 
 describe('trojanHorseCheck', () => {
