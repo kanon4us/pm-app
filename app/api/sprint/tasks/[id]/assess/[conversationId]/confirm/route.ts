@@ -8,6 +8,18 @@ import type { Json } from '@/lib/supabase/types'
 
 type Params = { params: Promise<{ id: string; conversationId: string }> }
 
+type ConfirmRole = {
+  roleId: string              // role_registry primary key — sent from client
+  roleName: string
+  teamDomain: string
+  influenceType: 'DM' | 'NDM'
+  weight: number
+  claudeProposedFrequency: number
+  userOverrideFrequency: number | null
+  claudeReasoning: string | null
+  userReasoning: string | null
+}
+
 // POST /api/sprint/tasks/[id]/assess/[conversationId]/confirm
 // Fast step: computes FVI, saves all scores to Supabase, updates ClickUp task description.
 // Vault branch creation, ClickUp custom field write-back, and kickoff comment are in /bundle.
@@ -19,12 +31,19 @@ export async function POST(req: NextRequest, { params }: Params) {
   const body = await req.json()
   const {
     scores,             // Array<{ objectiveId, score, objectiveName, objectiveOwner, reasoning }>
-    roles,              // Array<{ roleId, roleName, influenceType, weight, usageFrequency, teamDomain }>
+    roles,              // Array<ConfirmRole>
     effort,             // number (total dev-days)
     risk,               // number (1.0, 1.2, 1.5, 2.0, 3.0)
     updatedDescription, // string | null
     vaultSpecContent,   // string | null — persisted for /bundle to read
-  } = body
+  } = body as {
+    scores: Array<{ objectiveId: number; score: number; objectiveName?: string; objectiveOwner?: string; reasoning?: string }>
+    roles: ConfirmRole[]
+    effort: number
+    risk: number
+    updatedDescription: string | null
+    vaultSpecContent: string | null
+  }
 
   const supabase = await getSupabaseServiceClient()
 
@@ -46,12 +65,29 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single()
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
+  // ── Validate overrides have reasoning ────────────────────────────────────────
+  const missingReasoning = roles.filter(
+    r => r.userOverrideFrequency !== null && !r.userReasoning?.trim()
+  )
+  if (missingReasoning.length > 0) {
+    return NextResponse.json(
+      { error: `Missing override reasoning for: ${missingReasoning.map(r => r.roleName).join(', ')}` },
+      { status: 400 }
+    )
+  }
+
   // ── Compute FVI ──────────────────────────────────────────────────────────────
-  const objectiveScores: ObjectiveScore[] = scores.map((s: { objectiveId: number; score: number }) => ({
+  const objectiveScores: ObjectiveScore[] = scores.map((s) => ({
     objectiveId: s.objectiveId,
     score: s.score,
   }))
-  const roleAssessments: RoleAssessment[] = roles.map((r: { roleName: string; influenceType: string; weight: number; usageFrequency: number }) => ({
+  const rolesForFVI = roles.map(r => ({
+    roleName: r.roleName,
+    influenceType: r.influenceType,
+    weight: r.weight,
+    usageFrequency: r.userOverrideFrequency ?? r.claudeProposedFrequency,
+  }))
+  const roleAssessments: RoleAssessment[] = rolesForFVI.map((r) => ({
     roleName: r.roleName,
     influenceType: r.influenceType as 'DM' | 'NDM',
     weight: r.weight,
@@ -70,19 +106,24 @@ export async function POST(req: NextRequest, { params }: Params) {
   )
 
   // ── Save conversation role assessments ────────────────────────────────────────
-  const { data: roleRows } = await supabase.from('role_registry').select('id, role_name, team_domain')
-  const roleIdMap = new Map((roleRows ?? []).map((r) => [`${r.role_name}::${r.team_domain}`, r.id]))
-  await Promise.all(
-    roles.map((r: { roleName: string; teamDomain: string; usageFrequency: number }) => {
-      const roleId = roleIdMap.get(`${r.roleName}::${r.teamDomain}`)
-      if (!roleId) return Promise.resolve()
-      return supabase.from('conversation_role_assessments').insert({
-        conversation_id: conversationId,
-        role_id: roleId,
-        usage_frequency: r.usageFrequency,
-      })
-    })
-  )
+  const roleInserts = roles.map(role => ({
+    conversation_id: conversationId,
+    role_id: role.roleId,
+    usage_frequency: role.userOverrideFrequency ?? role.claudeProposedFrequency,
+    claude_proposed_frequency: role.claudeProposedFrequency,
+    user_override_frequency: role.userOverrideFrequency,
+    claude_reasoning: role.claudeReasoning,
+    user_reasoning: role.userReasoning,
+  }))
+
+  const { error: roleError } = await supabase
+    .from('conversation_role_assessments')
+    .upsert(roleInserts, { onConflict: 'conversation_id,role_id' })
+
+  if (roleError) {
+    console.error('Role insert error:', roleError)
+    return NextResponse.json({ error: 'Failed to save role assessments' }, { status: 500 })
+  }
 
   // ── Merge computed scores into tasks.mapped_fields ────────────────────────────
   const mappedUpdate: Record<string, number | string | null> = {

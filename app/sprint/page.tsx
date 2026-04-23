@@ -490,14 +490,24 @@ export default function SprintPage() {
         objectiveOwner: s.objectiveOwner,
         reasoning: s.reasoning,
       }))
-      const selectedRoles = roleSelections.filter((r) => r.usageFrequency > 0)
+      const rolesPayload = roleSelections.map(r => ({
+        roleId: r.roleId ?? '',
+        roleName: r.roleName,
+        teamDomain: r.teamDomain,
+        influenceType: r.influenceType,
+        weight: r.weight,
+        claudeProposedFrequency: r.claudeProposedFrequency,
+        userOverrideFrequency: r.userOverrideFrequency,
+        claudeReasoning: r.claudeReasoning,
+        userReasoning: r.userReasoning,
+      }))
 
       const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/${conversation.conversationId}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scores,
-          roles: selectedRoles,
+          roles: rolesPayload,
           effort: confirmedEffort,
           risk: confirmedRisk,
           updatedDescription: conversation.finalizeProposal?.updatedDescription ?? null,
