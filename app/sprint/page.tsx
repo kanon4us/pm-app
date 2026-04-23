@@ -333,7 +333,12 @@ export default function SprintPage() {
     setRippleEffect(null)
     setReassessChoice(null)
     setAssessOpen(true)
-    void initAssessment()
+
+    if (detailTask?.fvi_score !== null && detailTask?.fvi_score !== undefined) {
+      setAssessPhase('reassess_check')
+    } else {
+      void initAssessment()
+    }
   }
 
   async function initAssessment(opts?: { considerNotes?: boolean; specificFeedback?: string }) {
@@ -1036,6 +1041,72 @@ export default function SprintPage() {
         styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
       >
         {assessError && <Alert type="error" title={assessError} style={{ marginBottom: 12 }} />}
+
+        {/* ── Reassessment Check ── */}
+        {assessPhase === 'reassess_check' && detailTask && (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <div style={{ background: '#161b22', border: '1px solid #f0883e', borderRadius: 8, padding: '14px 16px' }}>
+              <Typography.Text style={{ color: '#f0883e', fontSize: 12, fontWeight: 600 }}>
+                This task already has an FVI assessment (score: {detailTask.fvi_score?.toFixed(2)}).
+              </Typography.Text>
+              <Typography.Paragraph style={{ color: '#8b949e', fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+                Running a fresh assessment will create a new conversation but won&apos;t overwrite the existing score until you confirm.
+              </Typography.Paragraph>
+            </div>
+
+            <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, padding: '12px 14px' }}>
+              <Typography.Text style={{ color: '#e6edf3', fontSize: 12 }}>Should Claude consider the existing notes?</Typography.Text>
+              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                <Button
+                  size="small"
+                  type={reassessChoice?.considerNotes === true ? 'primary' : 'default'}
+                  onClick={() => setReassessChoice((prev) => ({ ...prev ?? { feedback: '' }, considerNotes: true }))}
+                >
+                  Yes, use existing notes
+                </Button>
+                <Button
+                  size="small"
+                  type={reassessChoice?.considerNotes === false ? 'primary' : 'default'}
+                  onClick={() => setReassessChoice((prev) => ({ ...prev ?? { feedback: '' }, considerNotes: false }))}
+                >
+                  No, start fresh
+                </Button>
+              </div>
+
+              {reassessChoice !== null && (
+                <>
+                  <Typography.Text style={{ color: '#8b949e', fontSize: 11, marginTop: 12, display: 'block' }}>
+                    Anything specific that&apos;s wrong? (optional)
+                  </Typography.Text>
+                  <Input.TextArea
+                    rows={2}
+                    value={reassessChoice.feedback}
+                    onChange={(e) => setReassessChoice((prev) => ({ ...prev!, feedback: e.target.value }))}
+                    placeholder="e.g. The effort estimate was too low — we discovered a DB migration is needed…"
+                    style={{ marginTop: 4 }}
+                  />
+                </>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <Button size="small" onClick={() => { setAssessOpen(false); setAssessPhase('idle') }}>
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                size="small"
+                disabled={reassessChoice === null}
+                onClick={() => {
+                  setAssessPhase('loading')
+                  void initAssessment({ considerNotes: reassessChoice!.considerNotes, specificFeedback: reassessChoice!.feedback })
+                }}
+              >
+                Start fresh assessment →
+              </Button>
+            </div>
+          </Space>
+        )}
 
         {/* ── Loading ── */}
         {assessPhase === 'loading' && (
