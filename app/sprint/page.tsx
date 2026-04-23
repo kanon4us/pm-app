@@ -10,6 +10,7 @@ import { SearchOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/i
 import { apiFetch } from '@/lib/fetch'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
 import { vaultBranchName } from '@/lib/github/vault'
+import { FREQ_LABELS } from '@/lib/fvi'
 
 // ── Assessment types ──────────────────────────────────────────────────────────
 
@@ -152,7 +153,6 @@ const DECISION_COLORS: Record<string, string> = {
   'kill-immediately': '#f85149',
 }
 
-const FREQ_LABELS = ['', 'Access by Default', 'Access Sometimes', 'Uses Sometimes', 'Uses Every Day']
 
 const RISK_OPTIONS = [
   { value: 1.0, label: '1.0× Routine — done this 100 times' },
@@ -1074,96 +1074,119 @@ export default function SprintPage() {
               Claude pre-selected roles based on the feature description. Adjust usage frequency per role (or set to 0 to exclude).
             </Typography.Text>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 8 }}>
-              <div>
-                <Typography.Text style={{ color: '#58a6ff', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>DECISION MAKERS (I-DM)</Typography.Text>
-                {roleSelections.filter((r) => r.influenceType === 'DM').map((r) => (
-                  <div key={`${r.roleName}::${r.teamDomain}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #21262d' }}>
-                    <div>
-                      <Typography.Text style={{ color: r.usageFrequency > 0 ? '#e6edf3' : '#8b949e', fontSize: 12 }}>{r.roleName}</Typography.Text>
-                      <Typography.Text style={{ color: '#8b949e', fontSize: 10, display: 'block' }}>{r.teamDomain} · wt {r.weight}</Typography.Text>
+            {/* Roles grouped: Agency DM → Agency NDM → Brand DM → Brand NDM */}
+            {(() => {
+              const hasInvalidOverride = roleSelections.some(
+                r => r.isUserOverride && !r.userReasoning?.trim()
+              )
+              return (
+                <>
+                  {(['agency', 'brand'] as const).map(domain => (
+                    <div key={domain} className="mb-6">
+                      {(['DM', 'NDM'] as const).map(iType => {
+                        const group = roleSelections.filter(
+                          r => r.teamDomain === domain && r.influenceType === iType
+                        )
+                        if (group.length === 0) return null
+                        return (
+                          <div key={iType} className="mb-4">
+                            <p className="text-xs font-mono font-bold mb-2 text-muted-foreground uppercase">
+                              {domain} — {iType === 'DM' ? 'DECISION MAKERS (I-DM)' : 'NON-DECISION MAKERS (I-NDM)'}
+                            </p>
+                            {group.map(role => {
+                              const isOverride = role.isUserOverride
+                              const missingReasoning = isOverride && !role.userReasoning?.trim()
+                              return (
+                                <div key={`${role.teamDomain}-${role.roleName}`} className="mb-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <span className="text-sm font-medium">{role.roleName}</span>
+                                      <span className="text-xs text-muted-foreground ml-2">wt {role.weight}</span>
+                                    </div>
+                                    {isOverride ? (
+                                      <span className="text-xs text-orange-400" title="You overrode Claude">👤</span>
+                                    ) : role.usageFrequency > 0 ? (
+                                      <span className="text-xs text-blue-400" title="Claude proposed">✦ AI</span>
+                                    ) : null}
+                                    <select
+                                      value={role.usageFrequency}
+                                      onChange={e => updateRoleFreq(role.roleName, role.teamDomain, Number(e.target.value))}
+                                      className="text-sm border rounded px-2 py-1 bg-background"
+                                    >
+                                      {FREQ_LABELS.map((label, idx) => (
+                                        <option key={idx} value={idx}>{idx} — {label}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="mt-1">
+                                    <input
+                                      type="text"
+                                      value={isOverride ? (role.userReasoning ?? '') : (role.claudeReasoning ?? '')}
+                                      readOnly={!isOverride}
+                                      onChange={e => isOverride && updateRoleReasoning(role.roleName, role.teamDomain, e.target.value)}
+                                      placeholder={isOverride ? 'Your override — explain why (required)' : ''}
+                                      className={[
+                                        'w-full text-xs px-2 py-1 rounded border bg-background',
+                                        isOverride ? 'border-orange-400' : 'border-transparent text-muted-foreground',
+                                        missingReasoning ? 'border-red-500' : '',
+                                      ].join(' ')}
+                                    />
+                                    {missingReasoning && (
+                                      <p className="text-xs text-red-500 mt-0.5">Explanation required for overrides</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
                     </div>
-                    <Select
-                      size="small"
-                      value={r.usageFrequency}
-                      onChange={(v) => updateRoleFreq(r.roleName, r.teamDomain, v)}
-                      style={{ width: 160 }}
-                      options={[
-                        { value: 0, label: 'Not affected' },
-                        { value: 1, label: '1 — Access Default' },
-                        { value: 2, label: '2 — Access Sometimes' },
-                        { value: 3, label: '3 — Uses Sometimes' },
-                        { value: 4, label: '4 — Uses Every Day' },
-                      ]}
-                    />
-                  </div>
-                ))}
-              </div>
+                  ))}
 
-              <div>
-                <Typography.Text style={{ color: '#8b949e', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>NON-DECISION MAKERS (I-NDM)</Typography.Text>
-                {roleSelections.filter((r) => r.influenceType === 'NDM').map((r) => (
-                  <div key={`${r.roleName}::${r.teamDomain}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #21262d' }}>
+                  <Divider style={{ borderColor: '#21262d', margin: '8px 0' }} />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <div>
-                      <Typography.Text style={{ color: r.usageFrequency > 0 ? '#e6edf3' : '#8b949e', fontSize: 12 }}>{r.roleName}</Typography.Text>
-                      <Typography.Text style={{ color: '#8b949e', fontSize: 10, display: 'block' }}>{r.teamDomain} · wt {r.weight}</Typography.Text>
+                      <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>EFFORT (total dev-days)</Typography.Text>
+                      <Typography.Text style={{ color: '#8b949e', fontSize: 11, fontStyle: 'italic', display: 'block' }}>
+                        {conversation.proposedEffort.reasoning}
+                      </Typography.Text>
+                      <InputNumber
+                        min={0.5} max={100} step={0.5}
+                        value={confirmedEffort}
+                        onChange={(v) => setConfirmedEffort(v ?? 3)}
+                        style={{ width: '100%', marginTop: 4 }}
+                      />
                     </div>
-                    <Select
-                      size="small"
-                      value={r.usageFrequency}
-                      onChange={(v) => updateRoleFreq(r.roleName, r.teamDomain, v)}
-                      style={{ width: 160 }}
-                      options={[
-                        { value: 0, label: 'Not affected' },
-                        { value: 1, label: '1 — Access Default' },
-                        { value: 2, label: '2 — Access Sometimes' },
-                        { value: 3, label: '3 — Uses Sometimes' },
-                        { value: 4, label: '4 — Uses Every Day' },
-                      ]}
-                    />
+                    <div>
+                      <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>RISK MULTIPLIER</Typography.Text>
+                      <Typography.Text style={{ color: '#8b949e', fontSize: 11, fontStyle: 'italic', display: 'block' }}>
+                        {conversation.proposedRisk.reasoning}
+                      </Typography.Text>
+                      <Select
+                        value={confirmedRisk}
+                        onChange={setConfirmedRisk}
+                        options={RISK_OPTIONS.map((r) => ({ value: r.value, label: r.label }))}
+                        style={{ width: '100%', marginTop: 4 }}
+                      />
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <Divider style={{ borderColor: '#21262d', margin: '8px 0' }} />
+                  <Button
+                    type="primary"
+                    icon={<ThunderboltOutlined />}
+                    onClick={handleConfirm}
+                    disabled={hasInvalidOverride}
+                    block
+                    style={{ marginTop: 8, ...(hasInvalidOverride ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                  >
+                    {hasInvalidOverride ? 'Explain all overrides to continue' : 'Compute FVI & Save'}
+                  </Button>
+                </>
+              )
+            })()}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div>
-                <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>EFFORT (total dev-days)</Typography.Text>
-                <Typography.Text style={{ color: '#8b949e', fontSize: 11, fontStyle: 'italic', display: 'block' }}>
-                  {conversation.proposedEffort.reasoning}
-                </Typography.Text>
-                <InputNumber
-                  min={0.5} max={100} step={0.5}
-                  value={confirmedEffort}
-                  onChange={(v) => setConfirmedEffort(v ?? 3)}
-                  style={{ width: '100%', marginTop: 4 }}
-                />
-              </div>
-              <div>
-                <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>RISK MULTIPLIER</Typography.Text>
-                <Typography.Text style={{ color: '#8b949e', fontSize: 11, fontStyle: 'italic', display: 'block' }}>
-                  {conversation.proposedRisk.reasoning}
-                </Typography.Text>
-                <Select
-                  value={confirmedRisk}
-                  onChange={setConfirmedRisk}
-                  options={RISK_OPTIONS.map((r) => ({ value: r.value, label: r.label }))}
-                  style={{ width: '100%', marginTop: 4 }}
-                />
-              </div>
-            </div>
-
-            <Button
-              type="primary"
-              icon={<ThunderboltOutlined />}
-              onClick={handleConfirm}
-              block
-              style={{ marginTop: 8 }}
-            >
-              Compute FVI & Save
-            </Button>
           </Space>
         )}
 
