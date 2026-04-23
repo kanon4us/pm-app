@@ -5,6 +5,7 @@ import { buildClickUpClient } from '@/lib/clickup/client'
 import { searchFeatureSpecs, searchVault, extractKeywords, readVaultFile, readDevObjectives } from '@/lib/github/vault'
 import Anthropic from '@anthropic-ai/sdk'
 import { mergeRolesWithRegistry } from '@/lib/role-merge'
+import type { AffectedWorkflow } from '@/lib/assessment-types'
 
 export const maxDuration = 300
 
@@ -14,10 +15,17 @@ const CLAUDE_MODEL = 'claude-opus-4-6'
 
 // POST /api/sprint/tasks/[id]/assess/init
 // Gathers vault context + other tasks, pre-scores all 7 objectives, generates first question.
-export async function POST(_req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json().catch(() => ({})) as {
+    considerExistingNotes?: boolean
+    specificFeedback?: string
+  }
+  const considerExistingNotes = body.considerExistingNotes ?? true
+  const specificFeedback = body.specificFeedback ?? ''
 
   const supabase = await getSupabaseServiceClient()
 
@@ -168,7 +176,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   ).join('\n')
 
   const reassessmentContext = isReassessment && lastAssessment
-    ? `\n\nPREVIOUS ASSESSMENT (${lastAssessment.created_at.slice(0, 10)}): FVI was ${lastAssessment.fvi_score?.toFixed(2) ?? 'N/A'}. Previous scores: ${JSON.stringify(lastAssessment.final_scores)}. Note what may have changed since then.`
+    ? `\n\nPREVIOUS ASSESSMENT (${lastAssessment.created_at.slice(0, 10)}): FVI was ${lastAssessment.fvi_score?.toFixed(2) ?? 'N/A'}. Previous scores: ${JSON.stringify(lastAssessment.final_scores)}.${considerExistingNotes ? ' Use these previous notes as context when scoring.' : ' Start fresh — do not anchor on previous scores.'}${specificFeedback ? ` PM feedback on what changed: ${specificFeedback}` : ''}`
     : ''
 
   const systemPrompt = `You are the Viscap PM Agent. Your role is to assess whether a ClickUp task should be prioritized in the product backlog by scoring it using the Feature Value Index (FVI) system.
@@ -189,12 +197,27 @@ ${objectivesText}
 AVAILABLE ROLES FOR INFLUENCE CALCULATION:
 ${rolesText}
 
+PHASE 1 — WORKFLOW STANDARDIZATION:
+Before proposing objective scores, identify all workflows this feature affects. A workflow is a named, repeatable process within the Viscap platform (e.g., "Create Campaign Brief", "Review Media Plan", "Submit Change Order").
+
+For each affected workflow:
+- name: Standardized title-case name matching or derived from Viscap documentation manuals
+- registryStatus: "existing" if this matches a known Viscap workflow, "proposed" if this would be a new manual entry
+- sopImpacted: true if this changes internal team operating procedures
+- educationImpacted: true if this changes customer-facing lesson content sold to customers
+- scribehowImpacted: true if this changes step-by-step ScribeHow tutorial documentation
+
+Your clarifying questions should surface: (1) which workflows change (not just what the feature does), (2) edge cases and failure modes, (3) which roles are directly vs. indirectly affected. Ask at least 2 workflow-focused questions BEFORE asking objective-specific questions.
+
 TROJAN HORSE RULE: If Obj1(Data)=+5 AND (Obj2(Modular)≤-4 OR Obj3(UserSuccess)≤-4) → flag as Trojan Horse.
 
 DECISION THRESHOLDS: >5=Build This Sprint | 2-5=Build Next Sprint | 0.5-2=Backlog | <0.5=Kill | Negative=Kill Immediately
 
 Your response MUST be valid JSON matching this exact structure — no markdown, no explanation outside JSON:
 {
+  "affectedWorkflows": [
+    {"name":"<title-case workflow name>","registryStatus":"existing|proposed","sopImpacted":<true|false>,"educationImpacted":<true|false>,"scribehowImpacted":<true|false>}
+  ],
   "proposedScores": [
     {"objectiveId":1,"objectiveName":"Data-Backed Decisions","objectiveOwner":"Architect of Truth","score":<-5 to 5>,"confidence":"high|medium|low","reasoning":"<1-2 sentences>","evidence":"<vault file path or task evidence, or 'No vault match found'>"}
   ],
@@ -263,6 +286,10 @@ ${reassessmentContext}`
     }
   }
 
+  const affectedWorkflows: AffectedWorkflow[] = (
+    assessment.affectedWorkflows as AffectedWorkflow[] | undefined
+  ) ?? []
+
   // ── Merge Claude's proposed roles with the full registry ───────────────────
   const claudeProposed: Array<{ roleName: string; usageFrequency: number; reasoning: string }> =
     (assessment.proposedRoles as Array<{ roleName: string; usageFrequency: number; reasoning: string }>) ?? []
@@ -277,6 +304,7 @@ ${reassessmentContext}`
       status: 'in_progress',
       vault_context: { filesRead: vaultFilesRead, hasVault: vaultConnected } as unknown as import('@/lib/supabase/types').Json,
       proposed_scores: assessment.proposedScores as unknown as import('@/lib/supabase/types').Json,
+      affected_workflows: affectedWorkflows as unknown as import('@/lib/supabase/types').Json,
     })
     .select('id')
     .single()
@@ -295,6 +323,7 @@ ${reassessmentContext}`
   return NextResponse.json({
     conversationId: conv?.id,
     ...assessment,
+    affectedWorkflows,
     proposedRoles: fullRoles,
     figmaThumbUrl,
     figmaLink,
