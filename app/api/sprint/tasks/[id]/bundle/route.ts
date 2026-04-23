@@ -4,6 +4,7 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import { writeVaultFile, createVaultBranch, vaultBranchName } from '@/lib/github/vault'
 import { computeFullFVI, RISK_LEVELS } from '@/lib/fvi'
+import { buildAssessmentDoc } from '@/lib/bundle-docs/assessment'
 import type { Json } from '@/lib/supabase/types'
 
 export const maxDuration = 300
@@ -290,14 +291,28 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
   if (!conv.effort || !conv.risk) return NextResponse.json({ error: 'Assessment not yet confirmed' }, { status: 400 })
 
+  // ── Types for columns not yet in generated Supabase types ─────────────────────
+  type RoleRegistryJoin = { role_name: string; team_domain: string; influence_type: string; weight: number }
+  type RoleAssessFullRow = {
+    claude_proposed_frequency: number | null
+    user_override_frequency: number | null
+    claude_reasoning: string | null
+    user_reasoning: string | null
+    role_registry: RoleRegistryJoin
+  }
+  type ObjRegistryRow = { objective_id: number; name: string; owner_name: string }
+
   // ── Load objective scores + role assessments in parallel ──────────────────────
-  const [{ data: objAssessments }, { data: roleAssessRows }] = await Promise.all([
+  const [{ data: objAssessments }, { data: roleAssessRows }, { data: roleAssessFull }] = await Promise.all([
     supabase.from('objective_assessments')
       .select('objective_id, score, reasoning')
       .eq('task_id', id),
     supabase.from('conversation_role_assessments')
       .select('usage_frequency, role_id')
       .eq('conversation_id', conversationId),
+    (supabase.from('conversation_role_assessments')
+      .select('claude_proposed_frequency, user_override_frequency, claude_reasoning, user_reasoning, role_registry!inner(role_name, team_domain, influence_type, weight)')
+      .eq('conversation_id', conversationId)) as unknown as Promise<{ data: RoleAssessFullRow[] | null }>,
   ])
 
   // Resolve role details from registry
@@ -314,6 +329,34 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!reg) return []
     return [{ roleName: reg.role_name, teamDomain: reg.team_domain, influenceType: reg.influence_type as 'DM' | 'NDM', weight: reg.weight, usageFrequency: r.usage_frequency }]
   })
+
+  const rolesForDoc = (roleAssessFull ?? []).map(ra => {
+    const reg = ra.role_registry
+    return {
+      roleName: reg.role_name,
+      teamDomain: reg.team_domain,
+      influenceType: reg.influence_type as 'DM' | 'NDM',
+      weight: reg.weight,
+      claudeProposedFrequency: ra.claude_proposed_frequency ?? 0,
+      userOverrideFrequency: ra.user_override_frequency ?? null,
+      claudeReasoning: ra.claude_reasoning ?? null,
+      userReasoning: ra.user_reasoning ?? null,
+    }
+  })
+
+  const { data: objRegistry } = (await supabase
+    .from('objectives_registry')
+    .select('objective_id, name, owner_name')) as unknown as { data: ObjRegistryRow[] | null }
+
+  const objNameMap = new Map((objRegistry ?? []).map(o => [o.objective_id, { name: o.name, owner: o.owner_name }]))
+
+  const objectivesForDoc = (objAssessments ?? []).map(s => ({
+    objectiveId: s.objective_id,
+    objectiveName: objNameMap.get(s.objective_id)?.name ?? `Objective ${s.objective_id}`,
+    objectiveOwner: objNameMap.get(s.objective_id)?.owner ?? '',
+    score: s.score,
+    reasoning: s.reasoning ?? '',
+  }))
 
   // ── Re-run FVI from persisted data ───────────────────────────────────────────
   const objectiveScores = (objAssessments ?? []).map((s) => ({ objectiveId: s.objective_id, score: s.score }))
@@ -412,6 +455,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       const today = new Date().toISOString().slice(0, 10)
       const commit = (file: string) => `PM Agent: ${file} for ${task.name} (${today})`
 
+      const pmAppCommitSha = process.env.NEXT_PUBLIC_COMMIT_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev'
+      const riskLevelLabel = RISK_LEVELS.find(r => r.multiplier === conv.risk)?.label ?? `${conv.risk}x`
+
       vaultBranch = await createVaultBranch(ghAccessToken, task.clickup_task_id, task.name)
 
       // spec.md — gating write
@@ -430,6 +476,23 @@ export async function POST(req: NextRequest, { params }: Params) {
       }))
 
       // Secondary files — each non-fatal
+      const assessmentContent = buildAssessmentDoc({
+        taskName: task.name,
+        clickupId: task.clickup_task_id,
+        objectives: objectivesForDoc,
+        roles: rolesForDoc,
+        fvi: fviResult,
+        effort: conv.effort,
+        riskLevel: riskLevelLabel,
+        riskMultiplier: conv.risk,
+        conversationId,
+        pmAppCommitSha,
+      })
+
+      await writeVaultFile(ghAccessToken, `${dir}/assessment.md`, assessmentContent, commit('FVI assessment doc'), vaultBranch)
+        .then(() => filesWritten.push('assessment.md'))
+        .catch((err) => console.error(`[bundle task=${id}] assessment.md failed:`, err))
+
       await writeVaultFile(ghAccessToken, `${dir}/roles-affected.md`, buildRolesAffected(task.name, roles, fviResult), commit('roles affected'), vaultBranch)
         .then(() => filesWritten.push('roles-affected.md'))
         .catch((err) => console.error(`[bundle task=${id}] roles-affected.md failed:`, err))
