@@ -4,6 +4,7 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import { searchFeatureSpecs, searchVault, extractKeywords, readVaultFile, readDevObjectives } from '@/lib/github/vault'
 import Anthropic from '@anthropic-ai/sdk'
+import { mergeRolesWithRegistry } from '@/lib/role-merge'
 
 export const maxDuration = 300
 
@@ -85,7 +86,21 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   // ── Objectives and roles from DB ───────────────────────────────────────────
   const { data: objectives } = await supabase.from('objectives_registry').select('*').order('objective_id')
-  const { data: roles } = await supabase.from('role_registry').select('*').eq('is_active', true)
+  const { data: allRolesRaw } = await supabase
+    .from('role_registry')
+    .select('id, role_name, team_domain, influence_type, weight')
+    .eq('is_active', true)
+    .order('team_domain')
+    .order('influence_type')
+    .order('weight', { ascending: false })
+  // Map DB `id` → `role_id` to satisfy RegistryRole interface
+  const allRoles = (allRolesRaw ?? []).map((r) => ({
+    role_id: r.id,
+    role_name: r.role_name,
+    team_domain: r.team_domain,
+    influence_type: r.influence_type as 'DM' | 'NDM',
+    weight: r.weight,
+  }))
 
   // ── Vault search ────────────────────────────────────────────────────────────
   const { data: ghToken } = await supabase.from('oauth_tokens').select('access_token').eq('user_id', user.id).eq('provider', 'github').single()
@@ -144,7 +159,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       `Objective ${o.objective_id} — ${o.name} (Owner: ${o.owner_name})\nMandate: ${o.mandate}\nScore matrix: ${JSON.stringify(o.score_matrix)}`
     ).join('\n\n')
 
-  const rolesText = (roles ?? []).map((r) =>
+  const rolesText = (allRoles ?? []).map((r) =>
     `${r.role_name} (${r.team_domain}, ${r.influence_type}, weight ${r.weight})`
   ).join(', ')
 
@@ -248,6 +263,12 @@ ${reassessmentContext}`
     }
   }
 
+  // ── Merge Claude's proposed roles with the full registry ───────────────────
+  const claudeProposed: Array<{ roleName: string; usageFrequency: number; reasoning: string }> =
+    (assessment.proposedRoles as Array<{ roleName: string; usageFrequency: number; reasoning: string }>) ?? []
+
+  const fullRoles = mergeRolesWithRegistry(allRoles ?? [], claudeProposed)
+
   // ── Persist conversation ────────────────────────────────────────────────────
   const { data: conv } = await supabase
     .from('assessment_conversations')
@@ -274,6 +295,7 @@ ${reassessmentContext}`
   return NextResponse.json({
     conversationId: conv?.id,
     ...assessment,
+    proposedRoles: fullRoles,
     figmaThumbUrl,
     figmaLink,
     vaultConnected,
