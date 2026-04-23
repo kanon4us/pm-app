@@ -46,8 +46,12 @@ interface RoleSelection {
   teamDomain: string
   influenceType: 'DM' | 'NDM'
   weight: number
-  usageFrequency: number // 0 = not selected
-  reasoning?: string
+  usageFrequency: number           // active value: userOverrideFrequency ?? claudeProposedFrequency
+  claudeProposedFrequency: number  // Claude's original proposal (0 if not proposed)
+  claudeReasoning: string | null   // Claude's explanation (null if not proposed)
+  userOverrideFrequency: number | null  // set when user changes from Claude's value
+  userReasoning: string | null     // required when userOverrideFrequency is set
+  isUserOverride: boolean          // true when userOverrideFrequency !== null
 }
 
 interface FinalizeProposal {
@@ -356,7 +360,7 @@ export default function SprintPage() {
 
       // If no questions needed, go straight to roles step
       if (!data.firstQuestion || data.totalEstimatedQuestions === 0) {
-        setupRolesFromProposal(data.proposedRoles ?? [])
+        setRoleSelections(setupRolesFromProposal(data.proposedRoles ?? []))
         setAssessPhase('roles')
       } else {
         setAssessPhase('interview')
@@ -400,7 +404,7 @@ export default function SprintPage() {
           ...s,
           confidence: 'high' as const,
         }))
-        setupRolesFromProposal(data.proposedRoles ?? [])
+        setRoleSelections(setupRolesFromProposal(data.proposedRoles ?? []))
         setConfirmedEffort(data.proposedEffort?.days ?? confirmedEffort)
         setConfirmedRisk(data.proposedRisk?.multiplier ?? confirmedRisk)
         setConversation({
@@ -426,23 +430,53 @@ export default function SprintPage() {
 
   async function skipToRoles() {
     if (!conversation) return
-    setupRolesFromProposal(conversation.finalizeProposal?.proposedRoles ?? [])
+    setRoleSelections(setupRolesFromProposal(conversation.finalizeProposal?.proposedRoles ?? []))
     setAssessPhase('roles')
   }
 
-  function setupRolesFromProposal(proposed: RoleSelection[]) {
-    // Start with proposed roles pre-selected, others at 0
-    setRoleSelections(proposed.map((r) => ({ ...r, usageFrequency: r.usageFrequency ?? 0 })))
+  function setupRolesFromProposal(
+    proposed: Array<{
+      roleId?: string; roleName: string; teamDomain: string
+      influenceType: 'DM' | 'NDM'; weight: number; usageFrequency: number
+      claudeProposedFrequency: number; claudeReasoning: string | null
+      userOverrideFrequency: number | null; userReasoning: string | null
+      isUserOverride: boolean
+    }>
+  ): RoleSelection[] {
+    return proposed.map(r => ({
+      roleId: r.roleId,
+      roleName: r.roleName,
+      teamDomain: r.teamDomain,
+      influenceType: r.influenceType,
+      weight: r.weight,
+      usageFrequency: r.usageFrequency,
+      claudeProposedFrequency: r.claudeProposedFrequency,
+      claudeReasoning: r.claudeReasoning,
+      userOverrideFrequency: r.userOverrideFrequency,
+      userReasoning: r.userReasoning,
+      isUserOverride: r.isUserOverride,
+    }))
   }
 
-  function updateRoleFreq(roleName: string, teamDomain: string, freq: number) {
-    setRoleSelections((prev) => {
-      const existing = prev.find((r) => r.roleName === roleName && r.teamDomain === teamDomain)
-      if (existing) {
-        return prev.map((r) => r.roleName === roleName && r.teamDomain === teamDomain ? { ...r, usageFrequency: freq } : r)
+  function updateRoleFreq(roleName: string, teamDomain: string, newFreq: number) {
+    setRoleSelections(prev => prev.map(r => {
+      if (r.roleName !== roleName || r.teamDomain !== teamDomain) return r
+      const isOverride = newFreq !== r.claudeProposedFrequency
+      return {
+        ...r,
+        usageFrequency: newFreq,
+        userOverrideFrequency: isOverride ? newFreq : null,
+        isUserOverride: isOverride,
+        userReasoning: isOverride ? (r.userReasoning ?? '') : null,
       }
-      return prev
-    })
+    }))
+  }
+
+  function updateRoleReasoning(roleName: string, teamDomain: string, reasoning: string) {
+    setRoleSelections(prev => prev.map(r => {
+      if (r.roleName !== roleName || r.teamDomain !== teamDomain) return r
+      return { ...r, userReasoning: reasoning }
+    }))
   }
 
   async function handleConfirm() {
