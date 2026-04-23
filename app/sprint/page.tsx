@@ -329,16 +329,28 @@ export default function SprintPage() {
     setDesignReview(null)
     setDesignReviewLoading(false)
     setDivergenceOpen(false)
+    setCritiqueText('')
+    setRippleEffect(null)
+    setReassessChoice(null)
     setAssessOpen(true)
     void initAssessment()
   }
 
-  async function initAssessment() {
+  async function initAssessment(opts?: { considerNotes?: boolean; specificFeedback?: string }) {
     if (!detailTask) return
     try {
-      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/init`, { method: 'POST' })
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          considerExistingNotes: opts?.considerNotes ?? true,
+          specificFeedback: opts?.specificFeedback ?? '',
+        }),
+      })
       const data = await res.json()
       if (!res.ok) { setAssessError(data.error ?? 'Assessment failed'); setAssessPhase('idle'); return }
+
+      const noQuestionsNeeded = !data.firstQuestion || data.totalEstimatedQuestions === 0
 
       const conv: AssessConversation = {
         conversationId: data.conversationId,
@@ -357,17 +369,21 @@ export default function SprintPage() {
         figmaLink: data.figmaLink ?? '',
         vaultConnected: data.vaultConnected ?? false,
         vaultFilesRead: data.vaultFilesRead ?? [],
-        finalizeProposal: data.finalizeProposal ?? null,
         affectedWorkflows: data.affectedWorkflows ?? [],
+        finalizeProposal: noQuestionsNeeded ? {
+          allScores: (data.proposedScores ?? []).map((s: ProposedScore) => ({ ...s, confidence: 'high' as const })),
+          proposedRoles: data.proposedRoles ?? [],
+          proposedEffort: data.proposedEffort ?? { days: 3, reasoning: '' },
+          proposedRisk: data.proposedRisk ?? { level: 'Standard', multiplier: 1.2, reasoning: '' },
+          vaultSpecContent: data.vaultSpecContent ?? '',
+        } : null,
       }
       setConversation(conv)
       setConfirmedEffort(data.proposedEffort?.days ?? 3)
       setConfirmedRisk(data.proposedRisk?.multiplier ?? 1.2)
 
-      // If no questions needed, go straight to roles step
-      if (!data.firstQuestion || data.totalEstimatedQuestions === 0) {
-        setRoleSelections(setupRolesFromProposal(data.proposedRoles ?? []))
-        setAssessPhase('roles')
+      if (noQuestionsNeeded) {
+        setAssessPhase('scoring_review')
       } else {
         setAssessPhase('interview')
       }
@@ -405,14 +421,12 @@ export default function SprintPage() {
         })
         setAssessPhase('interview')
       } else {
-        // finalize
+        // finalize → go to scoring_review for critique loop before roles
         const finalScores: ProposedScore[] = (data.allScores ?? updatedScores).map((s: ProposedScore) => ({
           ...s,
           confidence: 'high' as const,
         }))
-        setRoleSelections(setupRolesFromProposal(data.proposedRoles ?? []))
-        setConfirmedEffort(data.proposedEffort?.days ?? confirmedEffort)
-        setConfirmedRisk(data.proposedRisk?.multiplier ?? confirmedRisk)
+        setRippleEffect(null)
         setConversation({
           ...conversation,
           proposedScores: finalScores,
@@ -424,9 +438,10 @@ export default function SprintPage() {
             proposedRisk: data.proposedRisk ?? { level: 'Standard', multiplier: confirmedRisk, reasoning: '' },
             vaultSpecContent: data.vaultSpecContent ?? '',
             updatedDescription: data.updatedDescription,
+            rippleEffect: data.rippleEffect,
           },
         })
-        setAssessPhase('roles')
+        setAssessPhase('scoring_review')
       }
     } catch (e) {
       setAssessError(e instanceof Error ? e.message : 'Reply failed')
@@ -437,6 +452,67 @@ export default function SprintPage() {
   async function skipToRoles() {
     if (!conversation) return
     setRoleSelections(setupRolesFromProposal(conversation.finalizeProposal?.proposedRoles ?? []))
+    setAssessPhase('roles')
+  }
+
+  async function handleCritique() {
+    if (!conversation || !critiqueText.trim()) return
+    const scores = (conversation.finalizeProposal?.allScores ?? conversation.proposedScores).map((s) => ({
+      objectiveId: s.objectiveId,
+      score: s.score,
+      reasoning: s.reasoning,
+    }))
+    setAssessPhase('loading')
+    try {
+      const res = await apiFetch(
+        `/api/sprint/tasks/${detailTask!.id}/assess/${conversation.conversationId}/reply`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ critiqueMode: true, critiqueText, currentScores: scores }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok) { setAssessError(data.error ?? 'Critique failed'); setAssessPhase('scoring_review'); return }
+
+      if (data.type === 'finalize') {
+        const finalScores: ProposedScore[] = (data.allScores ?? []).map((s: ProposedScore) => ({
+          ...s,
+          confidence: 'high' as const,
+        }))
+        setRippleEffect(data.rippleEffect ?? null)
+        setCritiqueText('')
+        setConversation({
+          ...conversation,
+          proposedScores: finalScores,
+          finalizeProposal: {
+            allScores: finalScores,
+            proposedRoles: data.proposedRoles ?? conversation.finalizeProposal?.proposedRoles ?? [],
+            proposedEffort: data.proposedEffort ?? conversation.finalizeProposal?.proposedEffort ?? { days: confirmedEffort, reasoning: '' },
+            proposedRisk: data.proposedRisk ?? conversation.finalizeProposal?.proposedRisk ?? { level: 'Standard', multiplier: confirmedRisk, reasoning: '' },
+            vaultSpecContent: data.vaultSpecContent ?? conversation.finalizeProposal?.vaultSpecContent ?? '',
+            updatedDescription: data.updatedDescription,
+            rippleEffect: data.rippleEffect,
+          },
+        })
+      }
+      setAssessPhase('scoring_review')
+    } catch (e) {
+      setAssessError(e instanceof Error ? e.message : 'Critique failed')
+      setAssessPhase('scoring_review')
+    }
+  }
+
+  function handleApproveScores() {
+    if (!conversation) return
+    const fp = conversation.finalizeProposal
+    if (fp) {
+      setRoleSelections(setupRolesFromProposal(fp.proposedRoles ?? []))
+      setConfirmedEffort(fp.proposedEffort?.days ?? confirmedEffort)
+      setConfirmedRisk(fp.proposedRisk?.multiplier ?? confirmedRisk)
+    }
+    setRippleEffect(null)
+    setCritiqueText('')
     setAssessPhase('roles')
   }
 
@@ -1079,6 +1155,87 @@ export default function SprintPage() {
                 </div>
               </div>
             )}
+          </Space>
+        )}
+
+        {/* ── Scoring Review ── */}
+        {assessPhase === 'scoring_review' && conversation && (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {/* Affected Workflows */}
+            {conversation.affectedWorkflows.length > 0 && (
+              <div>
+                <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>AFFECTED WORKFLOWS</Typography.Text>
+                <div style={{ marginTop: 4 }}>
+                  {conversation.affectedWorkflows.map((w, i) => (
+                    <div key={i} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 4, padding: '6px 8px', marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <Typography.Text style={{ color: '#e6edf3', fontSize: 12, fontWeight: 600 }}>{w.name}</Typography.Text>
+                      {w.registryStatus === 'proposed' && <Tag color="orange" style={{ fontSize: 10 }}>proposed</Tag>}
+                      {w.sopImpacted && <Tag color="blue" style={{ fontSize: 10 }}>SOP</Tag>}
+                      {w.educationImpacted && <Tag color="purple" style={{ fontSize: 10 }}>Education</Tag>}
+                      {w.scribehowImpacted && <Tag color="cyan" style={{ fontSize: 10 }}>ScribeHow</Tag>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ripple Effect — shown after a critique submission */}
+            {rippleEffect && (
+              <div style={{ background: '#1c2128', border: '1px solid #388bfd', borderRadius: 6, padding: '10px 12px' }}>
+                <Typography.Text style={{ color: '#58a6ff', fontSize: 11 }}>RIPPLE EFFECT</Typography.Text>
+                <Typography.Paragraph style={{ color: '#e6edf3', fontSize: 12, margin: '4px 0 0' }}>
+                  {rippleEffect}
+                </Typography.Paragraph>
+              </div>
+            )}
+
+            {/* Proposed scores */}
+            <div>
+              <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>PROPOSED SCORES — review and approve or provide feedback</Typography.Text>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', marginTop: 6 }}>
+                {(conversation.finalizeProposal?.allScores ?? conversation.proposedScores).map((s) => (
+                  <div key={s.objectiveId} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '4px 0' }}>
+                    <Tag
+                      color={s.score > 0 ? 'green' : s.score === 0 ? 'default' : 'red'}
+                      style={{ fontSize: 11, minWidth: 32, textAlign: 'center', marginTop: 2 }}
+                    >
+                      {s.score > 0 ? '+' : ''}{s.score}
+                    </Tag>
+                    <div>
+                      <Typography.Text style={{ color: '#e6edf3', fontSize: 11 }}>{s.objectiveName}</Typography.Text>
+                      <Typography.Text style={{ color: '#8b949e', fontSize: 11, display: 'block' }}>{s.reasoning}</Typography.Text>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Divider style={{ borderColor: '#21262d', margin: '4px 0' }} />
+
+            {/* Critique input */}
+            <div>
+              <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>FEEDBACK (optional) — describe any score that seems wrong and why</Typography.Text>
+              <Input.TextArea
+                rows={2}
+                value={critiqueText}
+                onChange={(e) => setCritiqueText(e.target.value)}
+                placeholder="e.g. Complexity should be higher — this touches the billing system…"
+                style={{ marginTop: 6 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <Button
+                size="small"
+                disabled={!critiqueText.trim()}
+                onClick={handleCritique}
+              >
+                Submit feedback
+              </Button>
+              <Button type="primary" size="small" onClick={handleApproveScores}>
+                Approve scores →
+              </Button>
+            </div>
           </Space>
         )}
 
