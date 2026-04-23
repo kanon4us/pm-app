@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { Json } from '@/lib/supabase/types'
+import { mergeRolesWithRegistry } from '@/lib/role-merge'
 
 export const maxDuration = 300
 
@@ -159,6 +160,33 @@ Based on this answer, update the score for Objective ${objectiveId} and determin
       proposed_score: q.currentProposedScore as number,
       vault_evidence: q.evidence as string,
     })
+  }
+
+  // For finalize responses, merge Claude's proposed roles with the full registry
+  const parsed = result as Record<string, unknown>
+  if (parsed.type === 'finalize') {
+    const { data: registryRoles } = await supabase
+      .from('role_registry')
+      .select('id, role_name, team_domain, influence_type, weight')
+      .eq('is_active', true)
+      .order('team_domain')
+      .order('influence_type')
+      .order('weight', { ascending: false })
+
+    const allRoles = (registryRoles ?? []).map(r => ({
+      role_id: r.id,
+      role_name: r.role_name,
+      team_domain: r.team_domain,
+      influence_type: r.influence_type as 'DM' | 'NDM',
+      weight: r.weight,
+    }))
+
+    const claudeProposed: Array<{ roleName: string; usageFrequency: number; reasoning: string }> =
+      (parsed.proposedRoles as Array<{ roleName: string; usageFrequency: number; reasoning: string }>) ?? []
+
+    const fullRoles = mergeRolesWithRegistry(allRoles, claudeProposed)
+
+    return NextResponse.json({ ...parsed, proposedRoles: fullRoles })
   }
 
   return NextResponse.json(result)
