@@ -42,7 +42,7 @@ interface OverlappingTask {
 }
 
 interface RoleSelection {
-  roleId?: string
+  roleId: string
   roleName: string
   teamDomain: string
   influenceType: 'DM' | 'NDM'
@@ -436,7 +436,7 @@ export default function SprintPage() {
 
   function setupRolesFromProposal(
     proposed: Array<{
-      roleId?: string; roleName: string; teamDomain: string
+      roleId: string; roleName: string; teamDomain: string
       influenceType: 'DM' | 'NDM'; weight: number; usageFrequency: number
       claudeProposedFrequency: number; claudeReasoning: string | null
       userOverrideFrequency: number | null; userReasoning: string | null
@@ -491,7 +491,7 @@ export default function SprintPage() {
         reasoning: s.reasoning,
       }))
       const rolesPayload = roleSelections.map(r => ({
-        roleId: r.roleId ?? '',
+        roleId: r.roleId,
         roleName: r.roleName,
         teamDomain: r.teamDomain,
         influenceType: r.influenceType,

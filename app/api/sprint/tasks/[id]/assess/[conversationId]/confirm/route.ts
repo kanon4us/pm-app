@@ -65,6 +65,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single()
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
+  // ── Validate all roles have a roleId ────────────────────────────────────────
+  const emptyRoleId = roles.find(r => !r.roleId)
+  if (emptyRoleId) {
+    return NextResponse.json(
+      { error: `Role missing roleId: ${emptyRoleId.roleName}` },
+      { status: 400 }
+    )
+  }
+
   // ── Validate overrides have reasoning ────────────────────────────────────────
   const missingReasoning = roles.filter(
     r => r.userOverrideFrequency !== null && !r.userReasoning?.trim()
