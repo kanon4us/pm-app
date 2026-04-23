@@ -319,7 +319,6 @@ export default function SprintPage() {
   }
 
   function openAssess() {
-    setAssessPhase('loading')
     setAssessError('')
     setConversation(null)
     setCurrentAnswer('')
@@ -337,6 +336,7 @@ export default function SprintPage() {
     if (detailTask?.fvi_score !== null && detailTask?.fvi_score !== undefined) {
       setAssessPhase('reassess_check')
     } else {
+      setAssessPhase('loading')
       void initAssessment()
     }
   }
@@ -1098,8 +1098,9 @@ export default function SprintPage() {
                 size="small"
                 disabled={reassessChoice === null}
                 onClick={() => {
+                  if (!reassessChoice) return
                   setAssessPhase('loading')
-                  void initAssessment({ considerNotes: reassessChoice!.considerNotes, specificFeedback: reassessChoice!.feedback })
+                  void initAssessment({ considerNotes: reassessChoice.considerNotes, specificFeedback: reassessChoice.feedback })
                 }}
               >
                 Start fresh assessment →
