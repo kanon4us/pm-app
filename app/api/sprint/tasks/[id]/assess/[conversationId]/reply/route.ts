@@ -12,8 +12,9 @@ type Params = { params: Promise<{ id: string; conversationId: string }> }
 const CLAUDE_MODEL = 'claude-opus-4-6'
 
 // POST /api/sprint/tasks/[id]/assess/[conversationId]/reply
-// Body: { answer: string, objectiveId: number }
-// Returns either the next question, or a finalization proposal when all objectives are covered.
+// Normal mode body: { answer: string, objectiveId: number }
+// Critique mode body: { critiqueMode: true, critiqueText: string, currentScores: Array<{objectiveId, score, reasoning}> }
+// Returns: next question, finalization proposal, or (critique mode) re-evaluated finalize with rippleEffect.
 export async function POST(req: NextRequest, { params }: Params) {
   const { id, conversationId } = await params
   const session = await auth()
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     currentScores?: Array<{ objectiveId: number; score: number; reasoning: string }>
   }
   const { answer, objectiveId, critiqueMode, critiqueText, currentScores } = body
+
+  // Validate critique mode has feedback text
+  if (critiqueMode && !critiqueText?.trim()) {
+    return NextResponse.json({ error: 'critiqueText is required in critique mode' }, { status: 400 })
+  }
 
   const supabase = await getSupabaseServiceClient()
 
