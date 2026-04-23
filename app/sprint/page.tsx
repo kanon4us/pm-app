@@ -452,11 +452,11 @@ export default function SprintPage() {
   async function skipToRoles() {
     if (!conversation) return
     setRoleSelections(setupRolesFromProposal(conversation.finalizeProposal?.proposedRoles ?? []))
-    setAssessPhase('roles')
+    setAssessPhase('scoring_review')
   }
 
   async function handleCritique() {
-    if (!conversation || !critiqueText.trim()) return
+    if (!detailTask || !conversation || !critiqueText.trim()) return
     const scores = (conversation.finalizeProposal?.allScores ?? conversation.proposedScores).map((s) => ({
       objectiveId: s.objectiveId,
       score: s.score,
@@ -506,11 +506,10 @@ export default function SprintPage() {
   function handleApproveScores() {
     if (!conversation) return
     const fp = conversation.finalizeProposal
-    if (fp) {
-      setRoleSelections(setupRolesFromProposal(fp.proposedRoles ?? []))
-      setConfirmedEffort(fp.proposedEffort?.days ?? confirmedEffort)
-      setConfirmedRisk(fp.proposedRisk?.multiplier ?? confirmedRisk)
-    }
+    if (!fp) return
+    setRoleSelections(setupRolesFromProposal(fp.proposedRoles ?? []))
+    setConfirmedEffort(fp.proposedEffort?.days ?? confirmedEffort)
+    setConfirmedRisk(fp.proposedRisk?.multiplier ?? confirmedRisk)
     setRippleEffect(null)
     setCritiqueText('')
     setAssessPhase('roles')
@@ -1166,8 +1165,8 @@ export default function SprintPage() {
               <div>
                 <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>AFFECTED WORKFLOWS</Typography.Text>
                 <div style={{ marginTop: 4 }}>
-                  {conversation.affectedWorkflows.map((w, i) => (
-                    <div key={i} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 4, padding: '6px 8px', marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {conversation.affectedWorkflows.map((w) => (
+                    <div key={w.name} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 4, padding: '6px 8px', marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       <Typography.Text style={{ color: '#e6edf3', fontSize: 12, fontWeight: 600 }}>{w.name}</Typography.Text>
                       {w.registryStatus === 'proposed' && <Tag color="orange" style={{ fontSize: 10 }}>proposed</Tag>}
                       {w.sopImpacted && <Tag color="blue" style={{ fontSize: 10 }}>SOP</Tag>}
