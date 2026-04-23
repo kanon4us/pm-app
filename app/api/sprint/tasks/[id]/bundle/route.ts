@@ -300,20 +300,26 @@ export async function POST(req: NextRequest, { params }: Params) {
     user_reasoning: string | null
     role_registry: RoleRegistryJoin
   }
-  type ObjRegistryRow = { objective_id: number; name: string; owner_name: string }
-
   // ── Load objective scores + role assessments in parallel ──────────────────────
-  const [{ data: objAssessments }, { data: roleAssessRows }, { data: roleAssessFull }] = await Promise.all([
+  const [{ data: objAssessments }, { data: roleAssessRows }, { data: roleAssessFull }, { data: objRegistry }] = await Promise.all([
     supabase.from('objective_assessments')
       .select('objective_id, score, reasoning')
       .eq('task_id', id),
     supabase.from('conversation_role_assessments')
       .select('usage_frequency, role_id')
       .eq('conversation_id', conversationId),
+    // Fetch override columns + role_registry join for assessment.md
+    // to-one join: role_registry returns as a nested object per row
     (supabase.from('conversation_role_assessments')
       .select('claude_proposed_frequency, user_override_frequency, claude_reasoning, user_reasoning, role_registry!inner(role_name, team_domain, influence_type, weight)')
       .eq('conversation_id', conversationId)) as unknown as Promise<{ data: RoleAssessFullRow[] | null }>,
+    supabase.from('objectives_registry')
+      .select('objective_id, name, owner_name'),
   ])
+
+  if (!roleAssessFull) {
+    console.error(`[bundle task=${id}] roleAssessFull query returned null — assessment.md will have empty roles`)
+  }
 
   // Resolve role details from registry
   const roleIds = (roleAssessRows ?? []).map((r) => r.role_id)
@@ -343,10 +349,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       userReasoning: ra.user_reasoning ?? null,
     }
   })
-
-  const { data: objRegistry } = (await supabase
-    .from('objectives_registry')
-    .select('objective_id, name, owner_name')) as unknown as { data: ObjRegistryRow[] | null }
 
   const objNameMap = new Map((objRegistry ?? []).map(o => [o.objective_id, { name: o.name, owner: o.owner_name }]))
 
