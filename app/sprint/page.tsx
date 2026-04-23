@@ -62,6 +62,7 @@ interface FinalizeProposal {
   proposedRisk: { level: string; multiplier: number; reasoning: string }
   vaultSpecContent: string
   updatedDescription?: string
+  rippleEffect?: string
 }
 
 interface AssessConversation {
@@ -82,6 +83,7 @@ interface AssessConversation {
   vaultConnected: boolean
   vaultFilesRead: string[]
   finalizeProposal: FinalizeProposal | null
+  affectedWorkflows: import('@/lib/assessment-types').AffectedWorkflow[]
 }
 
 interface ConfirmResult {
@@ -135,7 +137,7 @@ interface DocProposal {
 
 type DocReviewPhase = 'loading' | 'questions' | 'proposals' | 'applying' | 'done'
 
-type AssessPhase = 'idle' | 'loading' | 'interview' | 'roles' | 'confirming' | 'results'
+type AssessPhase = 'idle' | 'loading' | 'reassess_check' | 'interview' | 'scoring_review' | 'roles' | 'confirming' | 'results'
 
 const DECISION_LABELS: Record<string, string> = {
   'build-this-sprint': 'Build This Sprint',
@@ -236,6 +238,9 @@ export default function SprintPage() {
   const [designReview, setDesignReview] = useState<DesignReview | null>(null)
   const [designReviewLoading, setDesignReviewLoading] = useState(false)
   const [divergenceOpen, setDivergenceOpen] = useState(false)
+  const [critiqueText, setCritiqueText] = useState('')
+  const [rippleEffect, setRippleEffect] = useState<string | null>(null)
+  const [reassessChoice, setReassessChoice] = useState<{ considerNotes: boolean; feedback: string } | null>(null)
 
   // Doc Review
   const [docReviewOpen, setDocReviewOpen] = useState(false)
@@ -353,6 +358,7 @@ export default function SprintPage() {
         vaultConnected: data.vaultConnected ?? false,
         vaultFilesRead: data.vaultFilesRead ?? [],
         finalizeProposal: data.finalizeProposal ?? null,
+        affectedWorkflows: data.affectedWorkflows ?? [],
       }
       setConversation(conv)
       setConfirmedEffort(data.proposedEffort?.days ?? 3)
