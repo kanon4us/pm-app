@@ -7,6 +7,8 @@ import {
   computeFullFVI,
   MAX_DM_SCORE,
   MAX_NDM_SCORE,
+  FREQ_LABELS,
+  RoleAssessment,
 } from '@/lib/fvi'
 
 describe('FVI constants', () => {
@@ -119,6 +121,38 @@ describe('trojanHorseCheck', () => {
       { objectiveId: 2, score: -5 },
       { objectiveId: 3, score: -5 },
     ])).toBe(false)
+  })
+})
+
+describe('FREQ_LABELS', () => {
+  it('exports 5 labels indexed 0-4', () => {
+    expect(FREQ_LABELS).toHaveLength(5)
+    expect(FREQ_LABELS[0]).toBe('Cannot Access')
+    expect(FREQ_LABELS[1]).toBe('Access Sometimes')
+    expect(FREQ_LABELS[2]).toBe('Access by Default')
+    expect(FREQ_LABELS[3]).toBe('Uses Sometimes')
+    expect(FREQ_LABELS[4]).toBe('Uses Every Day')
+  })
+})
+
+describe('computeInfluence with 0-frequency roles', () => {
+  it('excludes roles with usageFrequency 0 from influence totals', () => {
+    const roles: RoleAssessment[] = [
+      { roleName: 'Admin', influenceType: 'DM', weight: 10, usageFrequency: 0 },
+      { roleName: 'Director', influenceType: 'DM', weight: 9, usageFrequency: 2 },
+    ]
+    const result = computeInfluence(roles)
+    // Only Director contributes: 9 * 2 = 18
+    expect(result.iDmRaw).toBe(18)
+  })
+
+  it('returns zero influence when all roles are 0-frequency', () => {
+    const roles: RoleAssessment[] = [
+      { roleName: 'Admin', influenceType: 'DM', weight: 10, usageFrequency: 0 },
+    ]
+    const result = computeInfluence(roles)
+    expect(result.iDmRaw).toBe(0)
+    expect(result.iNdmRaw).toBe(0)
   })
 })
 

@@ -8,6 +8,14 @@
  * Reference: documentation/00-Meta/FVI-Rubric.md
  */
 
+export const FREQ_LABELS = [
+  'Cannot Access',     // 0
+  'Access Sometimes',  // 1
+  'Access by Default', // 2
+  'Uses Sometimes',    // 3
+  'Uses Every Day',    // 4
+] as const
+
 // Theoretical maximum raw scores for normalization.
 // DM roles: agency(10+10+8+9+7+5+6=55) + brand(10+10+9+5+6=40) = 95 × max_freq(4) = 380
 // NDM roles: agency(5+4+3+1+7+4+2+1+1+1=29) + brand(5+4+3+7+4+2+1+1=27) = 56 × 4 = 224
@@ -54,18 +62,15 @@ export const RISK_LEVELS = [
 ] as const
 
 export function computeInfluence(roles: RoleAssessment[]): {
-  iDmRaw: number
-  iNdmRaw: number
-  iDmNorm: number
-  iNdmNorm: number
+  iDmRaw: number; iNdmRaw: number; iDmNorm: number; iNdmNorm: number
 } {
-  let iDmRaw = 0
-  let iNdmRaw = 0
-  for (const r of roles) {
-    const roleScore = r.weight * r.usageFrequency
-    if (r.influenceType === 'DM') iDmRaw += roleScore
-    else iNdmRaw += roleScore
-  }
+  const active = roles.filter(r => r.usageFrequency > 0)
+  const iDmRaw = active
+    .filter(r => r.influenceType === 'DM')
+    .reduce((sum, r) => sum + r.weight * r.usageFrequency, 0)
+  const iNdmRaw = active
+    .filter(r => r.influenceType === 'NDM')
+    .reduce((sum, r) => sum + r.weight * r.usageFrequency, 0)
   return {
     iDmRaw,
     iNdmRaw,
