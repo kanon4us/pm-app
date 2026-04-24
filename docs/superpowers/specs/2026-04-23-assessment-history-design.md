@@ -1,22 +1,29 @@
 # Assessment History Design
 
 **Date:** 2026-04-23
-**Status:** Revised — incorporates Resume capability, Show Archived toggle, race condition protection, and UI layout adjustments.
+**Status:** Revised v2 — resolves Resume stub, abandoned run visibility, FVI badge sync, and workflow hint.
 
 ## Goal
 
-Let the team review past FVI assessment results without reopening the assessment modal. Completed assessments are shown inline in the task detail drawer — newest run fully expanded, older runs collapsed — with the ability to resume an in-progress run, archive completed runs, and toggle archived visibility.
+Let the team review past FVI assessment results without reopening the assessment modal. Completed assessments are shown inline in the task detail drawer — newest run fully expanded, older runs collapsed — with the ability to archive completed runs and toggle archived visibility.
 
 ## Scope
 
 - Assessment history section in the task detail drawer (below FVI badge, above ClickUp fields)
-- "Resume Assessment" vs "Run New Assessment" primary action based on in-progress run detection
+- In-progress run indicator (passive — no Resume button yet; see deferred section)
+- "Previous workflows" hint shown during assessment init so PMs can catch workflow tag drift manually
 - Archive/unarchive a completed run
 - "Show Archived" toggle in the history header
 - DB migration to add `is_archived` flag
 
+**Explicit design decisions:**
+- **FVI badge** always reflects `tasks.fvi_score` (the last confirmed score). Archiving history runs does not change it.
+- **Abandoned runs** are never shown in history — not even when "Show Archived" is on. They are noise, not data.
+- **Resume button** is NOT included in this plan. An in-progress run is shown as a passive indicator only. Full resume requires a dedicated `GET .../resume` route — deferred to the next plan.
+
 **Out of scope (future iteration):**
-- Workflow removal justification: when a new assessment removes workflow tags that existed in a previous run, prompt for justification. Deferred until we have usage data on how often tags drift between runs.
+- Resume assessment: restore conversation state from an in-progress run (next plan).
+- Workflow removal justification: automated gate when tags are dropped between runs (deferred until usage data).
 - Pagination: expect 3–4 runs per task; full list fetch is sufficient.
 - Side-by-side run comparison diff view.
 - Hard delete of assessment runs (archive is sufficient; hard delete is irreversible).
@@ -311,47 +318,63 @@ Note: uses optimistic update (marks archived in local state immediately) rather 
 
 **File:** `app/sprint/components/AssessmentButton.tsx`
 
-Extracted component to encapsulate the "Run New" vs "Resume" logic cleanly, keeping `page.tsx` readable.
+Extracted component for the primary assessment action button. In this plan, the button always shows "Run Assessment" (or is disabled while history loads). An in-progress run is surfaced as a separate passive indicator — the Resume button is deferred to the next plan.
 
 ```typescript
 // app/sprint/components/AssessmentButton.tsx
 
 interface AssessmentButtonProps {
-  history: AssessHistoryRun[] | null
   historyLoading: boolean
   onRunNew: () => void
-  onResume: (conversationId: string) => void
 }
 
-export function AssessmentButton({ history, historyLoading, onRunNew, onResume }: AssessmentButtonProps) {
-  const inProgressRun = history?.find((r) => r.status === 'in_progress')
-
-  if (historyLoading) {
-    return <Button size="small" disabled loading>Loading…</Button>
-  }
-
-  if (inProgressRun) {
-    return (
-      <Button type="primary" size="small" onClick={() => onResume(inProgressRun.conversationId)}>
-        Resume Assessment
-      </Button>
-    )
-  }
-
+export function AssessmentButton({ historyLoading, onRunNew }: AssessmentButtonProps) {
   return (
-    <Button type="primary" size="small" onClick={onRunNew}>
+    <Button type="primary" size="small" disabled={historyLoading} onClick={onRunNew}>
       Run Assessment
     </Button>
   )
 }
 ```
 
-The `onResume` handler in `page.tsx` should:
-1. Set `assessPhase('interview')` (or `'scoring_review'` if the conversation has `final_scores` already populated)
-2. Restore `conversation` state from the in-progress run's data (conversationId, proposedScores from `assessment_conversations.proposed_scores`)
-3. Make an API call to load the current pending question from `assessment_messages` (the last assistant message for that conversation)
+The in-progress indicator (shown in the history section when `inProgressRun` is non-null):
 
-**Note:** The resume flow requires fetching the last state of the in-progress conversation. A `GET /api/sprint/tasks/[id]/assess/[conversationId]/resume` route may be needed to return the current question and proposed scores — or this data can be included in the history response for `in_progress` runs. **This is a deferred design decision:** the resume capability is wired in the UI (button shows, history API returns in-progress runs) but the actual `onResume` handler implementation is out of scope for this plan. The button will be present but the handler can stub to `onRunNew` until the resume route is built in a follow-up plan.
+```tsx
+{inProgressRun && (
+  <div style={{ background: '#161b22', border: '1px solid #f0883e', borderRadius: 6, padding: '8px 10px', marginTop: 8 }}>
+    <Typography.Text style={{ color: '#f0883e', fontSize: 11 }}>
+      ⚠ An assessment is in progress (started {new Date(inProgressRun.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}). Resume capability coming soon.
+    </Typography.Text>
+  </div>
+)}
+```
+
+### "Previous workflows" hint in the assessment modal
+
+When `assessHistory` has at least one completed run with non-empty `affectedWorkflows`, and the assessment modal is in `'interview'` phase, show a collapsible hint at the top of the interview section:
+
+```tsx
+{assessPhase === 'interview' && conversation && (() => {
+  const prevWorkflows = assessHistory
+    ?.find((r) => r.status === 'complete')
+    ?.affectedWorkflows ?? []
+  if (prevWorkflows.length === 0) return null
+  return (
+    <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 6, padding: '8px 10px', marginBottom: 10 }}>
+      <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>
+        PREVIOUS RUN WORKFLOWS — review for accuracy
+      </Typography.Text>
+      <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {prevWorkflows.map((w) => (
+          <Tag key={w.name} style={{ fontSize: 11 }}>{w.name}</Tag>
+        ))}
+      </div>
+    </div>
+  )
+})()}
+```
+
+This gives the PM visibility into what workflows the previous run identified, so they can notice if Claude drops any in the new run. No automated enforcement — manual review only in this iteration.
 
 ### History UI Block
 
@@ -362,8 +385,12 @@ Inserted in the task detail drawer **below the FVI score / AssessmentButton area
 const visibleHistory = (assessHistory ?? []).filter((r) =>
   r.status === 'complete' && (showArchived || !r.isArchived)
 )
+const inProgressRun = (assessHistory ?? []).find((r) => r.status === 'in_progress')
 ```
-In-progress and abandoned runs are not shown in the history list (they are used only for the Resume button logic).
+
+- `visibleHistory`: only `complete` runs; includes archived when toggle is on
+- `inProgressRun`: first in-progress run, used to show a passive indicator only
+- `abandoned` runs: never shown, excluded from both lists
 
 **Structure:**
 
@@ -556,8 +583,8 @@ The history section and `AssessmentButton` are display components — no new uni
 | `app/api/sprint/tasks/[id]/assess/history/route.ts` | Create |
 | `app/api/sprint/tasks/[id]/assess/history/[conversationId]/route.ts` | Create |
 | `__tests__/app/api/sprint/tasks/[id]/assess/history/route.test.ts` | Create |
-| `app/sprint/components/AssessmentButton.tsx` | Create |
-| `app/sprint/page.tsx` | Modify — types, state, `detailTaskRef`, `openDetail`, `loadAssessHistory`, `archiveRun`, history UI block, AssessmentButton wiring |
+| `app/sprint/components/AssessmentButton.tsx` | Create — simple "Run Assessment" button; Resume deferred |
+| `app/sprint/page.tsx` | Modify — types, state, `detailTaskRef`, `openDetail`, `loadAssessHistory`, `archiveRun`, history UI block, in-progress indicator, previous workflows hint, AssessmentButton wiring |
 
 ---
 
@@ -565,6 +592,6 @@ The history section and `AssessmentButton` are display components — no new uni
 
 | Item | Reason deferred |
 |---|---|
+| Resume assessment | Needs `GET .../resume` route to restore conversation state (proposedScores + last question); build in next plan after history ships |
 | Workflow removal justification | Requires comparing workflow sets across runs and gating the init call — add after real usage data shows how often tags drift |
-| Resume handler implementation | Button and UI are wired; actual conversation restoration logic needs a `GET .../resume` route — separate follow-up plan |
-| Side-by-side run diff view | Nice-to-have; low value until users have 3+ runs to compare |
+| Side-by-side run diff view | Low value until users have 3+ runs to compare |
