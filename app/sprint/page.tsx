@@ -8,6 +8,7 @@ import {
 import type { ColumnType } from 'antd/es/table'
 import { SearchOutlined, SaveOutlined, ThunderboltOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
+import { AssessmentButton } from '@/app/sprint/components/AssessmentButton'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
 import { vaultBranchName } from '@/lib/github/vault'
 import { FREQ_LABELS } from '@/lib/fvi'
@@ -1077,6 +1078,173 @@ export default function SprintPage() {
                 )
                 : null}
 
+            {/* ── Assessment History ── */}
+            <div style={{ marginTop: 8 }}>
+              {/* Section header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>ASSESSMENT HISTORY</Typography.Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Typography.Text style={{ color: '#8b949e', fontSize: 10 }}>Show Archived</Typography.Text>
+                  <Switch size="small" checked={showArchived} onChange={setShowArchived} />
+                </div>
+              </div>
+
+              {assessHistoryLoading && <Spin size="small" style={{ marginTop: 8 }} />}
+
+              {!assessHistoryLoading && (() => {
+                const allComplete = (assessHistory ?? []).filter((r) => r.status === 'complete')
+                const visibleRuns = allComplete.filter((r) => showArchived || !r.isArchived)
+                const hasHiddenArchived = allComplete.length > 0 && visibleRuns.length === 0 && !showArchived
+                const noRunsAtAll = allComplete.length === 0
+                const inProgressRun = (assessHistory ?? []).find((r) => r.status === 'in_progress')
+
+                return (
+                  <>
+                    {inProgressRun && (
+                      <div style={{ background: '#161b22', border: '1px solid #f0883e', borderRadius: 6, padding: '8px 10px', marginTop: 8 }}>
+                        <Typography.Text style={{ color: '#f0883e', fontSize: 11 }}>
+                          ⚠ An assessment is in progress (started {new Date(inProgressRun.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}). Resume capability coming soon.
+                        </Typography.Text>
+                      </div>
+                    )}
+
+                    {noRunsAtAll && (
+                      <Typography.Text style={{ color: '#484f58', fontSize: 12, display: 'block', marginTop: 6 }}>
+                        No assessments yet — run one to see history here.
+                      </Typography.Text>
+                    )}
+
+                    {hasHiddenArchived && (
+                      <Typography.Text style={{ color: '#484f58', fontSize: 12, display: 'block', marginTop: 6 }}>
+                        All assessments archived — toggle &quot;Show Archived&quot; to view them.
+                      </Typography.Text>
+                    )}
+
+                    {visibleRuns.map((run) => {
+                      const isExpanded = expandedHistoryRuns.has(run.conversationId)
+                      const agencyDM = run.roles.filter((r) => r.teamDomain === 'agency' && r.influenceType === 'DM' && r.usageFrequency > 0)
+                      const agencyNDM = run.roles.filter((r) => r.teamDomain === 'agency' && r.influenceType === 'NDM' && r.usageFrequency > 0)
+                      const brandDM = run.roles.filter((r) => r.teamDomain === 'brand' && r.influenceType === 'DM' && r.usageFrequency > 0)
+                      const brandNDM = run.roles.filter((r) => r.teamDomain === 'brand' && r.influenceType === 'NDM' && r.usageFrequency > 0)
+                      const roleGroups = [
+                        { label: 'Agency — Decision Makers', roles: agencyDM },
+                        { label: 'Agency — Non-Decision Makers', roles: agencyNDM },
+                        { label: 'Brand — Decision Makers', roles: brandDM },
+                        { label: 'Brand — Non-Decision Makers', roles: brandNDM },
+                      ].filter((g) => g.roles.length > 0)
+
+                      return (
+                        <div key={run.conversationId}
+                          style={{ border: `1px solid ${run.isArchived ? '#21262d' : '#30363d'}`, borderRadius: 6, marginTop: 8, opacity: run.isArchived ? 0.6 : 1 }}>
+
+                          {/* Header row */}
+                          <div
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer' }}
+                            onClick={() => setExpandedHistoryRuns((prev) => {
+                              const next = new Set(prev)
+                              isExpanded ? next.delete(run.conversationId) : next.add(run.conversationId)
+                              return next
+                            })}
+                          >
+                            {run.fviScore != null && (
+                              <Tag color="blue" style={{ fontSize: 12 }}>FVI {run.fviScore.toFixed(2)}</Tag>
+                            )}
+                            <Typography.Text style={{ color: '#8b949e', fontSize: 11, flex: 1 }}>
+                              {new Date(run.completedAt ?? run.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </Typography.Text>
+                            <Tag style={{ fontSize: 11 }}>{run.riskLevel}</Tag>
+                            {run.effort != null && (
+                              <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>{run.effort}d</Typography.Text>
+                            )}
+                            {run.isArchived && <Tag style={{ fontSize: 10 }}>archived</Tag>}
+                            <Popconfirm
+                              title={run.isArchived ? 'Unarchive this run?' : 'Archive this run?'}
+                              onConfirm={(e) => { e?.stopPropagation(); void (run.isArchived ? unarchiveRun(run.conversationId) : archiveRun(run.conversationId)) }}
+                              onCancel={(e) => e?.stopPropagation()}
+                              okText={run.isArchived ? 'Unarchive' : 'Archive'}
+                              cancelText="Cancel"
+                            >
+                              <Button
+                                type="text" size="small"
+                                icon={run.isArchived ? <UndoOutlined /> : <DeleteOutlined />}
+                                style={{ color: '#484f58' }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </Popconfirm>
+                            <Typography.Text style={{ color: '#484f58', fontSize: 11 }}>{isExpanded ? '▲' : '▼'}</Typography.Text>
+                          </div>
+
+                          {/* Expanded body */}
+                          {isExpanded && (
+                            <div style={{ padding: '0 10px 12px', borderTop: '1px solid #21262d' }}>
+
+                              {run.affectedWorkflows.length > 0 && (
+                                <div style={{ marginTop: 10 }}>
+                                  <Typography.Text style={{ color: '#8b949e', fontSize: 10 }}>WORKFLOWS</Typography.Text>
+                                  <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                    {run.affectedWorkflows.map((w) => (
+                                      <Tag key={w.name} style={{ fontSize: 11 }}>
+                                        {w.name}{w.registryStatus === 'proposed' ? ' ✦' : ''}
+                                      </Tag>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {run.finalScores.length > 0 && (
+                                <div style={{ marginTop: 10 }}>
+                                  <Typography.Text style={{ color: '#8b949e', fontSize: 10 }}>OBJECTIVES</Typography.Text>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', marginTop: 4 }}>
+                                    {run.finalScores.map((s) => (
+                                      <div key={s.objectiveId} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '3px 0' }}>
+                                        <Tag
+                                          color={s.score > 0 ? 'green' : s.score === 0 ? 'default' : 'red'}
+                                          style={{ fontSize: 10, minWidth: 28, textAlign: 'center', marginTop: 2 }}
+                                        >
+                                          {s.score > 0 ? '+' : ''}{s.score}
+                                        </Tag>
+                                        <div>
+                                          <Typography.Text style={{ color: '#e6edf3', fontSize: 11 }}>{s.objectiveName}</Typography.Text>
+                                          <Typography.Text style={{ color: '#8b949e', fontSize: 10, display: 'block' }}>{s.reasoning}</Typography.Text>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {roleGroups.map((group) => (
+                                <div key={group.label} style={{ marginTop: 10 }}>
+                                  <Typography.Text style={{ color: '#8b949e', fontSize: 10 }}>{group.label.toUpperCase()}</Typography.Text>
+                                  <div style={{ marginTop: 4 }}>
+                                    {group.roles.map((r) => (
+                                      <div key={r.roleId} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '2px 0' }}>
+                                        <Tag style={{ fontSize: 10, minWidth: 20, textAlign: 'center' }}>{r.usageFrequency}</Tag>
+                                        <div style={{ flex: 1 }}>
+                                          <Typography.Text style={{ color: '#e6edf3', fontSize: 11 }}>{r.roleName}</Typography.Text>
+                                          {r.isUserOverride && (
+                                            <Tag color="orange" style={{ fontSize: 9, marginLeft: 4 }}>override</Tag>
+                                          )}
+                                          <Typography.Text style={{ color: '#8b949e', fontSize: 10, display: 'block' }}>
+                                            {r.isUserOverride ? r.userReasoning : r.claudeReasoning}
+                                          </Typography.Text>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </>
+                )
+              })()}
+            </div>
+
             <Divider style={{ borderColor: '#21262d', margin: '8px 0' }} />
 
             {/* Editable custom fields */}
@@ -1128,9 +1296,7 @@ export default function SprintPage() {
               <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave} block>
                 Save Changes
               </Button>
-              <Button icon={<ThunderboltOutlined />} onClick={openAssess} block>
-                AI Assessment
-              </Button>
+              <AssessmentButton historyLoading={assessHistoryLoading} onRunNew={openAssess} />
               <Button onClick={openDocReview} block>
                 Review Documentation
               </Button>
@@ -1235,6 +1401,25 @@ export default function SprintPage() {
         {/* ── Interview ── */}
         {assessPhase === 'interview' && conversation && (
           <Space orientation="vertical" style={{ width: '100%' }}>
+                {/* Previous run workflows hint — helps PM catch tag drift */}
+                {(() => {
+                  const prevWorkflows = assessHistory
+                    ?.find((r) => r.status === 'complete')
+                    ?.affectedWorkflows ?? []
+                  if (prevWorkflows.length === 0) return null
+                  return (
+                    <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 6, padding: '8px 10px', marginBottom: 10 }}>
+                      <Typography.Text style={{ color: '#8b949e', fontSize: 11 }}>
+                        PREVIOUS RUN WORKFLOWS — review for accuracy
+                      </Typography.Text>
+                      <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {prevWorkflows.map((w) => (
+                          <Tag key={w.name} style={{ fontSize: 11 }}>{w.name}</Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
             {/* Context row */}
             <div style={{ display: 'grid', gridTemplateColumns: conversation.figmaThumbUrl ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 8 }}>
               <div>
