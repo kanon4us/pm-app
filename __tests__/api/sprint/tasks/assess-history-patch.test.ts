@@ -90,4 +90,31 @@ describe('PATCH /api/sprint/tasks/[id]/assess/history/[conversationId]', () => {
     expect(res.status).toBe(200)
     expect(body.ok).toBe(true)
   })
+
+  it('returns 404 when user not found', async () => {
+    mockFrom.mockReturnValueOnce({
+      select: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    })
+    const res = await PATCH(makeRequest({ isArchived: true }), makeParams('task-1', 'conv-1'))
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 500 on DB error', async () => {
+    mockUserFound()
+    mockFrom.mockReturnValueOnce({
+      update: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            select: jest.fn().mockResolvedValue({ data: null, error: { message: 'connection refused' } }),
+          }),
+        }),
+      }),
+    })
+    const res = await PATCH(makeRequest({ isArchived: true }), makeParams('task-1', 'conv-1'))
+    expect(res.status).toBe(500)
+  })
 })

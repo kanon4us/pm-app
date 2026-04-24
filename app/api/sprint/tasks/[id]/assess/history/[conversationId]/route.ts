@@ -6,14 +6,25 @@ type Params = { params: Promise<{ id: string; conversationId: string }> }
 
 // PATCH /api/sprint/tasks/[id]/assess/history/[conversationId]
 // Body: { isArchived: boolean }
-// Archives or unarchives a completed assessment run.
-// Verifies the conversation belongs to the task before updating.
+// Archives or unarchives an assessment run.
+// Scopes the update to both conversationId and task_id — a zero-row result signals the conversation
+// does not exist or does not belong to this task. Note: user ownership is not enforced beyond
+// session authentication (single-tenant app, all authenticated users share a workspace).
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id, conversationId } = await params
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { isArchived } = await req.json() as { isArchived: boolean }
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  if (typeof (body as Record<string, unknown>)?.isArchived !== 'boolean') {
+    return NextResponse.json({ error: 'isArchived must be a boolean' }, { status: 400 })
+  }
+  const { isArchived } = body as { isArchived: boolean }
 
   const supabase = await getSupabaseServiceClient()
 
@@ -33,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   // If no rows were updated, the conversation doesn't exist or doesn't belong to this task
-  if (!data || (Array.isArray(data) && data.length === 0)) {
+  if (!data || data.length === 0) {
     return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
   }
 
