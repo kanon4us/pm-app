@@ -1,12 +1,12 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Layout, Typography, Table, Button, Tag, Modal, Form, Input,
   DatePicker, InputNumber, Select, Space, Spin, Alert, Drawer,
-  Switch, Tooltip, Divider, Slider, Progress,
+  Switch, Tooltip, Divider, Slider, Progress, Popconfirm,
 } from 'antd'
 import type { ColumnType } from 'antd/es/table'
-import { SearchOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { SearchOutlined, SaveOutlined, ThunderboltOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
 import { vaultBranchName } from '@/lib/github/vault'
@@ -135,6 +135,41 @@ interface DocProposal {
   approved: boolean
 }
 
+interface AssessHistoryRole {
+  roleId: string
+  roleName: string
+  teamDomain: string
+  influenceType: 'DM' | 'NDM'
+  weight: number
+  usageFrequency: number
+  claudeProposedFrequency: number | null
+  claudeReasoning: string | null
+  userOverrideFrequency: number | null
+  userReasoning: string | null
+  isUserOverride: boolean
+}
+
+interface AssessHistoryRun {
+  conversationId: string
+  status: 'in_progress' | 'complete' | 'abandoned'
+  isArchived: boolean
+  fviScore: number | null
+  effort: number | null
+  risk: number | null
+  riskLevel: string
+  completedAt: string | null
+  createdAt: string
+  finalScores: Array<{
+    objectiveId: number
+    objectiveName: string
+    objectiveOwner: string
+    score: number
+    reasoning: string
+  }>
+  affectedWorkflows: import('@/lib/assessment-types').AffectedWorkflow[]
+  roles: AssessHistoryRole[]
+}
+
 type DocReviewPhase = 'loading' | 'questions' | 'proposals' | 'applying' | 'done'
 
 type AssessPhase = 'idle' | 'loading' | 'reassess_check' | 'interview' | 'scoring_review' | 'roles' | 'confirming' | 'results'
@@ -253,6 +288,13 @@ export default function SprintPage() {
   const [docApplyResults, setDocApplyResults] = useState<{ applied: string[]; errors: string[] } | null>(null)
   const [docReviewError, setDocReviewError] = useState('')
 
+  // ── Assessment history state ───────────────────────────────────────────────
+  const detailTaskRef = useRef<Task | null>(null)
+  const [assessHistory, setAssessHistory] = useState<AssessHistoryRun[] | null>(null)
+  const [assessHistoryLoading, setAssessHistoryLoading] = useState(false)
+  const [expandedHistoryRuns, setExpandedHistoryRuns] = useState<Set<string>>(new Set())
+  const [showArchived, setShowArchived] = useState(false)
+
   const [form] = Form.useForm()
 
   useEffect(() => { setFieldConfig(loadFieldConfig()); setFieldOrder(loadFieldOrder()) }, [])
@@ -275,17 +317,43 @@ export default function SprintPage() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => { detailTaskRef.current = detailTask }, [detailTask])
+
+  async function loadAssessHistory(taskId: string) {
+    setAssessHistoryLoading(true)
+    try {
+      const res = await apiFetch(`/api/sprint/tasks/${taskId}/assess/history`)
+      const data = await res.json()
+      if (res.ok && detailTaskRef.current?.id === taskId) {
+        const runs: AssessHistoryRun[] = data.runs ?? []
+        setAssessHistory(runs)
+        const newestUnarchived = runs.find((r) => r.status === 'complete' && !r.isArchived)
+        if (newestUnarchived) {
+          setExpandedHistoryRuns(new Set([newestUnarchived.conversationId]))
+        }
+      }
+    } catch (err) {
+      console.error('[loadAssessHistory] fetch failed', err)
+    } finally {
+      setAssessHistoryLoading(false)
+    }
+  }
+
   async function openDetail(task: Task) {
     setDetailTask(task)
+    detailTaskRef.current = task
     setEditedFields(task.custom_fields ? [...task.custom_fields] : [])
     setSaveSuccess(false)
     setDescription('')
     setDescLoading(true)
+    setAssessHistory(null)
+    setExpandedHistoryRuns(new Set())
+    setShowArchived(false)
+    void loadAssessHistory(task.id)
     try {
       const res = await apiFetch(`/api/sprint/tasks/${task.id}`)
       const data = await res.json()
       setDescription(data.description ?? '')
-      // Use fresh ClickUp fields — includes fields that were empty at import time
       if (Array.isArray(data.customFields) && data.customFields.length > 0) {
         setEditedFields(data.customFields)
       }
@@ -518,6 +586,35 @@ export default function SprintPage() {
     setRippleEffect(null)
     setCritiqueText('')
     setAssessPhase('roles')
+  }
+
+  async function archiveRun(conversationId: string) {
+    if (!detailTask) return
+    await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/history/${conversationId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isArchived: true }),
+    })
+    setAssessHistory((prev) =>
+      prev?.map((r) => r.conversationId === conversationId ? { ...r, isArchived: true } : r) ?? null
+    )
+    setExpandedHistoryRuns((prev) => {
+      const next = new Set(prev)
+      next.delete(conversationId)
+      return next
+    })
+  }
+
+  async function unarchiveRun(conversationId: string) {
+    if (!detailTask) return
+    await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/history/${conversationId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isArchived: false }),
+    })
+    setAssessHistory((prev) =>
+      prev?.map((r) => r.conversationId === conversationId ? { ...r, isArchived: false } : r) ?? null
+    )
   }
 
   function setupRolesFromProposal(
@@ -915,7 +1012,13 @@ export default function SprintPage() {
           </Typography.Text>
         }
         open={!!detailTask}
-        onClose={() => setDetailTask(null)}
+        onClose={() => {
+          setDetailTask(null)
+          detailTaskRef.current = null
+          setAssessHistory(null)
+          setExpandedHistoryRuns(new Set())
+          setShowArchived(false)
+        }}
         size="large"
       >
         {detailTask && (
