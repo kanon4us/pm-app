@@ -712,6 +712,7 @@ export default function SprintPage() {
       if (!res.ok) { setAssessError(data.error ?? 'Confirm failed'); setAssessPhase('roles'); return }
       setConfirmResult(data)
       setAssessPhase('results')
+      if (detailTask) void loadAssessHistory(detailTask.id)
       if (conversation.figmaLink) {
         void handleDesignReview(conversation.figmaLink)
       }

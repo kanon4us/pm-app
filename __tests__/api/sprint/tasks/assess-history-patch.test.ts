@@ -117,4 +117,34 @@ describe('PATCH /api/sprint/tasks/[id]/assess/history/[conversationId]', () => {
     const res = await PATCH(makeRequest({ isArchived: true }), makeParams('task-1', 'conv-1'))
     expect(res.status).toBe(500)
   })
+
+  it('returns 400 when isArchived is a string', async () => {
+    const req = new NextRequest('http://localhost/api/sprint/tasks/task-1/assess/history/conv-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isArchived: 'true' }),
+    })
+    const res = await PATCH(req, makeParams('task-1', 'conv-1'))
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when isArchived is a number', async () => {
+    const req = new NextRequest('http://localhost/api/sprint/tasks/task-1/assess/history/conv-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isArchived: 1 }),
+    })
+    const res = await PATCH(req, makeParams('task-1', 'conv-1'))
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when isArchived is missing', async () => {
+    const req = new NextRequest('http://localhost/api/sprint/tasks/task-1/assess/history/conv-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const res = await PATCH(req, makeParams('task-1', 'conv-1'))
+    expect(res.status).toBe(400)
+  })
 })
