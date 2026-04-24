@@ -121,9 +121,9 @@ export interface Database {
         Relationships: []
       }
       conversation_role_assessments: {
-        Row: { id: string; conversation_id: string; role_id: string; usage_frequency: number; created_at: string }
-        Insert: { id?: string; conversation_id: string; role_id: string; usage_frequency: number }
-        Update: never
+        Row: { id: string; conversation_id: string; role_id: string; usage_frequency: number; claude_proposed_frequency: number | null; user_override_frequency: number | null; claude_reasoning: string | null; user_reasoning: string | null; created_at: string }
+        Insert: { id?: string; conversation_id: string; role_id: string; usage_frequency: number; claude_proposed_frequency?: number | null; user_override_frequency?: number | null; claude_reasoning?: string | null; user_reasoning?: string | null }
+        Update: { usage_frequency?: number; claude_proposed_frequency?: number | null; user_override_frequency?: number | null; claude_reasoning?: string | null; user_reasoning?: string | null }
         Relationships: []
       }
       developer_experiments: {
