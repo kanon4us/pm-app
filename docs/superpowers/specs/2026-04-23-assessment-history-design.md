@@ -243,10 +243,11 @@ async function loadAssessHistory(taskId: string) {
     if (res.ok && detailTaskRef.current?.id === taskId) {
       const runs: AssessHistoryRun[] = data.runs ?? []
       setAssessHistory(runs)
-      // Auto-expand the newest completed run
-      const newestComplete = runs.find((r) => r.status === 'complete')
-      if (newestComplete) {
-        setExpandedHistoryRuns(new Set([newestComplete.conversationId]))
+      // Auto-expand the newest unarchived complete run only.
+      // If the newest complete run is archived (or all are archived), start fully collapsed.
+      const newestUnarchived = runs.find((r) => r.status === 'complete' && !r.isArchived)
+      if (newestUnarchived) {
+        setExpandedHistoryRuns(new Set([newestUnarchived.conversationId]))
       }
     }
   } catch (err) {
@@ -409,11 +410,23 @@ const inProgressRun = (assessHistory ?? []).find((r) => r.status === 'in_progres
 
   {assessHistoryLoading && <Spin size="small" style={{ marginTop: 8 }} />}
 
-  {!assessHistoryLoading && visibleHistory.length === 0 && (
-    <Typography.Text style={{ color: '#484f58', fontSize: 12, display: 'block', marginTop: 6 }}>
-      No assessments yet — run one to see history here.
-    </Typography.Text>
-  )}
+  {!assessHistoryLoading && (() => {
+    const allComplete = (assessHistory ?? []).filter((r) => r.status === 'complete')
+    const hasHiddenArchived = allComplete.length > 0 && visibleHistory.length === 0 && !showArchived
+    const noRunsAtAll = allComplete.length === 0
+
+    if (noRunsAtAll) return (
+      <Typography.Text style={{ color: '#484f58', fontSize: 12, display: 'block', marginTop: 6 }}>
+        No assessments yet — run one to see history here.
+      </Typography.Text>
+    )
+    if (hasHiddenArchived) return (
+      <Typography.Text style={{ color: '#484f58', fontSize: 12, display: 'block', marginTop: 6 }}>
+        All assessments archived — toggle &quot;Show Archived&quot; to view them.
+      </Typography.Text>
+    )
+    return null
+  })()}
 
   {!assessHistoryLoading && visibleHistory.map((run) => {
     const isExpanded = expandedHistoryRuns.has(run.conversationId)
