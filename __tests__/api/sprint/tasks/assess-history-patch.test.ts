@@ -36,7 +36,9 @@ function mockConvFound() {
   mockFrom.mockReturnValueOnce({
     update: jest.fn().mockReturnValue({
       eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ data: [{ id: 'conv-1' }], error: null, count: 1 }),
+        eq: jest.fn().mockReturnValue({
+          select: jest.fn().mockResolvedValue({ data: [{ id: 'conv-1' }], error: null, count: 1 }),
+        }),
       }),
     }),
   })
@@ -46,7 +48,9 @@ function mockConvNotFound() {
   mockFrom.mockReturnValueOnce({
     update: jest.fn().mockReturnValue({
       eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ data: [], error: null, count: 0 }),
+        eq: jest.fn().mockReturnValue({
+          select: jest.fn().mockResolvedValue({ data: [], error: null, count: 0 }),
+        }),
       }),
     }),
   })

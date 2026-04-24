@@ -25,6 +25,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .update({ is_archived: isArchived })
     .eq('id', conversationId)
     .eq('task_id', id)
+    .select('id')
 
   if (error) {
     console.error('[assess/history PATCH] DB error:', error)
