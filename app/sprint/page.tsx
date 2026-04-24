@@ -324,16 +324,16 @@ export default function SprintPage() {
     try {
       const res = await apiFetch(`/api/sprint/tasks/${taskId}/assess/history`)
       const data = await res.json()
-      if (res.ok && detailTaskRef.current?.id === taskId) {
-        const runs: AssessHistoryRun[] = data.runs ?? []
-        setAssessHistory(runs)
-        const newestUnarchived = runs.find((r) => r.status === 'complete' && !r.isArchived)
-        if (newestUnarchived) {
-          setExpandedHistoryRuns(new Set([newestUnarchived.conversationId]))
-        }
+      if (!res.ok || detailTaskRef.current?.id !== taskId) return
+      const runs: AssessHistoryRun[] = data.runs ?? []
+      setAssessHistory(runs)
+      const newestUnarchived = runs.find((r) => r.status === 'complete' && !r.isArchived)
+      if (newestUnarchived) {
+        setExpandedHistoryRuns(new Set([newestUnarchived.conversationId]))
       }
     } catch (err) {
       console.error('[loadAssessHistory] fetch failed', err)
+      setAssessHistory([])
     } finally {
       setAssessHistoryLoading(false)
     }
@@ -590,31 +590,41 @@ export default function SprintPage() {
 
   async function archiveRun(conversationId: string) {
     if (!detailTask) return
-    await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/history/${conversationId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isArchived: true }),
-    })
-    setAssessHistory((prev) =>
-      prev?.map((r) => r.conversationId === conversationId ? { ...r, isArchived: true } : r) ?? null
-    )
-    setExpandedHistoryRuns((prev) => {
-      const next = new Set(prev)
-      next.delete(conversationId)
-      return next
-    })
+    try {
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/history/${conversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: true }),
+      })
+      if (!res.ok) { console.error('[archiveRun] failed', res.status); return }
+      setAssessHistory((prev) =>
+        prev?.map((r) => r.conversationId === conversationId ? { ...r, isArchived: true } : r) ?? null
+      )
+      setExpandedHistoryRuns((prev) => {
+        const next = new Set(prev)
+        next.delete(conversationId)
+        return next
+      })
+    } catch (err) {
+      console.error('[archiveRun] error', err)
+    }
   }
 
   async function unarchiveRun(conversationId: string) {
     if (!detailTask) return
-    await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/history/${conversationId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isArchived: false }),
-    })
-    setAssessHistory((prev) =>
-      prev?.map((r) => r.conversationId === conversationId ? { ...r, isArchived: false } : r) ?? null
-    )
+    try {
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/history/${conversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: false }),
+      })
+      if (!res.ok) { console.error('[unarchiveRun] failed', res.status); return }
+      setAssessHistory((prev) =>
+        prev?.map((r) => r.conversationId === conversationId ? { ...r, isArchived: false } : r) ?? null
+      )
+    } catch (err) {
+      console.error('[unarchiveRun] error', err)
+    }
   }
 
   function setupRolesFromProposal(
