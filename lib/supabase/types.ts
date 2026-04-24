@@ -103,9 +103,9 @@ export interface Database {
         Relationships: []
       }
       assessment_conversations: {
-        Row: { id: string; task_id: string; status: 'in_progress' | 'complete' | 'abandoned'; vault_context: Json | null; proposed_scores: Json | null; final_scores: Json | null; effort: number | null; risk: number | null; fvi_score: number | null; vault_spec_content: string | null; created_at: string; completed_at: string | null }
-        Insert: { id?: string; task_id: string; status?: 'in_progress' | 'complete' | 'abandoned'; vault_context?: Json | null; proposed_scores?: Json | null }
-        Update: { status?: 'in_progress' | 'complete' | 'abandoned'; proposed_scores?: Json | null; final_scores?: Json | null; effort?: number | null; risk?: number | null; fvi_score?: number | null; vault_spec_content?: string | null; completed_at?: string | null }
+        Row: { id: string; task_id: string; status: 'in_progress' | 'complete' | 'abandoned'; vault_context: Json | null; proposed_scores: Json | null; final_scores: Json | null; effort: number | null; risk: number | null; fvi_score: number | null; vault_spec_content: string | null; affected_workflows: Json | null; is_archived: boolean; created_at: string; completed_at: string | null }
+        Insert: { id?: string; task_id: string; status?: 'in_progress' | 'complete' | 'abandoned'; vault_context?: Json | null; proposed_scores?: Json | null; is_archived?: boolean }
+        Update: { status?: 'in_progress' | 'complete' | 'abandoned'; proposed_scores?: Json | null; final_scores?: Json | null; effort?: number | null; risk?: number | null; fvi_score?: number | null; vault_spec_content?: string | null; affected_workflows?: Json | null; is_archived?: boolean; completed_at?: string | null }
         Relationships: []
       }
       bundle_generations: {
