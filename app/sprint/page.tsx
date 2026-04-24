@@ -1159,8 +1159,7 @@ export default function SprintPage() {
                             {run.isArchived && <Tag style={{ fontSize: 10 }}>archived</Tag>}
                             <Popconfirm
                               title={run.isArchived ? 'Unarchive this run?' : 'Archive this run?'}
-                              onConfirm={(e) => { e?.stopPropagation(); void (run.isArchived ? unarchiveRun(run.conversationId) : archiveRun(run.conversationId)) }}
-                              onCancel={(e) => e?.stopPropagation()}
+                              onConfirm={() => { void (run.isArchived ? unarchiveRun(run.conversationId) : archiveRun(run.conversationId)) }}
                               okText={run.isArchived ? 'Unarchive' : 'Archive'}
                               cancelText="Cancel"
                             >
@@ -1404,7 +1403,7 @@ export default function SprintPage() {
                 {/* Previous run workflows hint — helps PM catch tag drift */}
                 {(() => {
                   const prevWorkflows = assessHistory
-                    ?.find((r) => r.status === 'complete')
+                    ?.find((r) => r.status === 'complete' && !r.isArchived)
                     ?.affectedWorkflows ?? []
                   if (prevWorkflows.length === 0) return null
                   return (
