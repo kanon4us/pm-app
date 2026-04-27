@@ -4,7 +4,7 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import type { Json } from '@/lib/supabase/types'
 
-// POST /api/lists/resubscribe — re-register webhooks for all subscribed lists and re-sync task statuses
+// POST /api/lists/resubscribe — register one team webhook and re-sync task statuses for all subscribed lists
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -29,36 +29,30 @@ export async function POST(req: NextRequest) {
 
   const client = buildClickUpClient(token.access_token)
   const webhookEndpoint = `${process.env.NEXTAUTH_URL}/api/webhooks/clickup`
-  const results: Array<{ listId: string; webhookId: string | null; tasksSynced: number; error?: string }> = []
+
+  // Delete all stale webhook IDs — deduplicated so we don't double-delete
+  const staleIds = [...new Set(lists.map((l) => l.webhook_id).filter(Boolean) as string[])]
+  for (const id of staleIds) {
+    try { await client.deleteWebhook(id) } catch { /* already gone */ }
+  }
+
+  // Create a single team-level webhook (ClickUp webhooks are team-scoped, not list-scoped)
+  let teamWebhookId: string
+  try {
+    const webhook = await client.createWebhook(teamId, webhookEndpoint, process.env.CLICKUP_WEBHOOK_SECRET!)
+    teamWebhookId = webhook.webhook.id
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`Webhook registration failed: ${message}`)
+    return NextResponse.json({ error: `ClickUp webhook registration failed: ${message}` }, { status: 502 })
+  }
+
+  // Store the shared webhook ID on every list and re-sync task statuses
+  const syncResults: Array<{ listId: string; tasksSynced: number; error?: string }> = []
 
   for (const list of lists) {
-    let newWebhookId: string | null = null
+    await supabase.from('lists').update({ webhook_id: teamWebhookId, synced_at: new Date().toISOString() }).eq('id', list.id)
 
-    // Delete stale webhook from ClickUp
-    if (list.webhook_id) {
-      try {
-        await client.deleteWebhook(list.webhook_id)
-      } catch {
-        // Stale ID — already gone or never valid, continue
-      }
-    }
-
-    // Register fresh webhook
-    try {
-      const webhook = await client.createWebhook(teamId, webhookEndpoint, process.env.CLICKUP_WEBHOOK_SECRET!)
-      newWebhookId = webhook.webhook.id
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.warn(`Webhook registration failed for list ${list.clickup_list_id}: ${message}`)
-      results.push({ listId: list.clickup_list_id, webhookId: null, tasksSynced: 0, error: message })
-      continue
-    }
-
-    // Update webhook_id on the list record
-    await supabase.from('lists').update({ webhook_id: newWebhookId, synced_at: new Date().toISOString() }).eq('id', list.id)
-
-    // Re-sync current task statuses from ClickUp
-    let tasksSynced = 0
     try {
       const tasks = await client.getTasks(list.clickup_list_id)
       if (tasks.length > 0) {
@@ -73,14 +67,14 @@ export async function POST(req: NextRequest) {
           })),
           { onConflict: 'clickup_task_id' }
         )
-        tasksSynced = tasks.length
       }
+      syncResults.push({ listId: list.clickup_list_id, tasksSynced: tasks.length })
     } catch (err) {
-      console.warn(`Task sync failed for list ${list.clickup_list_id}:`, err)
+      const message = err instanceof Error ? err.message : String(err)
+      console.warn(`Task sync failed for list ${list.clickup_list_id}: ${message}`)
+      syncResults.push({ listId: list.clickup_list_id, tasksSynced: 0, error: message })
     }
-
-    results.push({ listId: list.clickup_list_id, webhookId: newWebhookId, tasksSynced })
   }
 
-  return NextResponse.json({ ok: true, webhookEndpoint, results })
+  return NextResponse.json({ ok: true, webhookEndpoint, webhookId: teamWebhookId, lists: syncResults })
 }
