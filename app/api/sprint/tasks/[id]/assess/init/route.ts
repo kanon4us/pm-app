@@ -257,8 +257,8 @@ ${reassessmentContext}`
   try {
     response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 16000,
-      thinking: { type: 'adaptive' },
+      max_tokens: 8192,
+      thinking: { type: 'enabled', budget_tokens: 6000 },
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     })
