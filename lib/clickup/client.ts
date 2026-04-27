@@ -37,7 +37,10 @@ async function clickupFetch<T>(token: string, path: string, options?: RequestIni
     ...options,
     headers: { Authorization: token, 'Content-Type': 'application/json', ...options?.headers },
   })
-  if (!res.ok) throw new Error(`ClickUp API error: ${res.status}`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`ClickUp API error: ${res.status} ${body}`)
+  }
   return res.json() as Promise<T>
 }
 
@@ -94,6 +97,10 @@ export function buildClickUpClient(token: string) {
         method: 'POST',
         body: JSON.stringify({ value }),
       }),
+
+    listWebhooks: (teamId: string) =>
+      clickupFetch<{ webhooks: Array<{ id: string; endpoint: string }> }>(token, `/team/${teamId}/webhook`)
+        .then((r) => r.webhooks),
 
     deleteWebhook: (webhookId: string) =>
       clickupFetch<void>(token, `/webhook/${webhookId}`, { method: 'DELETE' }),

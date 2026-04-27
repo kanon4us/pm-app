@@ -30,10 +30,15 @@ export async function POST(req: NextRequest) {
   const client = buildClickUpClient(token.access_token)
   const webhookEndpoint = `${process.env.NEXTAUTH_URL}/api/webhooks/clickup`
 
-  // Delete all stale webhook IDs — deduplicated so we don't double-delete
-  const staleIds = [...new Set(lists.map((l) => l.webhook_id).filter(Boolean) as string[])]
-  for (const id of staleIds) {
-    try { await client.deleteWebhook(id) } catch { /* already gone */ }
+  // Delete all webhooks in ClickUp pointing at our endpoint (handles orphans not tracked in Supabase)
+  try {
+    const existing = await client.listWebhooks(teamId)
+    const ours = existing.filter((w) => w.endpoint === webhookEndpoint)
+    for (const w of ours) {
+      try { await client.deleteWebhook(w.id) } catch { /* ignore */ }
+    }
+  } catch (err) {
+    console.warn('Could not list existing webhooks:', err)
   }
 
   // Create a single team-level webhook (ClickUp webhooks are team-scoped, not list-scoped)
