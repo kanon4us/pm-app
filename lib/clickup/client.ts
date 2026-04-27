@@ -30,6 +30,7 @@ export interface ClickUpTask {
   description: string | null
   status: { status: string }
   custom_fields: Array<{ id: string; name: string; value: unknown }>
+  list: { id: string; name: string }
 }
 
 async function clickupFetch<T>(token: string, path: string, options?: RequestInit): Promise<T> {

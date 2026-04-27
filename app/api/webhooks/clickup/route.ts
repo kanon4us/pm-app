@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyClickUpSignature, parseWebhookEvent } from '@/lib/clickup/webhook'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
+import { buildClickUpClient } from '@/lib/clickup/client'
+import type { Json } from '@/lib/supabase/types'
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
@@ -17,13 +19,41 @@ export async function POST(req: NextRequest) {
   const supabase = await getSupabaseServiceClient()
 
   // Find the task by ClickUp task ID
-  const { data: task } = await supabase
+  let { data: task } = await supabase
     .from('tasks')
     .select('id, list_id, status')
     .eq('clickup_task_id', event.taskId)
     .single()
 
-  if (!task) return NextResponse.json({ ok: true }) // Task not in a subscribed list
+  // Task not tracked yet — auto-import if it belongs to a subscribed list
+  if (!task) {
+    const { data: token } = await supabase
+      .from('oauth_tokens').select('access_token').eq('provider', 'clickup').limit(1).single()
+
+    if (token) {
+      try {
+        const cuTask = await buildClickUpClient(token.access_token).getTask(event.taskId)
+        const { data: list } = await supabase
+          .from('lists').select('id').eq('clickup_list_id', cuTask.list.id).single()
+
+        if (list) {
+          const { data: inserted } = await supabase.from('tasks').insert({
+            clickup_task_id: cuTask.id,
+            list_id: list.id,
+            name: cuTask.name,
+            status: event.toStatus,
+            custom_fields: (cuTask.custom_fields ?? []) as unknown as Json,
+            synced_at: new Date().toISOString(),
+          }).select('id, list_id, status').single()
+          task = inserted
+        }
+      } catch (err) {
+        console.warn('[webhook] auto-import failed for task', event.taskId, err)
+      }
+    }
+
+    if (!task) return NextResponse.json({ ok: true }) // Not in a subscribed list
+  }
 
   // Find matching trigger configs for this status transition
   const { data: configs } = await supabase
