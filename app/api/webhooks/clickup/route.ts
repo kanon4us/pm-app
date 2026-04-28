@@ -8,16 +8,12 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text()
   const signature = req.headers.get('x-signature') ?? ''
 
-  const secret = process.env.CLICKUP_WEBHOOK_SECRET ?? ''
-  const secretDebug = `len=${secret.length} prefix=${secret.slice(0, 8)}`
-  if (!verifyClickUpSignature(rawBody, signature, secret)) {
-    console.error('[webhook] 401', { secretDebug, sigReceived: signature.slice(0, 16) })
+  if (!verifyClickUpSignature(rawBody, signature, process.env.CLICKUP_WEBHOOK_SECRET!)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   const payload = JSON.parse(rawBody) as Record<string, unknown>
   const event = parseWebhookEvent(payload)
-  console.log('[webhook] parsed', JSON.stringify({ event: payload.event, parsedEvent: event, historyItem0: (payload.history_items as unknown[])?.[0] }))
   if (!event) return NextResponse.json({ ok: true }) // Unsupported event — ack and ignore
 
   const supabase = await getSupabaseServiceClient()

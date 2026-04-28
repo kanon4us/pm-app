@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     // Register ClickUp webhook (best-effort — fails on localhost)
     let webhookId: string | null = null
     try {
-      const webhook = await client.createWebhook(teamId, webhookEndpoint, process.env.CLICKUP_WEBHOOK_SECRET!)
+      const webhook = await client.createWebhook(teamId, webhookEndpoint)
       webhookId = webhook.webhook.id
     } catch {
       console.warn(`Webhook registration skipped for list ${listId} (endpoint may not be publicly accessible)`)

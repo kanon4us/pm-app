@@ -41,11 +41,14 @@ export async function POST(req: NextRequest) {
     console.warn('Could not list existing webhooks:', err)
   }
 
-  // Create a single team-level webhook (ClickUp webhooks are team-scoped, not list-scoped)
+  // Create a single team-level webhook. ClickUp generates its own signing secret
+  // and returns it in webhook.secret — that's the HMAC key for X-Signature verification.
   let teamWebhookId: string
+  let clickupSecret: string
   try {
-    const webhook = await client.createWebhook(teamId, webhookEndpoint, process.env.CLICKUP_WEBHOOK_SECRET!)
+    const webhook = await client.createWebhook(teamId, webhookEndpoint)
     teamWebhookId = webhook.webhook.id
+    clickupSecret = webhook.webhook.secret
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`Webhook registration failed: ${message}`)
@@ -81,5 +84,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, webhookEndpoint, webhookId: teamWebhookId, lists: syncResults })
+  return NextResponse.json({ ok: true, webhookEndpoint, webhookId: teamWebhookId, clickupSecret, lists: syncResults })
 }

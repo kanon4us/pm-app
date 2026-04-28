@@ -71,14 +71,12 @@ export function buildClickUpClient(token: string) {
     getTask: (taskId: string) =>
       clickupFetch<ClickUpTask>(token, `/task/${taskId}`),
 
-    createWebhook: (teamId: string, endpoint: string, secret: string) =>
-      clickupFetch<{ id: string; webhook: { id: string } }>(token, `/team/${teamId}/webhook`, {
+    // ClickUp generates its own signing secret — ignore the `secret` param we pass,
+    // and use webhook.secret from the response as the HMAC signing key.
+    createWebhook: (teamId: string, endpoint: string) =>
+      clickupFetch<{ id: string; webhook: { id: string; secret: string } }>(token, `/team/${teamId}/webhook`, {
         method: 'POST',
-        body: JSON.stringify({
-          endpoint,
-          events: ['taskStatusUpdated'],
-          secret,
-        }),
+        body: JSON.stringify({ endpoint, events: ['taskStatusUpdated'] }),
       }),
 
     updateTask: (taskId: string, body: { description?: string; name?: string }) =>
