@@ -8,7 +8,10 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text()
   const signature = req.headers.get('x-signature') ?? ''
 
-  if (!verifyClickUpSignature(rawBody, signature, process.env.CLICKUP_WEBHOOK_SECRET!)) {
+  const secret = process.env.CLICKUP_WEBHOOK_SECRET ?? ''
+  const secretDebug = `len=${secret.length} prefix=${secret.slice(0, 8)}`
+  if (!verifyClickUpSignature(rawBody, signature, secret)) {
+    console.error('[webhook] 401', { secretDebug, sigReceived: signature.slice(0, 16) })
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
