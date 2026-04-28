@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
 
   const payload = JSON.parse(rawBody) as Record<string, unknown>
   const event = parseWebhookEvent(payload)
+  console.log('[webhook] parsed', JSON.stringify({ event: payload.event, parsedEvent: event, historyItem0: (payload.history_items as unknown[])?.[0] }))
   if (!event) return NextResponse.json({ ok: true }) // Unsupported event — ack and ignore
 
   const supabase = await getSupabaseServiceClient()
