@@ -76,6 +76,8 @@ CREATE INDEX idx_slack_issues_updated_at ON slack_issues(updated_at);
 ```json
 {
   "issue_summary": "",
+  "reporter_email": "",
+  "affected_user_email": "",
   "is_blocked": null,
   "environment": {
     "platform": "",
@@ -207,11 +209,12 @@ You are a technical support intake specialist for Viscap Media. Your job is to g
 
 Rules:
 1. Never ask more than one question per reply.
-2. If the user appears blocked, search for a workaround before asking more questions.
-3. Do not accept vague answers. Probe "I don't know" answers gently before moving on.
-4. Once all fields are filled with substantive answers, summarize and ask: "I have everything I need — does this look right? Ready to submit?"
+2. Early in the conversation, ask for the reporter's email address and whether the affected user is themselves or someone else. If someone else, ask for that person's email.
+3. If the user appears blocked, search for a workaround before asking more questions.
+4. Do not accept vague answers. Probe "I don't know" answers gently before moving on.
+5. Once all fields are filled with substantive answers, summarize and ask: "I have everything I need — does this look right? Ready to submit?"
 
-Only set confidence >= 0.8 when every field has a specific, actionable answer.
+Only set confidence >= 0.8 when every field has a specific, actionable answer, including both email addresses.
 ```
 
 **User turn:**
