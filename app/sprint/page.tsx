@@ -6,7 +6,7 @@ import {
   Switch, Tooltip, Divider, Slider, Progress, Popconfirm,
 } from 'antd'
 import type { ColumnType } from 'antd/es/table'
-import { SearchOutlined, SaveOutlined, ThunderboltOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons'
+import { SearchOutlined, SaveOutlined, ThunderboltOutlined, DeleteOutlined, UndoOutlined, ReloadOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
 import { AssessmentButton } from '@/app/sprint/components/AssessmentButton'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
@@ -240,6 +240,7 @@ export default function SprintPage() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [assignTarget, setAssignTarget] = useState<string>('')
   const [sprintModalOpen, setSprintModalOpen] = useState(false)
@@ -316,7 +317,17 @@ export default function SprintPage() {
     })
   }
 
-  useEffect(() => { load() }, [])
+  async function syncClickUp() {
+    setSyncing(true)
+    try {
+      await apiFetch('/api/sprint/tasks/sync-status', { method: 'POST' })
+      await load()
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  useEffect(() => { load().then(() => syncClickUp()) }, [])
 
   useEffect(() => { detailTaskRef.current = detailTask }, [detailTask])
 
@@ -971,7 +982,10 @@ export default function SprintPage() {
           <Typography.Title level={3} style={{ color: '#e6edf3', marginBottom: 4 }}>Sprint Planner</Typography.Title>
           <Typography.Text style={{ color: '#8b949e' }}>Assign tasks to sprints</Typography.Text>
         </div>
-        <Button type="primary" onClick={() => setSprintModalOpen(true)}>+ New Sprint</Button>
+        <Space>
+          <Button icon={<ReloadOutlined />} loading={syncing} onClick={syncClickUp}>Refresh ClickUp</Button>
+          <Button type="primary" onClick={() => setSprintModalOpen(true)}>+ New Sprint</Button>
+        </Space>
       </Space>
 
       <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
