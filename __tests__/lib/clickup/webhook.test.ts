@@ -29,7 +29,7 @@ describe('parseWebhookEvent', () => {
     const payload = {
       event: 'taskStatusUpdated',
       task_id: 'abc123',
-      history_items: [{ after: { status: { status: 'In Progress' } } }],
+      history_items: [{ after: { status: 'In Progress' } }],
     }
     const event = parseWebhookEvent(payload)
     expect(event).toEqual({ taskId: 'abc123', toStatus: 'In Progress', event: 'taskStatusUpdated' })

@@ -22,8 +22,8 @@ export function verifyClickUpSignature(
 export function parseWebhookEvent(payload: Record<string, unknown>): ClickUpWebhookEvent | null {
   if (payload.event !== 'taskStatusUpdated') return null
   const taskId = payload.task_id as string
-  const historyItems = payload.history_items as Array<{ after?: { status?: { status?: string } } }>
-  const toStatus = historyItems?.[0]?.after?.status?.status
+  const historyItems = payload.history_items as Array<{ after?: { status?: string } }>
+  const toStatus = historyItems?.[0]?.after?.status
   if (!taskId || !toStatus) return null
   return { taskId, toStatus, event: payload.event as string }
 }
