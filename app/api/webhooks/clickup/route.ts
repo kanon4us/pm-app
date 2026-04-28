@@ -8,7 +8,10 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text()
   const signature = req.headers.get('x-signature') ?? ''
 
-  if (!verifyClickUpSignature(rawBody, signature, process.env.CLICKUP_WEBHOOK_SECRET!)) {
+  const secret = process.env.CLICKUP_WEBHOOK_SECRET!
+  if (!verifyClickUpSignature(rawBody, signature, secret)) {
+    const expected = require('crypto').createHmac('sha256', secret).update(rawBody).digest('hex')
+    console.error('[webhook] sig mismatch', { received: signature.slice(0, 16), expected: expected.slice(0, 16), bodySnippet: rawBody.slice(0, 120) })
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
