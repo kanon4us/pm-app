@@ -6,13 +6,19 @@ import type { SlackIssue, TriageClaudeResponse } from './types'
 const PRIORITY_MAP: Record<string, number> = { urgent: 1, high: 2, normal: 3, low: 4 }
 
 function bumpPriority(currentStr: string | null | undefined): number | 'already_urgent' {
-  const current = PRIORITY_MAP[currentStr ?? ''] ?? 4  // default to low
+  const current = PRIORITY_MAP[currentStr ?? '']
+  if (current === undefined) {
+    console.warn(`bumpPriority: unrecognized priority "${currentStr}" — skipping bump`)
+    return 'already_urgent'
+  }
   if (current <= 1) return 'already_urgent'
   return current - 1  // lower number = higher priority
 }
 
 function buildTaskDescription(issue: SlackIssue): string {
   const t = issue.ticket_data
+  const slackBase = process.env.SLACK_WORKSPACE_URL ?? 'https://slack.com'
+  const threadUrl = `${slackBase}/archives/${issue.channel_id}/p${issue.thread_ts.replace('.', '')}`
   return [
     `**Reporter:** ${t.reporter_email}`,
     `**Affected User:** ${t.affected_user_email}`,
@@ -27,7 +33,7 @@ function buildTaskDescription(issue: SlackIssue): string {
     '',
     `**Last occurred:** ${t.last_occurred_at}`,
     t.urls.length > 0 ? `**URLs:** ${t.urls.join(', ')}` : '',
-    `**Slack thread:** https://slack.com (thread_ts: ${issue.thread_ts})`,
+    `**Slack thread:** ${threadUrl}`,
   ].filter(Boolean).join('\n')
 }
 
@@ -37,16 +43,19 @@ export async function routeTicket(issue: SlackIssue, triage: TriageClaudeRespons
   if (!cuToken) throw new Error('CLICKUP_BOT_TOKEN is not set')
   if (!slackToken) throw new Error('SLACK_BOT_TOKEN is not set')
 
+  const listNew = process.env.CLICKUP_NEW_TICKETS_LIST_ID
+  const listKnown = process.env.CLICKUP_KNOWN_ISSUES_LIST_ID
+  const listTutorial = process.env.CLICKUP_NEEDS_TUTORIAL_LIST_ID
+  const listPlanning = process.env.CLICKUP_PLANNING_LIST_ID
+  if (!listNew || !listKnown || !listTutorial || !listPlanning) {
+    throw new Error('One or more CLICKUP_*_LIST_ID env vars are not set')
+  }
+
+  const listIds = { new: listNew, known: listKnown, tutorial: listTutorial, planning: listPlanning }
+
   const cu = buildClickUpClient(cuToken)
   const slack = buildSlackClient(slackToken)
   const michaelId = process.env.SLACK_MICHAEL_USER_ID
-
-  const listIds = {
-    new: process.env.CLICKUP_NEW_TICKETS_LIST_ID!,
-    known: process.env.CLICKUP_KNOWN_ISSUES_LIST_ID!,
-    tutorial: process.env.CLICKUP_NEEDS_TUTORIAL_LIST_ID!,
-    planning: process.env.CLICKUP_PLANNING_LIST_ID!,
-  }
 
   const { routing_decision } = triage
 
@@ -60,6 +69,8 @@ export async function routeTicket(issue: SlackIssue, triage: TriageClaudeRespons
       if (michaelId) {
         const dmChannel = await slack.openDM(michaelId)
         await slack.postMessage(dmChannel, `🚨 Urgent issue reported again: ${existing.url}\nReporter: ${issue.ticket_data.reporter_email}`)
+      } else {
+        console.warn('routeTicket: SLACK_MICHAEL_USER_ID is not set — skipping urgent DM')
       }
     } else {
       await cu.setTaskPriority(triage.duplicate_task_id, newPriority as 1 | 2 | 3 | 4)
@@ -127,5 +138,7 @@ export async function routeTicket(issue: SlackIssue, triage: TriageClaudeRespons
       dmChannel,
       `🚨 New HIGH priority bug — no workaround exists.\nReporter: ${issue.ticket_data.reporter_email}\nAffected user: ${issue.ticket_data.affected_user_email}\nTicket: ${task.url}`,
     )
+  } else {
+    console.warn('routeTicket: SLACK_MICHAEL_USER_ID is not set — skipping urgent DM')
   }
 }

@@ -91,7 +91,7 @@ describe('routeTicket', () => {
 
     expect(mockCu.createTask).toHaveBeenCalledWith('list-new', expect.objectContaining({ priority: 2 }))
     expect(mockSlack.openDM).toHaveBeenCalledWith('U_MICHAEL')
-    expect(mockSlack.postMessage).toHaveBeenCalledWith('D_MICHAEL', expect.stringContaining('cu-new'))
+    expect(mockSlack.postMessage).toHaveBeenCalledWith('D_MICHAEL', expect.stringContaining('https://app.clickup.com/t/cu-new'))
   })
 
   it('creates ticket in Needs Tutorial for needs_tutorial routing', async () => {
@@ -143,5 +143,60 @@ describe('routeTicket', () => {
 
     expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-old', 2)
     expect(mockCu.moveTask).toHaveBeenCalledWith('cu-old', 'list-planning')
+  })
+
+  it('comments and DMs Michael when existing ticket is already urgent', async () => {
+    mockCu.getTask.mockResolvedValue({
+      id: 'cu-urgent',
+      name: 'CMS crash',
+      description: null,
+      status: { status: 'open' },
+      priority: { id: '1', priority: 'urgent' },
+      url: 'https://app.clickup.com/t/cu-urgent',
+      custom_fields: [],
+      list: { id: 'list-known', name: 'Known Issues' },
+    })
+    const issue = makeIssue()
+    const triage = makeTriageResponse({
+      routing_decision: 'known_issues',
+      duplicate_task_id: 'cu-urgent',
+      duplicate_confidence: 0.92,
+    })
+
+    await routeTicket(issue, triage)
+
+    // Comment added but priority NOT changed and NOT moved
+    expect(mockCu.createTaskComment).toHaveBeenCalledWith('cu-urgent', expect.any(String))
+    expect(mockCu.setTaskPriority).not.toHaveBeenCalled()
+    expect(mockCu.moveTask).not.toHaveBeenCalled()
+    // Michael DM'd
+    expect(mockSlack.openDM).toHaveBeenCalledWith('U_MICHAEL')
+    // No new ticket
+    expect(mockCu.createTask).not.toHaveBeenCalled()
+  })
+
+  it('does NOT move to Planning when priority bump does not land on high', async () => {
+    // Start at low(4) → bumps to normal(3), not high → no Planning move
+    mockCu.getTask.mockResolvedValue({
+      id: 'cu-low',
+      name: 'Minor bug',
+      description: null,
+      status: { status: 'open' },
+      priority: { id: '4', priority: 'low' },
+      url: 'https://app.clickup.com/t/cu-low',
+      custom_fields: [],
+      list: { id: 'list-new', name: 'New Tickets' },
+    })
+    const issue = makeIssue()
+    const triage = makeTriageResponse({
+      routing_decision: 'known_issues',
+      duplicate_task_id: 'cu-low',
+      duplicate_confidence: 0.9,
+    })
+
+    await routeTicket(issue, triage)
+
+    expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-low', 3)  // normal
+    expect(mockCu.moveTask).not.toHaveBeenCalled()
   })
 })
