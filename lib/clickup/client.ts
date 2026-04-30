@@ -29,6 +29,8 @@ export interface ClickUpTask {
   name: string
   description: string | null
   status: { status: string }
+  priority: { id: '1' | '2' | '3' | '4'; priority: string } | null
+  url: string
   custom_fields: Array<{ id: string; name: string; value: unknown }>
   list: { id: string; name: string }
 }
@@ -103,5 +105,28 @@ export function buildClickUpClient(token: string) {
 
     deleteWebhook: (webhookId: string) =>
       clickupFetch<void>(token, `/webhook/${webhookId}`, { method: 'DELETE' }),
+
+    createTask: (listId: string, fields: {
+      name: string
+      description: string
+      priority: 1 | 2 | 3 | 4
+    }) =>
+      clickupFetch<{ id: string; url: string }>(token, `/list/${listId}/task`, {
+        method: 'POST',
+        body: JSON.stringify(fields),
+      }),
+
+    setTaskPriority: (taskId: string, priority: 1 | 2 | 3 | 4) =>
+      clickupFetch<ClickUpTask>(token, `/task/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ priority }),
+      }),
+
+    // Note: ClickUp v2 accepts list_id in PUT body to move a task to another list.
+    moveTask: (taskId: string, listId: string) =>
+      clickupFetch<ClickUpTask>(token, `/task/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ list_id: listId }),
+      }),
   }
 }
