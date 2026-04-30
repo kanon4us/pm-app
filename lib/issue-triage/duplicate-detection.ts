@@ -49,8 +49,13 @@ export async function detectDuplicate(ticketData: TicketData): Promise<TriageCla
     process.env.CLICKUP_PLANNING_LIST_ID,
   ].filter(Boolean) as string[]
 
+  if (listIds.length < 4) {
+    console.warn(`detectDuplicate: only ${listIds.length}/4 ClickUp list IDs are configured — duplicate search may be incomplete`)
+  }
+
   const client = buildClickUpClient(token)
 
+  // NOTE: ClickUp API returns max 100 tasks per list (first page only)
   const taskArrays = await Promise.all(
     listIds.map((listId) =>
       client.getTasks(listId).catch(() => [])
