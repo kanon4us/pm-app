@@ -56,8 +56,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Guard: ignore bot messages and off-channel messages
   const issuesChannel = process.env.SLACK_ISSUES_CHANNEL_ID
+  if (!issuesChannel) {
+    console.error('[slack-webhook] SLACK_ISSUES_CHANNEL_ID is not set — dropping event')
+    return NextResponse.json({ ok: true })
+  }
   if (event.bot_id || event.subtype === 'bot_message') return NextResponse.json({ ok: true })
   if (event.channel !== issuesChannel) return NextResponse.json({ ok: true })
+  if (!event.user) return NextResponse.json({ ok: true })
 
   // ACK immediately — all work in after()
   after(async () => {
@@ -111,7 +116,11 @@ async function processSlackEvent(event: SlackEvent): Promise<void> {
       clickup_task_id: null,
       last_msg_ts: event.ts,
     }
-    await supabase.from('slack_issues').insert(newIssue)
+    const { error: insertError } = await supabase.from('slack_issues').insert(newIssue)
+    if (insertError) {
+      console.error('[slack-webhook] failed to insert new issue:', insertError)
+      return
+    }
     const fullIssue: SlackIssue = { ...newIssue, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
     await handleGathering(fullIssue, event, slack, supabase)
     return
@@ -180,11 +189,15 @@ async function handleConfirming(
       }
     }
 
-    await routeTicket(issue, triageResult)
+    const clickupTaskId = await routeTicket(issue, triageResult)
 
     await supabase
       .from('slack_issues')
-      .update({ status: 'complete', updated_at: new Date().toISOString() })
+      .update({
+        status: 'complete',
+        clickup_task_id: clickupTaskId,
+        updated_at: new Date().toISOString(),
+      })
       .eq('thread_ts', issue.thread_ts)
 
   } else if (isNo) {

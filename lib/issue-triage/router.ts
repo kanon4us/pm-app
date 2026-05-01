@@ -37,7 +37,7 @@ function buildTaskDescription(issue: SlackIssue): string {
   ].filter(Boolean).join('\n')
 }
 
-export async function routeTicket(issue: SlackIssue, triage: TriageClaudeResponse): Promise<void> {
+export async function routeTicket(issue: SlackIssue, triage: TriageClaudeResponse): Promise<string | null> {
   const cuToken = process.env.CLICKUP_BOT_TOKEN
   const slackToken = process.env.SLACK_BOT_TOKEN
   if (!cuToken) throw new Error('CLICKUP_BOT_TOKEN is not set')
@@ -88,7 +88,7 @@ export async function routeTicket(issue: SlackIssue, triage: TriageClaudeRespons
       `✅ This looks like a known issue! I've linked your report to the existing ticket and bumped its priority: ${existing.url}`,
       issue.thread_ts,
     )
-    return
+    return null
   }
 
   if (routing_decision === 'needs_tutorial') {
@@ -101,7 +101,7 @@ export async function routeTicket(issue: SlackIssue, triage: TriageClaudeRespons
       ? `📝 I've created a ticket for the team to document this properly: ${task.url}\n\nIn the meantime, here's a workaround:\n${triage.workaround_text}`
       : `📝 No workaround found yet. I've created a documentation ticket: ${task.url}`
     await slack.postMessage(issue.channel_id, message, issue.thread_ts)
-    return
+    return task.id
   }
 
   if (routing_decision === 'new_tickets_with_workaround') {
@@ -118,7 +118,7 @@ export async function routeTicket(issue: SlackIssue, triage: TriageClaudeRespons
       `✅ Ticket created: ${task.url}${docsNote}`,
       issue.thread_ts,
     )
-    return
+    return task.id
   }
 
   // escalate_to_michael (default)
@@ -141,4 +141,5 @@ export async function routeTicket(issue: SlackIssue, triage: TriageClaudeRespons
   } else {
     console.warn('routeTicket: SLACK_MICHAEL_USER_ID is not set — skipping urgent DM')
   }
+  return task.id
 }

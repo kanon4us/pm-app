@@ -87,11 +87,12 @@ describe('routeTicket', () => {
     const issue = makeIssue()
     const triage = makeTriageResponse({ routing_decision: 'escalate_to_michael' })
 
-    await routeTicket(issue, triage)
+    const result = await routeTicket(issue, triage)
 
     expect(mockCu.createTask).toHaveBeenCalledWith('list-new', expect.objectContaining({ priority: 2 }))
     expect(mockSlack.openDM).toHaveBeenCalledWith('U_MICHAEL')
     expect(mockSlack.postMessage).toHaveBeenCalledWith('D_MICHAEL', expect.stringContaining('https://app.clickup.com/t/cu-new'))
+    expect(result).toBe('cu-new')
   })
 
   it('creates ticket in Needs Tutorial for needs_tutorial routing', async () => {
@@ -102,7 +103,7 @@ describe('routeTicket', () => {
       workaround_text: 'Use Ctrl+S instead',
     })
 
-    await routeTicket(issue, triage)
+    const result = await routeTicket(issue, triage)
 
     expect(mockCu.createTask).toHaveBeenCalledWith('list-tutorial', expect.objectContaining({ name: expect.any(String) }))
     expect(mockSlack.postMessage).toHaveBeenCalledWith(
@@ -110,6 +111,7 @@ describe('routeTicket', () => {
       expect.stringContaining('Ctrl+S'),
       '1234567890.000001'
     )
+    expect(result).toBe('cu-new')
   })
 
   it('bumps priority and comments on existing ticket for known_issues routing', async () => {
@@ -120,7 +122,7 @@ describe('routeTicket', () => {
       duplicate_confidence: 0.95,
     })
 
-    await routeTicket(issue, triage)
+    const result = await routeTicket(issue, triage)
 
     // Priority bumped from normal(3) → high(2)
     expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-old', 2)
@@ -128,6 +130,7 @@ describe('routeTicket', () => {
     expect(mockCu.createTaskComment).toHaveBeenCalledWith('cu-old', expect.any(String))
     // No new ticket created
     expect(mockCu.createTask).not.toHaveBeenCalled()
+    expect(result).toBeNull()
   })
 
   it('moves ticket to Planning when priority bump lands on high', async () => {
@@ -139,10 +142,11 @@ describe('routeTicket', () => {
       duplicate_confidence: 0.9,
     })
 
-    await routeTicket(issue, triage)
+    const result = await routeTicket(issue, triage)
 
     expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-old', 2)
     expect(mockCu.moveTask).toHaveBeenCalledWith('cu-old', 'list-planning')
+    expect(result).toBeNull()
   })
 
   it('comments and DMs Michael when existing ticket is already urgent', async () => {
@@ -163,7 +167,7 @@ describe('routeTicket', () => {
       duplicate_confidence: 0.92,
     })
 
-    await routeTicket(issue, triage)
+    const result = await routeTicket(issue, triage)
 
     // Comment added but priority NOT changed and NOT moved
     expect(mockCu.createTaskComment).toHaveBeenCalledWith('cu-urgent', expect.any(String))
@@ -173,6 +177,7 @@ describe('routeTicket', () => {
     expect(mockSlack.openDM).toHaveBeenCalledWith('U_MICHAEL')
     // No new ticket
     expect(mockCu.createTask).not.toHaveBeenCalled()
+    expect(result).toBeNull()
   })
 
   it('does NOT move to Planning when priority bump does not land on high', async () => {
@@ -194,9 +199,10 @@ describe('routeTicket', () => {
       duplicate_confidence: 0.9,
     })
 
-    await routeTicket(issue, triage)
+    const result = await routeTicket(issue, triage)
 
     expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-low', 3)  // normal
     expect(mockCu.moveTask).not.toHaveBeenCalled()
+    expect(result).toBeNull()
   })
 })
