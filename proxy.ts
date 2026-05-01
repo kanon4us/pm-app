@@ -9,6 +9,8 @@ const PUBLIC_PATHS = [
   '/api/github/connect',
   '/api/github/callback',
   '/api/webhooks/clickup',
+  '/api/webhooks/slack',
+  '/api/cron/slack-stale-check',
 ]
 
 function isSafeRedirect(url: string): boolean {
