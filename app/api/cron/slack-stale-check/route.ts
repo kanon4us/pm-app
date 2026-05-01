@@ -3,6 +3,11 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildSlackClient } from '@/lib/slack/client'
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
+  const authHeader = _req.headers.get('authorization')
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabase = await getSupabaseServiceClient()
   const slackToken = process.env.SLACK_BOT_TOKEN
   if (!slackToken) {
@@ -35,7 +40,13 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
           "Still there? I'm ready to finish documenting this whenever you are. Just reply to this thread and we'll pick up where we left off.",
           issue.thread_ts,
         )
-        .then(() => { nudged++ })
+        .then(async () => {
+          nudged++
+          await supabase
+            .from('slack_issues')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('thread_ts', issue.thread_ts)
+        })
         .catch((err: unknown) =>
           console.error('[stale-check] postMessage failed:', issue.thread_ts, err)
         )
