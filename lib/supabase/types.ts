@@ -187,6 +187,60 @@ export interface Database {
         }
         Relationships: []
       }
+      features: {
+        Row: { id: string; name: string; description: string | null; status: 'draft' | 'active' | 'archived'; created_at: string; updated_at: string }
+        Insert: { id?: string; name: string; description?: string | null; status?: 'draft' | 'active' | 'archived' }
+        Update: { name?: string; description?: string | null; status?: 'draft' | 'active' | 'archived' }
+        Relationships: []
+      }
+      feature_tasks: {
+        Row: { feature_id: string; task_id: string }
+        Insert: { feature_id: string; task_id: string }
+        Update: never
+        Relationships: []
+      }
+      user_stories: {
+        Row: { id: string; title: string; as_a: string; i_want: string; so_that: string; created_at: string }
+        Insert: { id?: string; title: string; as_a: string; i_want: string; so_that: string }
+        Update: { title?: string; as_a?: string; i_want?: string; so_that?: string }
+        Relationships: []
+      }
+      feature_user_stories: {
+        Row: { feature_id: string; user_story_id: string; display_order: number }
+        Insert: { feature_id: string; user_story_id: string; display_order?: number }
+        Update: { display_order?: number }
+        Relationships: []
+      }
+      scenarios: {
+        Row: { id: string; user_story_id: string; title: string; description: string | null; display_order: number }
+        Insert: { id?: string; user_story_id: string; title: string; description?: string | null; display_order?: number }
+        Update: { title?: string; description?: string | null; display_order?: number }
+        Relationships: []
+      }
+      steps: {
+        Row: { id: string; scenario_id: string; title: string; description: string | null; figma_url: string | null; figma_frame_id: string | null; figma_thumbnail_url: string | null; display_order: number }
+        Insert: { id?: string; scenario_id: string; title: string; description?: string | null; figma_url?: string | null; figma_frame_id?: string | null; figma_thumbnail_url?: string | null; display_order?: number }
+        Update: { title?: string; description?: string | null; figma_url?: string | null; figma_frame_id?: string | null; figma_thumbnail_url?: string | null; display_order?: number }
+        Relationships: []
+      }
+      feature_prototypes: {
+        Row: { id: string; feature_id: string; scenario_id: string | null; is_current: boolean; html_content: string; vault_path: string | null; vault_url: string | null; generated_by: string; created_at: string; updated_at: string }
+        Insert: { id?: string; feature_id: string; scenario_id?: string | null; is_current?: boolean; html_content: string; vault_path?: string | null; vault_url?: string | null; generated_by: string }
+        Update: { is_current?: boolean; vault_path?: string | null; vault_url?: string | null; updated_at?: string }
+        Relationships: []
+      }
+      feature_conversations: {
+        Row: { id: string; feature_id: string; status: 'in_progress' | 'complete'; created_at: string; updated_at: string }
+        Insert: { id?: string; feature_id: string; status?: 'in_progress' | 'complete' }
+        Update: { status?: 'in_progress' | 'complete'; updated_at?: string }
+        Relationships: []
+      }
+      feature_messages: {
+        Row: { id: string; conversation_id: string; role: 'assistant' | 'user'; content: string; created_at: string }
+        Insert: { id?: string; conversation_id: string; role: 'assistant' | 'user'; content: string }
+        Update: never
+        Relationships: []
+      }
     }
   }
 }
