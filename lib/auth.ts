@@ -22,3 +22,9 @@ export const authConfig: NextAuthConfig = {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
+
+export async function getSessionUser(): Promise<{ email: string; dbId?: string } | null> {
+  const session = await auth()
+  if (!session?.user?.email) return null
+  return session.user as { email: string; dbId?: string }
+}

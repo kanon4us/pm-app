@@ -197,7 +197,22 @@ export interface Database {
         Row: { feature_id: string; task_id: string }
         Insert: { feature_id: string; task_id: string }
         Update: never
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'feature_tasks_feature_id_fkey'
+            columns: ['feature_id']
+            isOneToOne: false
+            referencedRelation: 'features'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'feature_tasks_task_id_fkey'
+            columns: ['task_id']
+            isOneToOne: false
+            referencedRelation: 'tasks'
+            referencedColumns: ['id']
+          },
+        ]
       }
       user_stories: {
         Row: { id: string; title: string; as_a: string; i_want: string; so_that: string; created_at: string }
@@ -209,7 +224,22 @@ export interface Database {
         Row: { feature_id: string; user_story_id: string; display_order: number }
         Insert: { feature_id: string; user_story_id: string; display_order?: number }
         Update: { display_order?: number }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'feature_user_stories_feature_id_fkey'
+            columns: ['feature_id']
+            isOneToOne: false
+            referencedRelation: 'features'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'feature_user_stories_user_story_id_fkey'
+            columns: ['user_story_id']
+            isOneToOne: false
+            referencedRelation: 'user_stories'
+            referencedColumns: ['id']
+          },
+        ]
       }
       scenarios: {
         Row: { id: string; user_story_id: string; title: string; description: string | null; display_order: number }
@@ -239,6 +269,42 @@ export interface Database {
         Row: { id: string; conversation_id: string; role: 'assistant' | 'user'; content: string; created_at: string }
         Insert: { id?: string; conversation_id: string; role: 'assistant' | 'user'; content: string }
         Update: never
+        Relationships: []
+      }
+      slack_issues: {
+        Row: {
+          thread_ts: string
+          channel_id: string
+          reporter_id: string
+          status: 'gathering' | 'confirming' | 'triaging' | 'complete' | 'human_takeover'
+          ticket_data: Json
+          metadata: Json
+          human_takeover: boolean
+          clickup_task_id: string | null
+          last_msg_ts: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          thread_ts: string
+          channel_id: string
+          reporter_id: string
+          status?: 'gathering' | 'confirming' | 'triaging' | 'complete' | 'human_takeover'
+          ticket_data?: Json
+          metadata?: Json
+          human_takeover?: boolean
+          clickup_task_id?: string | null
+          last_msg_ts?: string | null
+        }
+        Update: {
+          status?: 'gathering' | 'confirming' | 'triaging' | 'complete' | 'human_takeover'
+          ticket_data?: Json
+          metadata?: Json
+          human_takeover?: boolean
+          clickup_task_id?: string | null
+          last_msg_ts?: string | null
+          updated_at?: string
+        }
         Relationships: []
       }
     }

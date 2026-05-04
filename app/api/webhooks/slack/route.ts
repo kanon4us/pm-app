@@ -116,7 +116,8 @@ async function processSlackEvent(event: SlackEvent): Promise<void> {
       clickup_task_id: null,
       last_msg_ts: event.ts,
     }
-    const { error: insertError } = await supabase.from('slack_issues').insert(newIssue)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: insertError } = await supabase.from('slack_issues').insert(newIssue as any)
     if (insertError) {
       console.error('[slack-webhook] failed to insert new issue:', insertError)
       return
@@ -147,7 +148,8 @@ async function handleGathering(
 
   await supabase
     .from('slack_issues')
-    .update({ ticket_data: result.updated_schema, status: newStatus, last_msg_ts: event.ts, updated_at: new Date().toISOString() })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update({ ticket_data: result.updated_schema as any, status: newStatus, last_msg_ts: event.ts, updated_at: new Date().toISOString() })
     .eq('thread_ts', issue.thread_ts)
 
   await slack.postMessage(event.channel, result.bot_response, issue.thread_ts)
