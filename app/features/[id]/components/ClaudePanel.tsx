@@ -17,20 +17,24 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
   const [loading, setLoading] = useState(true)
   const [reviewing, setReviewing] = useState(false)
   const [reviewFindings, setReviewFindings] = useState<{ type: string; title: string; description: string }[] | null>(null)
+  const [reviewError, setReviewError] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   async function runReview() {
     setReviewing(true)
+    setReviewError(false)
     try {
       const res = await fetch('/api/features/review', {
         method: 'POST',
         body: JSON.stringify({ feature_ids: [featureId] }),
         headers: { 'Content-Type': 'application/json' },
       })
+      if (!res.ok) throw new Error('Review failed')
       const findings = await res.json()
       setReviewFindings(Array.isArray(findings) ? findings : [])
     } catch {
-      setReviewFindings([])
+      setReviewError(true)
+      message.error('Review failed')
     } finally {
       setReviewing(false)
     }

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createUserStory, linkStory, getFeatureStories, getStoryFeatureCount } from '@/lib/user-stories/client'
+import { getSessionUser } from '@/lib/auth'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
   const stories = await getFeatureStories(id)
   const storiesWithCount = await Promise.all(stories.map(async (s) => ({

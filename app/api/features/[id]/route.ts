@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFeature, updateFeature } from '@/lib/features/client'
-import { getFeatureStories } from '@/lib/user-stories/client'
+import { getFeatureStories, getStoryFeatureCount } from '@/lib/user-stories/client'
 import { getStoryScenarios, getScenarioSteps } from '@/lib/scenarios/client'
 import { getSessionUser } from '@/lib/auth'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
   const feature = await getFeature(id)
   if (!feature) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -15,7 +17,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ...scenario,
       steps: await getScenarioSteps(scenario.id),
     })))
-    return { ...story, scenarios: scenariosWithSteps }
+    const featureCount = await getStoryFeatureCount(story.id)
+    return { ...story, featureCount, scenarios: scenariosWithSteps }
   }))
   return NextResponse.json({ ...feature, stories: storiesWithScenarios })
 }
@@ -25,6 +28,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
   const body = await req.json()
-  const feature = await updateFeature(id, body)
+  const { status, name, description } = body
+  const feature = await updateFeature(id, {
+    ...(status !== undefined && { status }),
+    ...(name !== undefined && { name }),
+    ...(description !== undefined && { description }),
+  })
   return NextResponse.json(feature)
 }

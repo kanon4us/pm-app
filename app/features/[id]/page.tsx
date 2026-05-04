@@ -1,7 +1,7 @@
 // app/features/[id]/page.tsx
 'use client'
 import { useEffect, useState } from 'react'
-import { Layout, Typography, Spin, Select, Button } from 'antd'
+import { Layout, Typography, Spin, Select, Button, message } from 'antd'
 import { useParams, useRouter } from 'next/navigation'
 import { UserStoriesPanel } from './components/UserStoriesPanel'
 import { ScenariosPanel } from './components/ScenariosPanel'
@@ -27,6 +27,7 @@ export default function FeatureEditorPage() {
   async function reload() {
     try {
       const res = await fetch(`/api/features/${id}`)
+      if (!res.ok) throw new Error('Failed to load feature')
       const data: Feature = await res.json()
       setFeature(data)
       if (!activeStoryId && data.stories.length > 0) setActiveStoryId(data.stories[0].id)
@@ -66,7 +67,10 @@ export default function FeatureEditorPage() {
         </Content>
         <Sider width={320} style={{ background: '#1a1a1a', borderLeft: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
           <ClaudePanel featureId={id} onSyncStep={(title, description) => {
-            if (!activeStory?.scenarios[0]) return
+            if (!activeStory?.scenarios[0]) {
+              message.warning('Add a scenario first.')
+              return
+            }
             fetch('/api/steps', { method: 'POST', body: JSON.stringify({ scenario_id: activeStory.scenarios[0].id, title, description }), headers: { 'Content-Type': 'application/json' } }).then(reload)
           }} />
         </Sider>

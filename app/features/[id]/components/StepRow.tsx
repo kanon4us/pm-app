@@ -1,7 +1,7 @@
 // app/features/[id]/components/StepRow.tsx
 'use client'
 import { useState } from 'react'
-import { Button, Input, Space, Typography, Tooltip, Image, Spin } from 'antd'
+import { Button, Input, Space, Typography, Tooltip, Image, Spin, message } from 'antd'
 import { DeleteOutlined, PictureOutlined } from '@ant-design/icons'
 import type { Step } from '../page'
 
@@ -23,22 +23,30 @@ export function StepRow({ step, onUpdate, onDelete }: Props) {
   async function save() {
     setSaving(true)
     try {
-      await fetch(`/api/steps/${step.id}`, {
+      const res = await fetch(`/api/steps/${step.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ title, description: description || null, figma_url: figmaUrl || null }),
         headers: { 'Content-Type': 'application/json' },
       })
+      if (!res.ok) throw new Error('Failed to save')
       setEditing(false)
       onUpdate()
+    } catch {
+      message.error('Failed to save')
     } finally {
       setSaving(false)
     }
   }
 
   async function deleteStep() {
-    await fetch(`/api/steps/${step.id}`, { method: 'DELETE' })
-    if (onDelete) onDelete()
-    else onUpdate()
+    try {
+      const res = await fetch(`/api/steps/${step.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete step')
+      if (onDelete) onDelete()
+      else onUpdate()
+    } catch {
+      message.error('Failed to delete step')
+    }
   }
 
   async function refreshThumbnail() {
