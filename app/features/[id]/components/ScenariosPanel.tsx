@@ -1,183 +1,124 @@
 // app/features/[id]/components/ScenariosPanel.tsx
 'use client'
 import { useState } from 'react'
-import { Button, Form, Input, Typography, Space, Collapse, Tag, message } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
-import type { UserStory, Scenario } from '../page'
+import { Tabs, Button, Typography, Space, message } from 'antd'
 import { StepRow } from './StepRow'
+import type { UserStory, Scenario } from '../page'
 
-interface Props {
-  featureId: string
-  featureName: string
-  story: UserStory | null
-  onUpdate: () => void
-}
+interface Props { featureId: string; featureName: string; story: UserStory | null; onUpdate: () => void }
 
-export function ScenariosPanel({ story, onUpdate }: Props) {
-  const [addingScenario, setAddingScenario] = useState(false)
-  const [scenarioForm] = Form.useForm()
-  const [addingStepFor, setAddingStepFor] = useState<string | null>(null)
+export function ScenariosPanel({ featureId, featureName, story, onUpdate }: Props) {
+  const [generating, setGenerating] = useState<string | null>(null)
 
-  async function addScenario(values: { title: string; description?: string }) {
-    if (!story) return
+  if (!story) return <div style={{ padding: 32, color: '#555' }}>Select a user story to see scenarios.</div>
+
+  async function addScenario() {
     try {
       await fetch('/api/scenarios', {
         method: 'POST',
-        body: JSON.stringify({ user_story_id: story.id, title: values.title, description: values.description ?? null }),
+        body: JSON.stringify({ user_story_id: story!.id, title: 'New Scenario' }),
         headers: { 'Content-Type': 'application/json' },
       })
-      scenarioForm.resetFields()
-      setAddingScenario(false)
       onUpdate()
     } catch {
       message.error('Failed to add scenario')
     }
   }
 
-  async function addStep(scenarioId: string, values: { title: string; description?: string; figma_url?: string }) {
+  async function addStep(scenarioId: string) {
     try {
       await fetch('/api/steps', {
         method: 'POST',
-        body: JSON.stringify({
-          scenario_id: scenarioId,
-          title: values.title,
-          description: values.description ?? null,
-          figma_url: values.figma_url ?? null,
-        }),
+        body: JSON.stringify({ scenario_id: scenarioId, title: 'New Step' }),
         headers: { 'Content-Type': 'application/json' },
       })
-      setAddingStepFor(null)
       onUpdate()
     } catch {
       message.error('Failed to add step')
     }
   }
 
-  if (!story) {
-    return (
-      <div style={{ padding: 32, color: '#666', textAlign: 'center' }}>
-        Select a user story to view scenarios.
-      </div>
-    )
+  async function deleteStep(stepId: string) {
+    try {
+      await fetch(`/api/steps/${stepId}`, { method: 'DELETE' })
+      onUpdate()
+    } catch {
+      message.error('Failed to delete step')
+    }
   }
 
-  const collapseItems = story.scenarios.map((scenario: Scenario) => ({
-    key: scenario.id,
-    label: (
-      <Space>
-        <Typography.Text strong style={{ fontSize: 13 }}>{scenario.title}</Typography.Text>
-        <Tag style={{ fontSize: 10 }}>{scenario.steps.length} steps</Tag>
-      </Space>
-    ),
-    children: (
-      <div>
-        {scenario.steps.length === 0 && (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>No steps yet.</Typography.Text>
-        )}
-        {scenario.steps.map((step) => (
-          <StepRow key={step.id} step={step} onUpdate={onUpdate} />
-        ))}
+  async function generatePrototype(scenario: Scenario) {
+    setGenerating(scenario.id)
+    try {
+      const res = await fetch(`/api/features/${featureId}/prototype`, {
+        method: 'POST',
+        body: JSON.stringify({ scenario_id: scenario.id, scenario_title: scenario.title }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        message.error(err.error ?? 'Failed to generate prototype')
+      } else {
+        message.success('Prototype generated!')
+      }
+    } catch {
+      message.error('Failed to generate prototype')
+    } finally {
+      setGenerating(null)
+    }
+  }
 
-        {addingStepFor === scenario.id ? (
-          <AddStepForm
-            onFinish={(values) => addStep(scenario.id, values)}
-            onCancel={() => setAddingStepFor(null)}
-          />
-        ) : (
-          <Button
-            size="small"
-            type="dashed"
-            icon={<PlusOutlined />}
-            style={{ marginTop: 8, width: '100%' }}
-            onClick={() => setAddingStepFor(scenario.id)}
-          >
-            Add Step
+  async function generateAll() {
+    setGenerating('all')
+    try {
+      const res = await fetch(`/api/features/${featureId}/prototype`, {
+        method: 'POST',
+        body: JSON.stringify({ scenario_title: `${featureName} — All Scenarios` }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        message.error(err.error ?? 'Failed to generate prototype')
+      } else {
+        message.success('Full prototype generated!')
+      }
+    } catch {
+      message.error('Failed to generate prototype')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  const tabItems = story.scenarios.map((scenario) => ({
+    key: scenario.id,
+    label: scenario.title,
+    children: (
+      <div style={{ padding: '8px 0' }}>
+        {scenario.steps.map((step, i) => (
+          <StepRow key={step.id} step={step} index={i} onUpdate={onUpdate} onDelete={() => deleteStep(step.id)} />
+        ))}
+        <Space style={{ marginTop: 12 }}>
+          <Button size="small" type="dashed" onClick={() => addStep(scenario.id)}>+ Add step</Button>
+          <Button size="small" type="primary" loading={generating === scenario.id} onClick={() => generatePrototype(scenario)}>
+            Generate Prototype
           </Button>
-        )}
+        </Space>
       </div>
     ),
   }))
 
   return (
-    <div style={{ padding: 20 }}>
-      <Space style={{ marginBottom: 12 }}>
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          {story.title || `As a ${story.as_a}, I want ${story.i_want}`}
-        </Typography.Title>
+    <div style={{ padding: '12px 20px' }}>
+      <Space style={{ marginBottom: 8, width: '100%', justifyContent: 'space-between' }}>
+        <Typography.Text strong>{`As a ${story.as_a}, I want ${story.i_want}`}</Typography.Text>
+        <Space>
+          <Button size="small" loading={generating === 'all'} onClick={generateAll}>Generate All</Button>
+          <Button size="small" type="dashed" onClick={addScenario}>+ Add scenario</Button>
+        </Space>
       </Space>
-
-      {story.as_a && (
-        <div style={{ marginBottom: 16, padding: '8px 12px', background: '#1a1a1a', borderRadius: 6, fontSize: 12, color: '#aaa' }}>
-          <div><strong>As a</strong> {story.as_a}</div>
-          <div><strong>I want</strong> {story.i_want}</div>
-          <div><strong>So that</strong> {story.so_that}</div>
-        </div>
-      )}
-
-      <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
-        Scenarios
-      </Typography.Text>
-
-      {story.scenarios.length > 0 ? (
-        <Collapse
-          items={collapseItems}
-          defaultActiveKey={story.scenarios.map((s) => s.id)}
-          style={{ marginTop: 8, background: 'transparent' }}
-        />
-      ) : (
-        <div style={{ marginTop: 8, color: '#555', fontSize: 12 }}>No scenarios yet.</div>
-      )}
-
-      {addingScenario ? (
-        <Form form={scenarioForm} layout="vertical" onFinish={addScenario} style={{ marginTop: 12 }}>
-          <Form.Item name="title" label="Scenario title" rules={[{ required: true }]}>
-            <Input size="small" placeholder="e.g. Happy path checkout" />
-          </Form.Item>
-          <Form.Item name="description" label="Description">
-            <Input.TextArea size="small" rows={2} />
-          </Form.Item>
-          <Space>
-            <Button size="small" type="primary" htmlType="submit">Save</Button>
-            <Button size="small" onClick={() => setAddingScenario(false)}>Cancel</Button>
-          </Space>
-        </Form>
-      ) : (
-        <Button
-          size="small"
-          type="dashed"
-          icon={<PlusOutlined />}
-          style={{ marginTop: 12, width: '100%' }}
-          onClick={() => setAddingScenario(true)}
-        >
-          Add Scenario
-        </Button>
-      )}
+      {story.scenarios.length === 0
+        ? <div style={{ color: '#555', padding: 16 }}>No scenarios yet. Add one above.</div>
+        : <Tabs items={tabItems} />}
     </div>
-  )
-}
-
-interface AddStepFormProps {
-  onFinish: (values: { title: string; description?: string; figma_url?: string }) => void
-  onCancel: () => void
-}
-
-function AddStepForm({ onFinish, onCancel }: AddStepFormProps) {
-  const [form] = Form.useForm()
-  return (
-    <Form form={form} layout="vertical" onFinish={onFinish} style={{ marginTop: 8 }}>
-      <Form.Item name="title" label="Step title" rules={[{ required: true }]}>
-        <Input size="small" />
-      </Form.Item>
-      <Form.Item name="description" label="Description">
-        <Input.TextArea size="small" rows={2} />
-      </Form.Item>
-      <Form.Item name="figma_url" label="Figma URL">
-        <Input size="small" placeholder="https://figma.com/design/..." />
-      </Form.Item>
-      <Space>
-        <Button size="small" type="primary" htmlType="submit">Save</Button>
-        <Button size="small" onClick={onCancel}>Cancel</Button>
-      </Space>
-    </Form>
   )
 }

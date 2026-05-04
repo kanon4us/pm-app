@@ -8,9 +8,11 @@ import type { Step } from '../page'
 interface Props {
   step: Step
   onUpdate: () => void
+  index?: number
+  onDelete?: () => void
 }
 
-export function StepRow({ step, onUpdate }: Props) {
+export function StepRow({ step, onUpdate, onDelete }: Props) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(step.title)
   const [description, setDescription] = useState(step.description ?? '')
@@ -35,7 +37,8 @@ export function StepRow({ step, onUpdate }: Props) {
 
   async function deleteStep() {
     await fetch(`/api/steps/${step.id}`, { method: 'DELETE' })
-    onUpdate()
+    if (onDelete) onDelete()
+    else onUpdate()
   }
 
   async function refreshThumbnail() {

@@ -1,7 +1,7 @@
 // app/features/[id]/components/ClaudePanel.tsx
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { Button, Input, Spin, Typography, Space, message } from 'antd'
+import { Alert, Button, Input, Spin, Typography, Space, message } from 'antd'
 import { SendOutlined, PlusCircleOutlined } from '@ant-design/icons'
 import type { FeatureMessage } from '@/lib/features/conversation'
 
@@ -15,7 +15,26 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewFindings, setReviewFindings] = useState<{ type: string; title: string; description: string }[] | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  async function runReview() {
+    setReviewing(true)
+    try {
+      const res = await fetch('/api/features/review', {
+        method: 'POST',
+        body: JSON.stringify({ feature_ids: [featureId] }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const findings = await res.json()
+      setReviewFindings(Array.isArray(findings) ? findings : [])
+    } catch {
+      setReviewFindings([])
+    } finally {
+      setReviewing(false)
+    }
+  }
 
   async function loadConversation() {
     try {
@@ -99,11 +118,19 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid #333' }}>
-        <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
-          Claude
-        </Typography.Text>
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography.Text strong>Claude</Typography.Text>
+        <Button size="small" loading={reviewing} onClick={runReview}>App-wide Review</Button>
       </div>
+      {reviewFindings && (
+        <div style={{ padding: 8, borderBottom: '1px solid #333' }}>
+          {reviewFindings.length === 0
+            ? <Alert message="No UX issues found" type="success" showIcon />
+            : reviewFindings.map((f, i) => (
+              <Alert key={i} type={f.type === 'contradiction' ? 'error' : 'warning'} message={f.title} description={f.description} showIcon closable style={{ marginBottom: 6 }} />
+            ))}
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
         {loading ? (
