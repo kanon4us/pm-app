@@ -3,11 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Layout, Typography, Table, Button, Tag, Modal, Form, Input,
   DatePicker, InputNumber, Select, Space, Spin, Alert, Drawer,
-  Switch, Tooltip, Divider, Slider, Progress, Popconfirm,
+  Switch, Tooltip, Divider, Slider, Progress, Popconfirm, Tabs,
 } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 import { SearchOutlined, SaveOutlined, ThunderboltOutlined, DeleteOutlined, UndoOutlined, ReloadOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
+import { FeaturesTab } from '@/components/FeaturesTab'
 import { AssessmentButton } from '@/app/sprint/components/AssessmentButton'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
 import { vaultBranchName } from '@/lib/github/vault'
@@ -1048,6 +1049,19 @@ export default function SprintPage() {
         size="large"
       >
         {detailTask && (
+          <Tabs
+            defaultActiveKey="details"
+            style={{ width: '100%' }}
+            items={[
+              {
+                key: 'features',
+                label: 'Features',
+                children: <FeaturesTab taskId={detailTask.id} />,
+              },
+              {
+                key: 'details',
+                label: 'Details',
+                children: (
           <Space orientation="vertical" style={{ width: '100%' }}>
 
             {/* Fixed info */}
@@ -1316,6 +1330,10 @@ export default function SprintPage() {
               </Button>
             </div>
           </Space>
+                ),
+              },
+            ]}
+          />
         )}
       </Drawer>
 
