@@ -26,11 +26,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const html = await generatePrototypeHtml(featureContext, scenario_title ?? 'All Scenarios')
 
   const db = await getSupabaseServiceClient()
-  await db.from('feature_prototypes').update({ is_current: false })
-    .eq('feature_id', featureId)
-    .eq('scenario_id', scenario_id ?? null)
+  const flipQ = db.from('feature_prototypes').update({ is_current: false }).eq('feature_id', featureId)
+  scenario_id ? await flipQ.eq('scenario_id', scenario_id) : await flipQ.is('scenario_id', null)
 
-  const githubToken = process.env.GITHUB_TOKEN ?? ''
+  const githubToken = process.env.GITHUB_TOKEN
+  if (!githubToken) return NextResponse.json({ error: 'GITHUB_TOKEN not configured' }, { status: 500 })
   const vaultResult = await pushPrototypeToVault(githubToken, featureId, feature.name, scenario_title ?? null, html)
 
   const { data: proto, error } = await db.from('feature_prototypes').insert({

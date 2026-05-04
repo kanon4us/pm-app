@@ -29,6 +29,9 @@ jest.mock('@/lib/supabase/server', () => ({
 }))
 
 describe('POST /api/features/[id]/prototype', () => {
+  beforeEach(() => { process.env.GITHUB_TOKEN = 'test-token' })
+  afterEach(() => { delete process.env.GITHUB_TOKEN })
+
   it('returns 201 with prototype record', async () => {
     const req = new NextRequest('http://localhost/api/features/f-1/prototype', {
       method: 'POST',
