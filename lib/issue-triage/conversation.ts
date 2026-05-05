@@ -1,5 +1,7 @@
+// lib/issue-triage/conversation.ts
 import Anthropic from '@anthropic-ai/sdk'
-import type { SlackIssue, IntakeClaudeResponse, TicketData } from './types'
+import { getActiveSop } from './sop'
+import type { SlackIssue, IntakeClaudeResponse, TicketData, BotSop } from './types'
 import type { SlackMessage } from '@/lib/slack/client'
 
 const TICKET_SCHEMA: TicketData = {
@@ -18,23 +20,21 @@ const TICKET_SCHEMA: TicketData = {
   documentation_gap: false,
 }
 
-const INTAKE_SYSTEM_PROMPT = `You are a technical support intake specialist for Viscap Media. Your job is to gather a complete bug report through friendly, natural conversation — one question at a time.
+function buildSystemPrompt(sop: BotSop): string {
+  const directives = sop.manual_directives
+    .map((d) => {
+      if (d.trigger === 'always') return `ALWAYS: ${d.action}`
+      if (d.trigger === 'contains_word') return `IF message contains "${d.value}": ${d.action}`
+      return d.action
+    })
+    .join('\n')
 
-Rules:
-1. Never ask more than one question per reply.
-2. Early in the conversation, ask for the reporter's email address and whether the affected user is themselves or someone else. If someone else, ask for that person's email.
-3. If the user appears blocked, search for a workaround before asking more questions.
-4. Do not accept vague answers. Probe "I don't know" answers gently before moving on.
-5. Once all fields are filled with substantive answers, summarize and ask: "I have everything I need — does this look right? Ready to submit?"
+  const directivesBlock = directives
+    ? `\n\nMANDATORY RULES (cannot be overridden):\n${directives}`
+    : ''
 
-Only set confidence >= 0.8 when every field has a specific, actionable answer, including both email addresses.
-
-Respond with valid JSON only — no markdown, no explanation:
-{
-  "updated_schema": { ...complete ticket object matching the schema... },
-  "bot_response": "The message to post in Slack",
-  "confidence": 0.0
-}`
+  return sop.intake_prompt + directivesBlock
+}
 
 function formatHistory(messages: SlackMessage[]): string {
   return messages
@@ -54,10 +54,6 @@ function parseClaudeJson(text: string): IntakeClaudeResponse {
   }
 }
 
-/**
- * Call Claude with the current issue state and latest user message.
- * Returns the parsed intake response (updated schema + bot reply + confidence).
- */
 export async function runIntakeTurn(
   issue: SlackIssue,
   userMessage: string,
@@ -66,6 +62,7 @@ export async function runIntakeTurn(
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
 
+  const sop = await getActiveSop()
   const client = new Anthropic({ apiKey })
 
   const userTurn = [
@@ -78,7 +75,7 @@ export async function runIntakeTurn(
   const response = await client.messages.create({
     model: 'claude-opus-4-6',
     max_tokens: 1024,
-    system: INTAKE_SYSTEM_PROMPT,
+    system: buildSystemPrompt(sop),
     messages: [{ role: 'user', content: userTurn }],
   })
 

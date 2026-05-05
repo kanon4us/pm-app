@@ -16,6 +16,22 @@ jest.mock('@anthropic-ai/sdk', () => ({
   })),
 }))
 
+jest.mock('@/lib/issue-triage/sop', () => ({
+  getActiveSop: jest.fn().mockResolvedValue({
+    id: 'sop-1',
+    version: 1,
+    intake_prompt: 'You are a helpful bot. Respond with valid JSON only:\n{"updated_schema":{},"bot_response":"","confidence":0.0}',
+    escalation_rules: { maxTurns: 8, disengagementThreshold: 2, minConfidenceMovementPerTurn: 0.05 },
+    duplicate_thresholds: { possible: 0.60, confirmed: 0.85, collisionWindowHours: 24, collisionCount: 3 },
+    manual_directives: [],
+    status: 'active',
+    change_summary: null,
+    approved_by: null,
+    approved_at: null,
+    created_at: new Date().toISOString(),
+  }),
+}))
+
 function makeIssue(overrides: Partial<SlackIssue> = {}): SlackIssue {
   return {
     thread_ts: '1234567890.000001',
