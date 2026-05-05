@@ -20,6 +20,17 @@ jest.mock('@/lib/clickup/client', () => {
   }
 })
 
+// Mock SOP loader — inlined to avoid hoisting issues
+jest.mock('@/lib/issue-triage/sop', () => ({
+  getActiveSop: jest.fn().mockResolvedValue({
+    version: 1,
+    duplicate_thresholds: { possible: 0.60, confirmed: 0.85, collisionWindowHours: 24, collisionCount: 3 },
+    escalation_rules: { maxTurns: 8, disengagementThreshold: 2, minConfidenceMovementPerTurn: 0.05 },
+    intake_prompt: '',
+    manual_directives: [],
+  }),
+}))
+
 // Mock Anthropic SDK
 const mockCreate = jest.fn()
 jest.mock('@anthropic-ai/sdk', () => ({
