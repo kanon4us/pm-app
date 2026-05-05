@@ -73,6 +73,17 @@ ALTER TABLE slack_issues ADD COLUMN sop_version INTEGER;
 -- Add 'passive' status (confirmed duplicate — thread alive, bot appends to parent)
 ALTER TYPE slack_issue_status ADD VALUE IF NOT EXISTS 'passive';
 
+-- Replace human_takeover boolean with reversible handoff_status
+-- 'taken': dev claimed the ticket; 'returned': dev sent it back for more info; null: no handoff yet
+ALTER TABLE slack_issues DROP COLUMN human_takeover;
+ALTER TABLE slack_issues ADD COLUMN handoff_status TEXT
+  CHECK (handoff_status IN ('taken', 'returned'));
+
+-- pgvector: install extension + add embedding column for Phase B.5 semantic duplicate detection
+-- Phase A just creates the column (NULL); population deferred to Phase B.5
+CREATE EXTENSION IF NOT EXISTS vector;
+ALTER TABLE slack_issues ADD COLUMN embedding vector(1536);
+
 -- bot_sops: versioned behavioral rules for the bot
 CREATE TABLE bot_sops (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -139,7 +150,7 @@ Expected: migration applied with no errors.
 
 ```bash
 git add supabase/migrations/012_bot_sops.sql
-git commit -m "feat: add bot_sops, bot_observations, sop_proposals tables; add sop_version to slack_issues"
+git commit -m "feat: add bot_sops, bot_observations, sop_proposals; replace human_takeover with handoff_status; add pgvector"
 ```
 
 ---
@@ -207,20 +218,9 @@ export type ObservationEventType =
 // ---- Update SlackIssueStatus to include 'passive' ----
 ```
 
-- [ ] **Step 2: Replace `SlackIssueStatus` to include the new `passive` value**
+- [ ] **Step 2: Replace `SlackIssueStatus` and update `SlackIssue` in `lib/issue-triage/types.ts`**
 
-Find this block in `lib/issue-triage/types.ts`:
-
-```typescript
-export type SlackIssueStatus =
-  | 'gathering'
-  | 'confirming'
-  | 'triaging'
-  | 'complete'
-  | 'human_takeover'
-```
-
-Replace with:
+Replace `SlackIssueStatus` (remove `human_takeover` — handoff is now tracked by `handoff_status`, not a status value; add `passive`):
 
 ```typescript
 export type SlackIssueStatus =
@@ -229,7 +229,42 @@ export type SlackIssueStatus =
   | 'triaging'
   | 'passive'
   | 'complete'
-  | 'human_takeover'
+```
+
+Replace `human_takeover: boolean` with `handoff_status` in the `SlackIssue` interface:
+
+Find:
+```typescript
+export interface SlackIssue {
+  thread_ts: string
+  channel_id: string
+  reporter_id: string
+  status: SlackIssueStatus
+  ticket_data: TicketData
+  metadata: SlackIssueMetadata
+  human_takeover: boolean
+  clickup_task_id: string | null
+  created_at: string
+  updated_at: string
+  last_msg_ts: string | null
+}
+```
+
+Replace with:
+```typescript
+export interface SlackIssue {
+  thread_ts: string
+  channel_id: string
+  reporter_id: string
+  status: SlackIssueStatus
+  ticket_data: TicketData
+  metadata: SlackIssueMetadata
+  handoff_status: 'taken' | 'returned' | null
+  clickup_task_id: string | null
+  created_at: string
+  updated_at: string
+  last_msg_ts: string | null
+}
 ```
 
 - [ ] **Step 3: Verify TypeScript**
@@ -506,6 +541,8 @@ git commit -m "feat: seed initial SOP v1 from existing hardcoded prompts"
 ---
 
 ## PHASE B — Core Workflow
+
+> **Media scope note:** Phase B handles images only (JPEG, PNG, GIF, WEBP) via Claude multimodal. Video files (QuickTime, MP4, etc.) are uploaded to ClickUp as attachments but receive no visual summary — `generateVisualSummary` returns `null` for non-image MIME types. Keyframe extraction and video triage are deferred to **Phase B.5** (a separate plan).
 
 ---
 
@@ -1129,7 +1166,17 @@ This is the largest change. The webhook now handles four payload types:
 
 Requires new env var: `SLACK_BOT_USER_ID` (the bot's own Slack user ID, needed to filter reactions on bot messages). Find it at `api.slack.com/apps → Viscap Support B → Basic Information → App Credentials → Bot User ID`, or call `auth.test` with the bot token.
 
-- [ ] **Step 1: Add env var to `.env.local` and `.env.local.example`**
+- [ ] **Step 1: Add `addReaction` to `lib/slack/client.ts`**
+
+The passive-mode 📝 acknowledgement uses `reactions.add`. Add this method to the object returned by `buildSlackClient` in `lib/slack/client.ts`, after `getThreadReplies`:
+
+```typescript
+    addReaction: async (channel: string, timestamp: string, name: string): Promise<void> => {
+      await slackFetch(token, 'reactions.add', { channel, timestamp, name })
+    },
+```
+
+- [ ] **Step 2: Add env var to `.env.local` and `.env.local.example`**
 
 In `.env.local`, add after `SLACK_WORKSPACE_URL`:
 ```
@@ -1281,12 +1328,23 @@ async function processMessageEvent(event: SlackEvent): Promise<void> {
     .from('slack_issues').select('*').eq('thread_ts', threadTs).single()
   const issue = existing as SlackIssue | null
 
-  if (issue?.human_takeover) return
+  // Bot is silent when dev has claimed the ticket
+  if (issue?.handoff_status === 'taken') return
+
+  // Ticket was returned by dev: re-enable gathering so bot can resume asking questions
+  if (issue?.handoff_status === 'returned') {
+    await supabase.from('slack_issues')
+      .update({ handoff_status: null, status: 'gathering', updated_at: new Date().toISOString() })
+      .eq('thread_ts', threadTs)
+    // Fall through to process as a gathering turn
+  }
 
   // Passive mode: confirmed duplicate — append additional reporter input to parent
   if (issue?.status === 'passive') {
     if (event.user === issue.reporter_id && issue.clickup_task_id) {
       await appendToParentTicket(issue.clickup_task_id, issue, event.text)
+      // Acknowledge with 📝 so reporter knows their input was captured
+      await slack.addReaction(event.channel, event.ts, 'memo').catch(() => undefined)
     }
     return
   }
@@ -1353,7 +1411,7 @@ async function handleNewIssue(
     status: 'gathering',
     ticket_data: seedTicketData,
     metadata: { logrocket_links: [], file_ids: [], vault_snippets_used: [], triage_reasoning: '' },
-    human_takeover: false,
+    handoff_status: null,
     clickup_task_id: null,
     last_msg_ts: event.ts,
     sop_version: sop.version,
@@ -1732,7 +1790,7 @@ it('does NOT silence bot when a non-reporter speaks in the thread', async () => 
       single: jest.fn().mockResolvedValue({
         data: {
           thread_ts: '111.001', reporter_id: 'U_REPORTER', status: 'gathering',
-          human_takeover: false, clickup_task_id: 'task-123', ticket_data: {},
+          handoff_status: null, clickup_task_id: 'task-123', ticket_data: {},
           channel_id: 'C_ISSUES', last_msg_ts: '111.001', sop_version: 1,
         },
         error: null,
@@ -1756,9 +1814,9 @@ it('does NOT silence bot when a non-reporter speaks in the thread', async () => 
 
   await POST(req)
 
-  // human_takeover must NOT have been set to true
+  // handoff_status must NOT have been set to 'taken' (team message should not silence bot)
   expect(mockUpdate).not.toHaveBeenCalledWith(
-    expect.objectContaining({ human_takeover: true })
+    expect.objectContaining({ handoff_status: 'taken' })
   )
 })
 ```
@@ -1797,13 +1855,15 @@ Find the line `return NextResponse.json({ ok: true })` at the end and replace th
   }
 
   // Parallel: check if this task is tracked in slack_issues for bot handoff
-  await handleSlackHandoff(event.taskId, supabase)
+  await handleSlackHandoff(event.taskId, event.type, event.listId, supabase)
 
   return NextResponse.json({ ok: true })
 }
 
 async function handleSlackHandoff(
   clickupTaskId: string,
+  eventType: string, // 'taskStatusUpdated' | 'taskMoved'
+  targetListId: string | undefined,
   supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').getSupabaseServiceClient>>,
 ): Promise<void> {
   const { data: slackIssue } = await supabase
@@ -1812,10 +1872,33 @@ async function handleSlackHandoff(
     .eq('clickup_task_id', clickupTaskId)
     .single()
 
-  if (!slackIssue || slackIssue.human_takeover) return
+  if (!slackIssue) return
+
+  // Ticket returned to New Tickets list → dev sent it back for more info
+  const newTicketsListId = process.env.CLICKUP_NEW_TICKETS_LIST_ID
+  if (eventType === 'taskMoved' && targetListId === newTicketsListId && slackIssue.handoff_status === 'taken') {
+    await supabase.from('slack_issues').update({
+      handoff_status: 'returned',
+      updated_at: new Date().toISOString(),
+    }).eq('clickup_task_id', clickupTaskId)
+
+    const token = process.env.SLACK_BOT_TOKEN
+    if (token) {
+      const { buildSlackClient } = await import('@/lib/slack/client')
+      await buildSlackClient(token).postMessage(
+        slackIssue.channel_id,
+        "🔄 The dev team needs more information — I'll follow up with some questions.",
+        slackIssue.thread_ts,
+      )
+    }
+    return
+  }
+
+  // Already handed off — don't re-trigger
+  if (slackIssue.handoff_status === 'taken') return
 
   await supabase.from('slack_issues').update({
-    human_takeover: true,
+    handoff_status: 'taken',
     updated_at: new Date().toISOString(),
   }).eq('clickup_task_id', clickupTaskId)
 
@@ -2163,6 +2246,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ result: 'error', reason: 'insert_failed' })
   }
 
+  // Check if proposed changes conflict with any PM-owned manual_directives
+  const conflictWarnings: string[] = []
+  if (analysis.proposed_changes && sop.manual_directives.length > 0) {
+    const changedFields = Object.keys(analysis.proposed_changes)
+    for (const directive of sop.manual_directives) {
+      // If the proposal touches intake_prompt and a directive has action rules baked in, flag it
+      if (changedFields.includes('intake_prompt')) {
+        conflictWarnings.push(`⚠️ Conflicts with PM directive: "${directive.action}" (added by <@${directive.added_by}>)`)
+      }
+    }
+  }
+
   // Notify PM channel
   const slackToken = process.env.SLACK_BOT_TOKEN
   const channel = process.env.SLACK_BOT_IMPROVEMENTS_CHANNEL_ID
@@ -2171,6 +2266,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const priorRejectionsNote = rejectedProposals?.length
       ? `\nRejection history: ${rejectedProposals.length} prior rejection(s) consulted.`
       : '\nRejection history: No prior rejections on this pattern.'
+
+    const conflictBlock = conflictWarnings.length
+      ? `\n\n${conflictWarnings.join('\n')}\n_Review these directives before approving — the analysis layer cannot modify manual_directives._`
+      : ''
 
     await slack.postMessage(
       channel,
@@ -2183,10 +2282,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         '',
         `*Expected outcome:* ${analysis.expected_outcome}`,
         `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
+        conflictBlock,
         '',
         `_(Reply with Approve or Reject — interactive buttons coming in Phase C UI)_`,
         `Proposal ID: \`${proposal.id}\``,
-      ].join('\n'),
+      ].filter((l) => l !== undefined).join('\n'),
     )
   }
 
