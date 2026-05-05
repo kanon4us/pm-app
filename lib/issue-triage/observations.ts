@@ -10,7 +10,8 @@ export async function recordObservation(
   payload: Record<string, unknown>,
 ): Promise<void> {
   const supabase = await getSupabaseServiceClient()
-  const { error } = await supabase.from('bot_observations').insert({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('bot_observations') as any).insert({
     thread_ts: threadTs,
     clickup_task_id: clickupTaskId,
     sop_version: sopVersion,

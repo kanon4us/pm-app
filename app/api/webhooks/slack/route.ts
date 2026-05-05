@@ -5,7 +5,6 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { runIntakeTurn } from '@/lib/issue-triage/conversation'
 import { detectDuplicate } from '@/lib/issue-triage/duplicate-detection'
 import { searchForWorkaround } from '@/lib/issue-triage/workaround-search'
-import { routeTicket } from '@/lib/issue-triage/router'
 import { EMPTY_TICKET_DATA } from '@/lib/issue-triage/types'
 import type { SlackIssue } from '@/lib/issue-triage/types'
 
@@ -188,7 +187,8 @@ async function handleConfirming(
       }
     }
 
-    const clickupTaskId = await routeTicket(issue, triageResult)
+    // TODO: replaced by createTicket/appendToParentTicket in Task 10
+    const clickupTaskId: string | null = null
 
     await supabase
       .from('slack_issues')

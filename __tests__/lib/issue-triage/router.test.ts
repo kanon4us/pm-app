@@ -1,26 +1,22 @@
-import { routeTicket } from '@/lib/issue-triage/router'
+import { createTicket, updateTicketDescription, appendToParentTicket, notifyUrgencyCollision } from '@/lib/issue-triage/router'
 import { EMPTY_TICKET_DATA } from '@/lib/issue-triage/types'
-import type { SlackIssue, TriageClaudeResponse } from '@/lib/issue-triage/types'
+import type { SlackIssue } from '@/lib/issue-triage/types'
 
 process.env.CLICKUP_BOT_TOKEN = 'test-cu-token'
 process.env.SLACK_BOT_TOKEN = 'xoxb-test'
-process.env.SLACK_MICHAEL_USER_ID = 'U_MICHAEL'
 process.env.CLICKUP_NEW_TICKETS_LIST_ID = 'list-new'
-process.env.CLICKUP_KNOWN_ISSUES_LIST_ID = 'list-known'
-process.env.CLICKUP_NEEDS_TUTORIAL_LIST_ID = 'list-tutorial'
-process.env.CLICKUP_PLANNING_LIST_ID = 'list-planning'
+process.env.SLACK_BOT_IMPROVEMENTS_CHANNEL_ID = 'C_IMPROVEMENTS'
+process.env.SLACK_WORKSPACE_URL = 'https://viscapvids.slack.com'
 
 const mockCu = {
   createTask: jest.fn(),
-  moveTask: jest.fn(),
-  setTaskPriority: jest.fn(),
-  getTask: jest.fn(),
+  updateTask: jest.fn(),
   createTaskComment: jest.fn(),
+  setTaskPriority: jest.fn(),
 }
 
 const mockSlack = {
   postMessage: jest.fn(),
-  openDM: jest.fn(),
 }
 
 jest.mock('@/lib/clickup/client', () => ({
@@ -36,7 +32,7 @@ function makeIssue(overrides: Partial<SlackIssue> = {}): SlackIssue {
     thread_ts: '1234567890.000001',
     channel_id: 'C_ISSUES',
     reporter_id: 'U_REPORTER',
-    status: 'triaging',
+    status: 'gathering',
     ticket_data: { ...EMPTY_TICKET_DATA, issue_summary: 'CMS crash on save' },
     metadata: { logrocket_links: [], file_ids: [], vault_snippets_used: [], triage_reasoning: '' },
     handoff_status: null,
@@ -49,161 +45,78 @@ function makeIssue(overrides: Partial<SlackIssue> = {}): SlackIssue {
   }
 }
 
-function makeTriageResponse(overrides: Partial<TriageClaudeResponse> = {}): TriageClaudeResponse {
-  return {
-    duplicate_task_id: null,
-    duplicate_confidence: 0,
-    workaround_found: false,
-    workaround_text: null,
-    has_user_facing_docs: false,
-    documentation_gap: false,
-    routing_decision: 'escalate_to_michael',
-    routing_reasoning: 'No related issues, no workaround',
-    ...overrides,
-  }
-}
+describe('createTicket', () => {
+  beforeEach(() => jest.clearAllMocks())
 
-describe('routeTicket', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-    mockCu.createTask.mockResolvedValue({ id: 'cu-new', url: 'https://app.clickup.com/t/cu-new' })
-    mockCu.moveTask.mockResolvedValue(undefined)
-    mockCu.setTaskPriority.mockResolvedValue(undefined)
-    mockCu.getTask.mockResolvedValue({
-      id: 'cu-old',
-      name: 'CMS crash',
-      description: null,
-      status: { status: 'open' },
-      priority: { id: '3', priority: 'normal' },
-      url: 'https://app.clickup.com/t/cu-old',
-      custom_fields: [],
-      list: { id: 'list-new', name: 'New Tickets' },
-    })
-    mockCu.createTaskComment.mockResolvedValue({ id: 'comment-1' })
-    mockSlack.postMessage.mockResolvedValue('1234567890.999')
-    mockSlack.openDM.mockResolvedValue('D_MICHAEL')
-  })
+  it('creates a task in the New Tickets list and returns id + url', async () => {
+    mockCu.createTask.mockResolvedValue({ id: 'cu-123', url: 'https://app.clickup.com/t/cu-123' })
 
-  it('creates a new ticket in New Tickets and DMs Michael for escalate_to_michael', async () => {
-    const issue = makeIssue()
-    const triage = makeTriageResponse({ routing_decision: 'escalate_to_michael' })
+    const result = await createTicket(makeIssue())
 
-    const result = await routeTicket(issue, triage)
-
-    expect(mockCu.createTask).toHaveBeenCalledWith('list-new', expect.objectContaining({ priority: 2 }))
-    expect(mockSlack.openDM).toHaveBeenCalledWith('U_MICHAEL')
-    expect(mockSlack.postMessage).toHaveBeenCalledWith('D_MICHAEL', expect.stringContaining('https://app.clickup.com/t/cu-new'))
-    expect(result).toBe('cu-new')
-  })
-
-  it('creates ticket in Needs Tutorial for needs_tutorial routing', async () => {
-    const issue = makeIssue()
-    const triage = makeTriageResponse({
-      routing_decision: 'needs_tutorial',
-      workaround_found: true,
-      workaround_text: 'Use Ctrl+S instead',
-    })
-
-    const result = await routeTicket(issue, triage)
-
-    expect(mockCu.createTask).toHaveBeenCalledWith('list-tutorial', expect.objectContaining({ name: expect.any(String) }))
-    expect(mockSlack.postMessage).toHaveBeenCalledWith(
-      'C_ISSUES',
-      expect.stringContaining('Ctrl+S'),
-      '1234567890.000001'
+    expect(mockCu.createTask).toHaveBeenCalledWith(
+      'list-new',
+      expect.objectContaining({ name: 'CMS crash on save', priority: 3 }),
     )
-    expect(result).toBe('cu-new')
+    expect(result).toEqual({ id: 'cu-123', url: 'https://app.clickup.com/t/cu-123' })
   })
 
-  it('bumps priority and comments on existing ticket for known_issues routing', async () => {
-    const issue = makeIssue()
-    const triage = makeTriageResponse({
-      routing_decision: 'known_issues',
-      duplicate_task_id: 'cu-old',
-      duplicate_confidence: 0.95,
-    })
+  it('includes a visual summary in the description when provided', async () => {
+    mockCu.createTask.mockResolvedValue({ id: 'cu-img', url: 'https://app.clickup.com/t/cu-img' })
 
-    const result = await routeTicket(issue, triage)
+    await createTicket(makeIssue(), 'User clicking Export — progress bar stuck at 0%')
 
-    // Priority bumped from normal(3) → high(2)
-    expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-old', 2)
-    // Comment added to old ticket
-    expect(mockCu.createTaskComment).toHaveBeenCalledWith('cu-old', expect.any(String))
-    // No new ticket created
-    expect(mockCu.createTask).not.toHaveBeenCalled()
-    expect(result).toBeNull()
+    expect(mockCu.createTask).toHaveBeenCalledWith(
+      'list-new',
+      expect.objectContaining({
+        description: expect.stringContaining('**Visual summary:** User clicking Export'),
+      }),
+    )
   })
+})
 
-  it('moves ticket to Planning when priority bump lands on high', async () => {
-    // Existing task is at normal(3); bump → high(2) → move to Planning
-    const issue = makeIssue()
-    const triage = makeTriageResponse({
-      routing_decision: 'known_issues',
-      duplicate_task_id: 'cu-old',
-      duplicate_confidence: 0.9,
-    })
+describe('updateTicketDescription', () => {
+  beforeEach(() => jest.clearAllMocks())
 
-    const result = await routeTicket(issue, triage)
+  it('calls updateTask with the rebuilt description', async () => {
+    mockCu.updateTask.mockResolvedValue(undefined)
 
-    expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-old', 2)
-    expect(mockCu.moveTask).toHaveBeenCalledWith('cu-old', 'list-planning')
-    expect(result).toBeNull()
+    await updateTicketDescription('cu-123', makeIssue())
+
+    expect(mockCu.updateTask).toHaveBeenCalledWith(
+      'cu-123',
+      expect.objectContaining({ description: expect.any(String) }),
+    )
   })
+})
 
-  it('comments and DMs Michael when existing ticket is already urgent', async () => {
-    mockCu.getTask.mockResolvedValue({
-      id: 'cu-urgent',
-      name: 'CMS crash',
-      description: null,
-      status: { status: 'open' },
-      priority: { id: '1', priority: 'urgent' },
-      url: 'https://app.clickup.com/t/cu-urgent',
-      custom_fields: [],
-      list: { id: 'list-known', name: 'Known Issues' },
-    })
-    const issue = makeIssue()
-    const triage = makeTriageResponse({
-      routing_decision: 'known_issues',
-      duplicate_task_id: 'cu-urgent',
-      duplicate_confidence: 0.92,
-    })
+describe('appendToParentTicket', () => {
+  beforeEach(() => jest.clearAllMocks())
 
-    const result = await routeTicket(issue, triage)
+  it('creates a comment on the parent task with thread link and reporter', async () => {
+    mockCu.createTaskComment.mockResolvedValue(undefined)
 
-    // Comment added but priority NOT changed and NOT moved
-    expect(mockCu.createTaskComment).toHaveBeenCalledWith('cu-urgent', expect.any(String))
-    expect(mockCu.setTaskPriority).not.toHaveBeenCalled()
-    expect(mockCu.moveTask).not.toHaveBeenCalled()
-    // Michael DM'd
-    expect(mockSlack.openDM).toHaveBeenCalledWith('U_MICHAEL')
-    // No new ticket
-    expect(mockCu.createTask).not.toHaveBeenCalled()
-    expect(result).toBeNull()
+    await appendToParentTicket('cu-parent', makeIssue(), 'Additional context here')
+
+    expect(mockCu.createTaskComment).toHaveBeenCalledWith(
+      'cu-parent',
+      expect.stringContaining('Related report via Slack'),
+    )
   })
+})
 
-  it('does NOT move to Planning when priority bump does not land on high', async () => {
-    // Start at low(4) → bumps to normal(3), not high → no Planning move
-    mockCu.getTask.mockResolvedValue({
-      id: 'cu-low',
-      name: 'Minor bug',
-      description: null,
-      status: { status: 'open' },
-      priority: { id: '4', priority: 'low' },
-      url: 'https://app.clickup.com/t/cu-low',
-      custom_fields: [],
-      list: { id: 'list-new', name: 'New Tickets' },
-    })
-    const issue = makeIssue()
-    const triage = makeTriageResponse({
-      routing_decision: 'known_issues',
-      duplicate_task_id: 'cu-low',
-      duplicate_confidence: 0.9,
-    })
+describe('notifyUrgencyCollision', () => {
+  beforeEach(() => jest.clearAllMocks())
 
-    const result = await routeTicket(issue, triage)
+  it('sets task to Urgent and posts in #bot-improvements', async () => {
+    mockCu.setTaskPriority.mockResolvedValue(undefined)
+    mockSlack.postMessage.mockResolvedValue('ts')
 
-    expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-low', 3)  // normal
-    expect(mockCu.moveTask).not.toHaveBeenCalled()
-    expect(result).toBeNull()
+    await notifyUrgencyCollision('cu-parent', 'https://app.clickup.com/t/cu-parent', 3)
+
+    expect(mockCu.setTaskPriority).toHaveBeenCalledWith('cu-parent', 1)
+    expect(mockSlack.postMessage).toHaveBeenCalledWith(
+      'C_IMPROVEMENTS',
+      expect.stringContaining('3 reports'),
+    )
   })
 })

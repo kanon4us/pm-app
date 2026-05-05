@@ -24,7 +24,7 @@ export async function uploadToClickUp(
   mimeType: string,
 ): Promise<string> {
   const formData = new FormData()
-  formData.append('attachment', new Blob([data], { type: mimeType }), filename)
+  formData.append('attachment', new Blob([new Uint8Array(data)], { type: mimeType }), filename)
 
   const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/attachment`, {
     method: 'POST',
