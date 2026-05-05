@@ -91,15 +91,11 @@ async function processSlackEvent(event: SlackEvent): Promise<void> {
 
   const issue = existing as SlackIssue | null
 
-  // Human takeover: bot is silent
-  if (issue?.human_takeover) return
+  // Bot is silent when dev has claimed the ticket
+  if (issue?.handoff_status === 'taken') return
 
-  // Non-reporter spoke in thread → activate human takeover
+  // Non-reporter spoke in thread → team feedback (Phase B will handle this properly)
   if (issue && event.user !== issue.reporter_id) {
-    await supabase
-      .from('slack_issues')
-      .update({ human_takeover: true, updated_at: new Date().toISOString() })
-      .eq('thread_ts', threadTs)
     return
   }
 
@@ -112,7 +108,8 @@ async function processSlackEvent(event: SlackEvent): Promise<void> {
       status: 'gathering' as const,
       ticket_data: { ...EMPTY_TICKET_DATA },
       metadata: { logrocket_links: [], file_ids: [], vault_snippets_used: [], triage_reasoning: '' },
-      human_takeover: false,
+      handoff_status: null,
+      sop_version: null,
       clickup_task_id: null,
       last_msg_ts: event.ts,
     }

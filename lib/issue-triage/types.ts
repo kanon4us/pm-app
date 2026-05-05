@@ -42,8 +42,8 @@ export type SlackIssueStatus =
   | 'gathering'
   | 'confirming'
   | 'triaging'
+  | 'passive'
   | 'complete'
-  | 'human_takeover'
 
 export interface SlackIssueMetadata {
   logrocket_links: string[]
@@ -59,8 +59,9 @@ export interface SlackIssue {
   status: SlackIssueStatus
   ticket_data: TicketData
   metadata: SlackIssueMetadata
-  human_takeover: boolean
+  handoff_status: 'taken' | 'returned' | null
   clickup_task_id: string | null
+  sop_version: number | null
   created_at: string
   updated_at: string
   last_msg_ts: string | null
@@ -88,3 +89,55 @@ export interface TriageClaudeResponse {
   routing_decision: RoutingDecision
   routing_reasoning: string
 }
+
+// ---- SOP types ----
+
+export interface EscalationRules {
+  maxTurns: number
+  disengagementThreshold: number
+  minConfidenceMovementPerTurn: number
+}
+
+export interface DuplicateThresholds {
+  possible: number
+  confirmed: number
+  collisionWindowHours: number
+  collisionCount: number
+}
+
+export interface ManualDirective {
+  trigger: 'contains_word' | 'always'
+  value?: string
+  action: string
+  added_by: string
+  added_at: string
+}
+
+export interface BotSop {
+  id: string
+  version: number
+  intake_prompt: string
+  escalation_rules: EscalationRules
+  duplicate_thresholds: DuplicateThresholds
+  manual_directives: ManualDirective[]
+  status: 'active' | 'archived'
+  change_summary: string | null
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+}
+
+// ---- Observation types ----
+
+export type ObservationEventType =
+  | 'ticket_created'
+  | 'enrichment_turn'
+  | 'duplicate_flagged'
+  | 'duplicate_confirmed'
+  | 'duplicate_overridden'
+  | 'priority_bump'
+  | 'team_correction'
+  | 'escalation_triggered'
+  | 'reporter_disengaged'
+  | 'handoff_complete'
+  | 'human_feedback'
