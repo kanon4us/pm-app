@@ -20,6 +20,9 @@ The current Slack bot withholds ticket creation until after a multi-turn intervi
 5. Store behavioral rules (SOPs) in Supabase so they can be updated without code deploys
 6. Build a self-analysis layer that proposes SOP improvements based on outcome data
 7. Route all SOP changes through a PM approval gate before going live
+8. Collect dual-channel feedback (reporter sentiment + dev emoji reactions) to train the analysis layer
+9. Handle media attachments (screen recordings, screenshots) via multimodal triage
+10. Give PMs direct control over bot behavior via manual directives without code deploys
 
 ---
 
@@ -27,13 +30,13 @@ The current Slack bot withholds ticket creation until after a multi-turn intervi
 
 Four layers working together:
 
-**Runtime Layer** — The live bot. Reads its behavioral rules from Supabase at runtime. Handles Slack events, creates/enriches ClickUp tickets, runs duplicate detection.
+**Runtime Layer** — The live bot. Reads its behavioral rules from Supabase at runtime. Handles Slack events, creates/enriches ClickUp tickets, runs duplicate detection, processes media attachments.
 
-**Observation Layer** — Built into every bot action. Records structured outcome data (confidence scores, turn counts, team corrections, escalations) to `bot_observations`.
+**Observation Layer** — Built into every bot action. Records structured outcome data (confidence scores, turn counts, team corrections, escalations, human feedback) to `bot_observations`.
 
-**Analysis Layer** — A weekly cron job that reads observations, identifies patterns, and generates proposed SOP changes with supporting evidence.
+**Analysis Layer** — A weekly cron job that reads observations, identifies patterns, consults rejection history before drafting, and generates proposed SOP changes with supporting evidence.
 
-**Approval Layer** — Proposed changes posted to `#bot-improvements` in Slack. PM approves or rejects. Approved changes become the new active SOP. Full version history preserved.
+**Approval Layer** — Proposed changes posted to `#bot-improvements` in Slack. PM approves or rejects with optional reason. Approved changes become the new active SOP. Full version history preserved.
 
 ---
 
@@ -41,25 +44,46 @@ Four layers working together:
 
 ### On First Message (Reporter Posts in Issues Channel)
 
-Three things happen in parallel:
-1. ClickUp ticket created immediately in the New Tickets list, with the initial message as description and a permalink to the original Slack message
-2. Quick initial duplicate check runs on the raw message
-3. Bot replies in the thread with:
+Four things happen on receipt of the first message:
+
+1. **File check** — Slack payload is inspected for attachments (screen recordings, screenshots). Any files found are immediately uploaded to the ClickUp ticket as attachments and their Slack permalinks added to the description. If an image is present, Claude runs a visual triage pass to generate a one-line summary (e.g., *"User clicking Export — progress bar stuck at 0%"*) prepended to the ticket description.
+
+2. **ClickUp ticket created** in New Tickets list with: initial message, visual summary if applicable, original Slack message permalink, and file attachment links.
+
+3. **Quick initial duplicate check** runs on the raw message text (and visual summary if present).
+
+4. **Bot replies in thread** with:
    - Link to the created ClickUp ticket
    - Link to the original Slack message
    - Duplicate status: either *"No related tickets found at this time."* or *"⚠️ Possible duplicate of [task link] — monitoring as we learn more."*
-   - First enrichment question (pulled from active SOP)
+   - First enrichment question (pulled from active SOP, including any `manual_directives`)
 
-Observation recorded: `ticket_created` — includes initial triage confidence score and SOP version.
+Observation recorded: `ticket_created` — initial triage confidence score, SOP version, whether media was present.
 
 ### On Each Reporter Follow-up
 
 - ClickUp ticket description updated in real-time with accumulated structured data
 - Duplicate detection re-runs with the richer ticket; thread updated if confidence changes materially
+- Any new file attachments in the reply are uploaded to the ClickUp ticket immediately
 - Next SOP question asked, OR escalation triggered if SOP escalation rules are met:
   > *"I don't have enough information to help you at this time — support will reach out within 24 hours."*
 
 Observation recorded: `enrichment_turn` — turn count, confidence delta, question asked, whether reporter answered or deflected.
+
+### On Confirmed Duplicate (High-Confidence Match)
+
+When duplicate confidence crosses the confirmed threshold:
+
+- Bot posts in thread: *"This looks like a known issue. Here's the existing ticket: [parent link]. Your context has been added as a comment. [workaround if available]"*
+- Reporter's full context (message history + any media) is appended as a new comment on the **parent** ClickUp task — not the newly created ticket
+- The newly created ticket is linked to the parent and closed/archived
+- Thread shifts to **passive mode**: bot stops asking questions but continues to receive messages. Any further reporter input is appended to the parent ticket as additional comments
+- Observation recorded: `duplicate_confirmed` — parent task ID, confidence score, turn count at confirmation
+
+**Urgency collision rule:** If 3 or more reporters independently trigger the same parent ticket within a 24-hour window, the bot automatically bumps the parent task priority to Urgent and posts in `#bot-improvements`:
+> *"🚨 3 reports of [task name] in the last 24 hours — priority elevated to Urgent."*
+
+Observation recorded: `priority_bump` — parent task ID, reporter count, time window.
 
 ### On Team Member Message in Thread (Before Handoff)
 
@@ -69,7 +93,7 @@ Observation recorded: `enrichment_turn` — turn count, confidence delta, questi
 - Acknowledges in thread what it acted on
 - Does NOT trigger human takeover — team members can speak freely
 
-Observation recorded: `team_correction` — what field was corrected, what the previous value was. If a duplicate was disputed, also records `duplicate_overridden` — the task ID that was cleared and who cleared it.
+Observation recorded: `team_correction` — field corrected, previous value. If a duplicate was disputed, also records `duplicate_overridden` — task ID cleared and who cleared it.
 
 ### On Reporter Disengagement
 
@@ -84,19 +108,55 @@ ClickUp webhook fires when a dev changes the ticket's status or moves it to a di
 - Bot finds the `slack_issues` row by `clickup_task_id`
 - Sets `human_takeover = true`
 - Posts in thread: *"✅ Dev team has claimed this ticket — handing off."*
-- Goes silent
+- Posts **reporter feedback survey** (Block Kit buttons): 🟢 Helpful  🟡 Neutral  🔴 Not Helpful
+- Goes silent after posting survey
 
-Observation recorded: `handoff_complete` — turn count, triage accuracy at handoff, whether duplicate detection was confirmed or overridden.
+Observation recorded: `handoff_complete` — total turns, final confidence, triage confirmed/overridden.
 
 ### Removed From Current Flow
 
-- Confirmation step ("does this look right?") — ticket already exists, no need to confirm before creating
-- Slack-based human takeover trigger (any non-reporter message → silent forever) — replaced by ClickUp webhook trigger
-- Final routing step that moved tickets between lists — ticket stays in New Tickets unless a dev moves it (which triggers handoff)
+- Confirmation step ("does this look right?") — ticket already exists
+- Slack-based human takeover trigger (any non-reporter message → silent forever) — replaced by ClickUp webhook
+- Final routing step that moved tickets between lists — ticket stays in New Tickets unless a dev moves it
 
 ---
 
-## Section 2 — SOP Storage and Runtime Loading
+## Section 2 — Dual-Channel Feedback System
+
+Two low-friction feedback mechanisms feed the observation layer with human signal.
+
+### Reporter Survey (Post-Handoff)
+
+When a dev claims the ticket, the bot posts a Block Kit message to the reporter in the thread:
+
+```
+How helpful was the support bot during this process?
+[🟢 Helpful]  [🟡 Neutral]  [🔴 Not Helpful]
+```
+
+Response captured via `block_actions` payload. Recorded as `human_feedback` event with `source: reporter`, `sentiment: positive | neutral | negative`, `sop_version`.
+
+### Dev Team Emoji Reactions
+
+Dev team members react to the bot's summary message in the thread using emoji to signal triage quality:
+
+| Reaction | Meaning |
+|---|---|
+| ✅ `:white_check_mark:` | Bot summary was accurate |
+| ⚠️ `:warning:` | Bot missed a key detail |
+| ❌ `:x:` | Complete misidentification |
+
+The bot listens for `reaction_added` events on its own messages. Reactions from non-reporter users are recorded as `human_feedback` events with `source: dev_team`, `signal: positive | missed_detail | misidentified`, `sop_version`.
+
+**Requires:** `reactions:read` scope added to bot OAuth permissions.
+
+### Data Path
+
+Both feedback streams land in `bot_observations` as `human_feedback` events. The analysis cron correlates sentiment scores against specific SOP versions — a version with a high misidentification rate from devs becomes a strong signal for a triage prompt change.
+
+---
+
+## Section 3 — SOP Storage and Runtime Loading
 
 Bot behavioral rules move from hardcoded constants in `conversation.ts` to a `bot_sops` Supabase table. The bot reads the active SOP at the start of each intake turn.
 
@@ -109,21 +169,40 @@ Bot behavioral rules move from hardcoded constants in `conversation.ts` to a `bo
 | `intake_prompt` | text | System prompt for Claude intake turns |
 | `escalation_rules` | jsonb | Thresholds: max turns, disengagement count, min confidence movement |
 | `duplicate_thresholds` | jsonb | Confidence cutoffs for "possible" vs "confirmed" duplicate |
+| `manual_directives` | jsonb | PM-forced rules that override AI-generated patterns (see below) |
 | `status` | text | `active` or `archived` |
 | `change_summary` | text | What changed and why |
 | `approved_by` | text | Slack user ID of PM who approved |
 | `approved_at` | timestamptz | |
 | `created_at` | timestamptz | |
 
-Only one row has `status = active` at any time. On new approval, old row is archived. Full history is preserved.
+Only one row has `status = active` at any time. On new approval, old row is archived. Full history preserved.
+
+### Manual Directives
+
+The `manual_directives` field is a JSON array of PM-authored rules that are injected into the intake prompt at runtime and cannot be overridden by the AI's generated patterns. Example:
+
+```json
+[
+  {
+    "trigger": "contains_word",
+    "value": "glitch",
+    "action": "always_ask_for_screen_recording",
+    "added_by": "U020PGH3RFW",
+    "added_at": "2026-05-05T00:00:00Z"
+  }
+]
+```
+
+Directives are editable by the PM directly in a future admin UI or via an approved `sop_proposal` that only touches the `manual_directives` field. The analysis layer never proposes changes to `manual_directives` — those are PM-owned.
 
 ### Runtime Behavior
 
-`conversation.ts` reads the active SOP before each Claude call. `duplicate-detection.ts` reads `duplicate_thresholds` from the active SOP. On day one the initial SOP is seeded from the current hardcoded prompts — no behavior change, just moving to the database.
+`conversation.ts` reads the active SOP before each Claude call. `duplicate-detection.ts` reads `duplicate_thresholds` from the active SOP. Manual directives are appended to the intake prompt as an inviolable rules block. On day one the initial SOP is seeded from the current hardcoded prompts — no behavior change.
 
 ---
 
-## Section 3 — Observation Layer
+## Section 4 — Observation Layer
 
 Every significant bot action writes a row to `bot_observations`.
 
@@ -143,34 +222,44 @@ Every significant bot action writes a row to `bot_observations`.
 
 | Event | Payload includes |
 |---|---|
-| `ticket_created` | Initial triage confidence, question asked |
+| `ticket_created` | Initial triage confidence, question asked, media present |
 | `enrichment_turn` | Turn number, confidence delta, question asked, answer received |
 | `duplicate_flagged` | Task ID flagged, confidence score |
+| `duplicate_confirmed` | Parent task ID, confidence score, turn count |
 | `duplicate_overridden` | Who overrode it, what the correct answer was |
+| `priority_bump` | Parent task ID, reporter count, time window |
 | `team_correction` | Field corrected, old value, new value |
 | `escalation_triggered` | Turn count, last confidence, reason |
 | `reporter_disengaged` | Turn count, last confidence |
 | `handoff_complete` | Total turns, final confidence, triage confirmed/overridden |
+| `human_feedback` | Source (reporter/dev_team), sentiment/signal, sop_version |
 
 ---
 
-## Section 4 — Self-Analysis Cron
+## Section 5 — Self-Analysis Cron
 
-Runs at `/api/cron/sop-analysis` on a weekly schedule (or manually triggered by PM).
+Runs at `/api/cron/sop-analysis` on a weekly schedule (or manually triggered by PM via Slack command).
+
+### Rejection Memory
+
+Before drafting any proposal, the cron queries the last 5 rejected `sop_proposals`. If a pattern being considered was already proposed and rejected, it is only re-raised if the supporting data has grown by at least 50% since the rejection (i.e., a much larger evidence base now exists). The PM's rejection reason is included verbatim in the new proposal so context is never lost.
 
 ### Patterns Examined
 
-- **Duplicate accuracy** — override rate on flagged duplicates. High rate → thresholds need tuning.
+- **Duplicate accuracy** — override rate on flagged duplicates + dev ❌ reactions. High rate → thresholds need tuning.
 - **Question effectiveness** — average turn at which reporters disengage. Questions past that point aren't working.
-- **Escalation calibration** — are escalations triggering too early or too late based on resolution outcomes?
-- **Correction frequency** — which ticket fields are most often corrected by the team? May indicate ambiguous or missing questions.
-- **SOP version comparison** — did key metrics improve or worsen after the last approved SOP change? Informs whether to continue or revert direction.
+- **Escalation calibration** — escalation frequency relative to ticket resolution outcomes.
+- **Correction frequency** — which ticket fields are most often corrected by devs. May indicate ambiguous or missing questions.
+- **Feedback sentiment** — reporter 🔴 rate and dev ⚠️/❌ rate correlated to specific SOP questions.
+- **Media triage accuracy** — when a visual summary was generated, did the dev team confirm or correct it?
+- **SOP version comparison** — did metrics improve or worsen after the last approved change?
 
 ### Proposal Generation
 
 When a pattern crosses a significance threshold (e.g., >30% override rate across 10+ tickets), Claude drafts a proposed SOP change:
 
-- Pattern observed and number of supporting tickets
+- Pattern observed and supporting ticket count
+- Rejection history consulted (last 5 rejections shown if relevant)
 - Current SOP behavior (quoted)
 - Proposed change (specific prompt text or threshold value)
 - Expected outcome
@@ -180,17 +269,18 @@ Written to `sop_proposals` with `status = pending_review`. Only one proposal per
 
 ---
 
-## Section 5 — PM Approval Gate
+## Section 6 — PM Approval Gate
 
 ### `sop_proposals` Table
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
-| `sop_version` | integer | Version this proposes to replace |
+| `sop_version` | integer | Current active version being proposed to replace |
 | `proposed_changes` | jsonb | Section → { old, new } for each change |
 | `pattern_summary` | text | Human-readable description of pattern found |
 | `supporting_data` | jsonb | Observation IDs, counts, rates |
+| `rejection_history` | jsonb | Last 5 rejections consulted before drafting |
 | `claude_confidence` | float | |
 | `status` | text | `pending_review`, `approved`, `rejected` |
 | `pm_response` | text | Optional rejection reason |
@@ -203,15 +293,17 @@ Written to `sop_proposals` with `status = pending_review`. Only one proposal per
 Posted to `#bot-improvements` when a proposal is created:
 
 ```
-🤖 SOP Improvement Proposal v{N}
+🤖 SOP Improvement Proposal — v{current} → v{proposed}
 
-Pattern: Duplicate detection was overridden 6 out of 18 times (33%) over the last 7 days.
+Pattern: Duplicate detection was overridden 6 out of 18 times (33%) over 7 days.
+Dev ❌ reactions on triage summaries: 4 of 18 threads.
 
 Current behavior: Flag as duplicate at confidence >= 0.85
-Proposed change: Raise threshold to 0.90 and require two matching fields, not one
+Proposed change: Raise threshold to 0.90 and require two matching fields
 
-Supporting tickets: [link to observation IDs]
-Expected outcome: Fewer false positives; team correction rate drops below 15%
+Supporting tickets: [link]
+Rejection history: No prior rejections on this pattern.
+Expected outcome: Team correction rate drops below 15%
 Confidence: 72%
 
 [Approve]  [Reject]
@@ -219,46 +311,49 @@ Confidence: 72%
 
 ### Slack App Requirement
 
-The Approve/Reject buttons use Slack Block Kit interactive components. The Slack app must have **Interactivity & Shortcuts** enabled in its settings, with the Request URL pointing to a new handler branch in the webhook route. The webhook handler checks `payload.type === 'block_actions'` to route these separately from event callbacks.
+The Approve/Reject buttons use Slack Block Kit interactive components. The Slack app must have **Interactivity & Shortcuts** enabled with the Request URL pointing to the webhook route. The handler checks `payload.type === 'block_actions'` to route these separately from event callbacks.
 
 ### On Approve
 
 - Active SOP archived, new SOP written with proposed changes and PM's Slack user ID
 - Bot posts in `#bot-improvements`: *"SOP v{N} is now active."*
-- Approval recorded as an observation so future analysis knows what PM endorsed
+- Approval recorded as a `human_feedback` observation
 
 ### On Reject
 
 - PM optionally provides a one-line reason via free text reply
 - Proposal marked `rejected` with reason stored
 - Bot continues on current SOP
-- Rejection reason feeds into next analysis cycle — same change won't be re-proposed without new supporting evidence
+- Rejection feeds into next analysis cycle's rejection memory check
 
 ### Guardrails
 
 - SOP changes never auto-apply — PM action always required
 - No proposal queue that bypasses review
+- `manual_directives` are never touched by the analysis layer
 - Any SOP version can be restored from archive
 
 ---
 
-## Section 6 — Data Model Changes Summary
+## Section 7 — Data Model Changes Summary
 
 ### Modified: `slack_issues`
 
-Add column: `sop_version integer` — records which SOP was active when the thread started.
+- Add `sop_version integer` — which SOP was active when thread started
+- Remove Slack-based `human_takeover` trigger from webhook handler — only set via ClickUp webhook now
 
-Remove behavior: the Slack-based `human_takeover` trigger (non-reporter message → silent) is deleted from the webhook handler. `human_takeover` is now only set via the ClickUp webhook.
+### Modified: `bot_sops`
+
+- Add `manual_directives jsonb` column (see Section 3)
 
 ### New Tables
 
-- `bot_sops`
 - `bot_observations`
 - `sop_proposals`
 
 ### ClickUp Webhook Handler
 
-Currently subscribed to `taskStatusUpdated` only. Extend to also handle task-moved events. On either event: find `slack_issues` by `clickup_task_id`, set `human_takeover = true`, post handoff message in thread.
+Extend subscription from `taskStatusUpdated` only to also include task-moved events. On either event: find `slack_issues` by `clickup_task_id`, set `human_takeover = true`, post handoff message + reporter feedback survey in thread.
 
 ---
 
@@ -266,23 +361,27 @@ Currently subscribed to `taskStatusUpdated` only. Extend to also handle task-mov
 
 | File | Change |
 |---|---|
-| `app/api/webhooks/slack/route.ts` | Remove Slack-based takeover trigger; add team-feedback branch; add `block_actions` branch for Approve/Reject; add observation writes |
-| `app/api/webhooks/clickup/route.ts` | Add handoff logic on status/list change |
-| `lib/issue-triage/conversation.ts` | Read SOP from Supabase; remove hardcoded prompt |
-| `lib/issue-triage/duplicate-detection.ts` | Read thresholds from active SOP |
-| `lib/issue-triage/router.ts` | Simplify — ticket stays in New Tickets; remove list routing |
+| `app/api/webhooks/slack/route.ts` | Remove Slack-based takeover; add team-feedback branch; add `block_actions` branch (Approve/Reject + reporter survey); add `reaction_added` handler; add observation writes |
+| `app/api/webhooks/clickup/route.ts` | Add handoff + reporter survey on status/list change |
+| `lib/issue-triage/conversation.ts` | Read SOP + manual_directives from Supabase; remove hardcoded prompt |
+| `lib/issue-triage/duplicate-detection.ts` | Read thresholds from active SOP; add urgency collision check |
+| `lib/issue-triage/router.ts` | Simplify — remove list routing; add parent-ticket comment logic for confirmed duplicates |
+| `lib/issue-triage/media.ts` | New — file detection, ClickUp upload, Claude visual triage |
 | `lib/issue-triage/observations.ts` | New — helper to write `bot_observations` rows |
 | `lib/issue-triage/sop.ts` | New — fetch active SOP from Supabase |
-| `app/api/cron/sop-analysis/route.ts` | New — weekly analysis cron |
-| `supabase/migrations/011_bot_sops.sql` | New — `bot_sops`, `bot_observations`, `sop_proposals` tables |
+| `app/api/cron/sop-analysis/route.ts` | New — weekly analysis cron with rejection memory |
+| `supabase/migrations/011_bot_sops.sql` | New — `bot_sops` (with `manual_directives`), `bot_observations`, `sop_proposals` tables |
+
+---
 
 ## Required Environment Variables (New)
 
 | Variable | Purpose |
 |---|---|
-| `SLACK_BOT_IMPROVEMENTS_CHANNEL_ID` | Channel ID for `#bot-improvements` where SOP proposals are posted |
+| `SLACK_BOT_IMPROVEMENTS_CHANNEL_ID` | Channel ID for `#bot-improvements` |
 
 ## Required Slack App Configuration (New)
 
-- Enable **Interactivity & Shortcuts** in the Slack app settings
-- Set the Interactivity Request URL to `https://viscap.edgefixautomation.com/api/webhooks/slack`
+- Enable **Interactivity & Shortcuts** — Request URL: `https://viscap.edgefixautomation.com/api/webhooks/slack`
+- Add OAuth scope: `reactions:read` (for dev emoji reaction capture)
+- Reinstall app to workspace after scope change
