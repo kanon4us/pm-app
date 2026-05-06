@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/slack-stale-check",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sop-analysis",
+      "schedule": "0 9 * * 1"
     }
   ]
 }
