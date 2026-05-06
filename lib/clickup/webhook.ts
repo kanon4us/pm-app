@@ -2,8 +2,10 @@ import crypto from 'crypto'
 
 export interface ClickUpWebhookEvent {
   taskId: string
+  type: string
   toStatus: string
-  event: string
+  /** Present on taskMoved events: the destination list ID */
+  listId?: string
 }
 
 export function verifyClickUpSignature(
@@ -20,10 +22,23 @@ export function verifyClickUpSignature(
 }
 
 export function parseWebhookEvent(payload: Record<string, unknown>): ClickUpWebhookEvent | null {
-  if (payload.event !== 'taskStatusUpdated') return null
+  const eventType = payload.event as string
   const taskId = payload.task_id as string
-  const historyItems = payload.history_items as Array<{ after?: { status?: string } }>
-  const toStatus = historyItems?.[0]?.after?.status
-  if (!taskId || !toStatus) return null
-  return { taskId, toStatus, event: payload.event as string }
+  if (!taskId) return null
+
+  if (eventType === 'taskStatusUpdated') {
+    const historyItems = payload.history_items as Array<{ after?: { status?: string } }>
+    const toStatus = historyItems?.[0]?.after?.status
+    if (!toStatus) return null
+    return { taskId, type: eventType, toStatus }
+  }
+
+  if (eventType === 'taskMoved') {
+    const historyItems = payload.history_items as Array<{ after?: { list?: { id?: string } }; field?: string }>
+    const listId = historyItems?.find((h) => h.field === 'section_moved')?.after?.list?.id
+      ?? historyItems?.[0]?.after?.list?.id
+    return { taskId, type: eventType, toStatus: '', listId }
+  }
+
+  return null
 }

@@ -32,7 +32,7 @@ describe('parseWebhookEvent', () => {
       history_items: [{ after: { status: 'In Progress' } }],
     }
     const event = parseWebhookEvent(payload)
-    expect(event).toEqual({ taskId: 'abc123', toStatus: 'In Progress', event: 'taskStatusUpdated' })
+    expect(event).toEqual({ taskId: 'abc123', toStatus: 'In Progress', type: 'taskStatusUpdated' })
   })
 
   it('returns null for unsupported event type', () => {
