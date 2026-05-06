@@ -50,5 +50,10 @@ export function buildSlackClient(token: string) {
       )
       return res.messages
     },
+
+    /** Add an emoji reaction to a message. */
+    addReaction: async (channel: string, timestamp: string, name: string): Promise<void> => {
+      await slackFetch(token, 'reactions.add', { channel, timestamp, name })
+    },
   }
 }
