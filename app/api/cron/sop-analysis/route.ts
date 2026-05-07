@@ -32,7 +32,12 @@ Respond with valid JSON only:
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.VIDF_HOOK_API_KEY}`) {
+  const cronSecret = process.env.CRON_SECRET
+  const vidfKey = process.env.VIDF_HOOK_API_KEY?.trim()
+  const isAuthorized =
+    (cronSecret && auth === `Bearer ${cronSecret}`) ||
+    (vidfKey && auth === `Bearer ${vidfKey}`)
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

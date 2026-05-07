@@ -48,10 +48,14 @@ describe('GET /api/cron/sop-analysis', () => {
     getSupabaseServiceClient.mockResolvedValue({ from: mockFrom })
   })
 
-  it('returns 401 when authorization header is missing', async () => {
+  it('returns 401 when authorization header is missing or wrong', async () => {
     const req = new NextRequest('http://localhost/api/cron/sop-analysis')
-    const res = await GET(req)
-    expect(res.status).toBe(401)
+    expect((await GET(req)).status).toBe(401)
+
+    const badReq = new NextRequest('http://localhost/api/cron/sop-analysis', {
+      headers: { authorization: 'Bearer wrong-key' },
+    })
+    expect((await GET(badReq)).status).toBe(401)
   })
 
   it('returns 200 with no_patterns when insufficient data', async () => {

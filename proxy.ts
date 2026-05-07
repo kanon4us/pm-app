@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   '/api/webhooks/clickup',
   '/api/webhooks/slack',
   '/api/cron/slack-stale-check',
+  '/api/cron/sop-analysis',
 ]
 
 function isSafeRedirect(url: string): boolean {
