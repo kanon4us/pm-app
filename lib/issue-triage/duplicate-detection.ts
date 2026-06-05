@@ -38,7 +38,7 @@ function parseTriageJson(text: string): TriageClaudeResponse {
   }
 }
 
-export async function detectDuplicate(ticketData: TicketData): Promise<TriageClaudeResponse> {
+export async function detectDuplicate(ticketData: TicketData, excludeTaskId?: string): Promise<TriageClaudeResponse> {
   const token = process.env.CLICKUP_BOT_TOKEN
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!token) throw new Error('CLICKUP_BOT_TOKEN is not set')
@@ -62,11 +62,13 @@ export async function detectDuplicate(ticketData: TicketData): Promise<TriageCla
   const taskArrays = await Promise.all(
     listIds.map((listId) => client.getTasks(listId).catch(() => []))
   )
-  const allTasks = taskArrays.flat().map((t) => ({
-    id: t.id,
-    name: t.name,
-    description: t.description,
-  }))
+  const allTasks = taskArrays.flat()
+    .filter((t) => t.id !== excludeTaskId)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+    }))
 
   const anthropic = new Anthropic({ apiKey })
   const userTurn = [

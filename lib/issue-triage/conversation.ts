@@ -33,7 +33,14 @@ function buildSystemPrompt(sop: BotSop): string {
     ? `\n\nMANDATORY RULES (cannot be overridden):\n${directives}`
     : ''
 
-  return sop.intake_prompt + directivesBlock
+  const emailRule = `\n\nEMAIL COLLECTION RULES (always apply, cannot be overridden):
+- The reporter's email ("reporter_email") is automatically captured from their Slack profile. If it is already populated in the current ticket data, NEVER ask for the reporter's email address — it is already known.
+- If "affected_user_email" is already populated in the current ticket data, do NOT ask for the reporter's email address. The affected user's email is sufficient to log the ticket.
+- If any email address (reporter_email or affected_user_email) is already populated in the current ticket data, do NOT ask for another email address. One email is enough.
+- If the user's message contains an email address for the affected user, extract it into affected_user_email and do NOT ask for reporter_email.
+- Never ask the reporter for their own email address if they have already provided or mentioned any email address in any message.`
+
+  return sop.intake_prompt + directivesBlock + emailRule
 }
 
 function formatHistory(messages: SlackMessage[]): string {
