@@ -1,6 +1,8 @@
 import type { Config } from 'jest'
 
 const config: Config = {
+  testPathIgnorePatterns: ['/node_modules/', '/.claude/'],
+  watchPathIgnorePatterns: ['/.claude/'],
   projects: [
     {
       displayName: 'node',
