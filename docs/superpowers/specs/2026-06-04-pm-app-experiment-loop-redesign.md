@@ -48,10 +48,12 @@ No change needed. `parseWebhookEvent` already extracts `listId` on `taskMoved` e
 **Current bug:** handler queries configs by `(list_id, to_status)` using the task's current list and a status string. On `taskMoved`, `toStatus` is `''`. Task's `list_id` in DB is never updated on move.
 
 **Fix:**
-- On `taskMoved`: query `trigger_configs` where `destination_list_id = event.listId`. Update task's `list_id` to the destination list (not just `status`). Enqueue matching configs.
+- On `taskMoved`: query `trigger_configs` where `destination_list_id = event.listId`. Update task's `list_id` to the destination list. **Do not update `status`** — `status` is authoritative from `taskStatusUpdated` events only; leaving it stale-but-correct is preferable to blanking it (Sprint Planner and FVI pipeline both filter on `status`).
 - On `taskStatusUpdated`: keep existing behavior.
-- Auto-import path: when task not tracked, set `list_id` from destination list lookup. Do not set `status` to `''`.
+- Auto-import path: when task not tracked, set `list_id` from destination list lookup. Leave `status` as `null` (not `''`).
 - `handleSlackHandoff` is correct as-is — no change.
+
+**v1 limitation:** The experiment tag does not include a per-task ID. Developers working two tasks simultaneously in the same sprint will have commits tagged with the same sprint/bundle context. Per-task linkage is deferred to a future experiment version; v1 analysis correlates commits to tasks via ClickUp assignment data post-hoc.
 
 ---
 
@@ -79,6 +81,11 @@ One-shot script (`npx tsx scripts/seed-trigger-configs.ts`):
 | Archive | `close_vault_branch` |
 
 `pm_agent_action` values are the enum strings the trigger queue processor matches on.
+
+**Idempotency guards (trigger queue processor, not the webhook):**
+- Before `cherry_pick_bundle_and_post_kickoff`: check that `active/{id}-{slug}` branch does not already exist in the docs repo. If it does, skip and mark queue item `done` with a note.
+- Before `archive_active_branch`: check that the `active/{id}-{slug}` branch is still open (not already merged). If already merged, skip and mark `done`.
+These guards make it safe for a PM to accidentally drag a task back and forth without creating duplicate branches or git errors.
 
 ---
 
@@ -129,7 +136,7 @@ CREATE TABLE bundle_prompt_versions (
   version INT NOT NULL UNIQUE,
   prompt_text TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
-  proposed_diff TEXT,
+  proposed_text TEXT,
   activated_at TIMESTAMPTZ,
   approved_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -144,11 +151,13 @@ One row has `status = 'active'` at any time. Bundle generation always fetches th
 
 ## Workstream 5: Sprint Feedback UI
 
-### Route: `/feedback` (no auth required)
+### Route: `/feedback?token={signed-token}` (no auth, token-gated)
+
+The PM shares a signed URL at sprint close (via ClickUp comment or Slack). The token encodes the sprint ID and expires after 7 days. This prevents exposure of task names and bundle versions to unauthenticated visitors. Token is a HMAC-signed JWT using `FEEDBACK_TOKEN_SECRET` env var.
 
 **Page flow:**
-1. Developer lands on `/feedback` — sees tasks from the most recently closed sprint (`sprints.status = 'closed'` ORDER BY `closed_at DESC` LIMIT 1) that have a `bundle_generation` attached.
-2. Developer enters their email.
+1. Developer follows the PM-shared URL — token is validated server-side, sprint ID extracted. If token is missing or expired, page shows an "Invalid or expired link" message.
+2. Developer enters their email (identifier only — no password).
 3. Per-task feedback card:
    - Task name + bundle version used
    - Three 1–5 star ratings: Kickoff Prompt, User Stories, Dev Skill
@@ -157,7 +166,7 @@ One row has `status = 'active'` at any time. Bundle generation always fetches th
 5. Thank-you state after submit.
 
 ### `POST /api/feedback/bundle`
-Payload: `{ email, responses: [{ task_id, bundle_version, ratings, comments }] }`. Validates ratings 1–5. Upserts. No auth — IP rate limiting sufficient for internal tool.
+Payload: `{ token, email, responses: [{ task_id, bundle_version, ratings, comments }] }`. Validates token, validates ratings 1–5. Upserts. Token validation replaces auth — IP rate limiting also applied.
 
 ---
 
@@ -176,17 +185,18 @@ Empty until PM clicks "Analyze & Propose Changes".
 ### `POST /api/experiments/propose-prompt`
 1. Fetch all `bundle_feedback` for active version
 2. Fetch active `bundle_prompt_versions` row
-3. Send to Claude: analyze feedback, propose minimal changes to bundle-generation prompt, return unified diff + one-paragraph rationale
-4. Store diff in `proposed_diff` on active version row
-5. Return diff + rationale to UI
+3. Send to Claude: analyze feedback, return the **complete rewritten prompt text** + a bullet-point summary of what changed and why (no diff format — full text replacement avoids patch application errors)
+4. Store proposed text in `proposed_diff` column (repurposed as `proposed_text` — rename column in migration 017) on active version row
+5. Return proposed text + change summary to UI
 
-Right panel renders diff as code block (+/- highlighting) with rationale. Two buttons: **Approve** / **Reject**.
+Right panel shows the full proposed prompt text (scrollable) with the change summary above it. Two buttons: **Approve** / **Reject**.
 
 ### `POST /api/experiments/approve-prompt`
 1. Set current active version `status = 'archived'`
-2. Apply diff to `prompt_text`, insert new row: `status = 'active'`, `version = prev + 1`, `activated_at = now()`, `approved_by = session.user.email`
+2. Insert new row: `prompt_text = proposed_text`, `status = 'active'`, `version = prev + 1`, `activated_at = now()`, `approved_by = session.user.email`
+3. Clear `proposed_text` on archived row (no longer needed)
 
-**Reject:** Clear `proposed_diff` on current row, reset right panel.
+**Reject:** Clear `proposed_text` on current row, reset right panel.
 
 ---
 
@@ -197,7 +207,7 @@ Run once in a feature repo. Writes `commit-msg` hook to `.git/hooks/commit-msg`:
 - Reads `git config user.email`
 - Calls `GET /api/developers/{email}/experiment`
 - Appends `[vidf:{version} | bundle:v{N} | sprint:{YYYY-MM}]` as a new line in the commit message body if not already present
-- Exits 0 on API unreachable (never blocks a commit)
+- **Falls back gracefully (exit 0, no tag appended) on any failure** — API unreachable, non-200 response, missing/malformed JSON. The GitHub Action is the enforcement point; the hook must never block a commit.
 
 ### `GET /api/developers/[email]/experiment`
 No auth. Returns:
@@ -207,7 +217,7 @@ No auth. Returns:
 Derives from: active `bundle_prompt_versions` row, current open sprint (`sprints` table), hardcoded experiment version `v1`.
 
 ### `.github/workflows/vidf-validate.yml`
-Runs on `pull_request`. Validates every commit in the PR branch contains tag pattern `[vidf:* | bundle:v* | sprint:*]`. Fails with clear message if any commit is missing. Only activates when `.vidf-enabled` file exists in repo root — opt-in to avoid breaking other Viscap repos.
+Runs on `pull_request`. Uses `git log --no-merges` to exclude merge commits (conflict resolution merges from main would otherwise fail the check). Validates every non-merge commit in the PR branch contains tag pattern `[vidf:* | bundle:v* | sprint:*]`. Fails with clear message listing the offending commit SHAs. Only activates when `.vidf-enabled` file exists in repo root — opt-in to avoid breaking other Viscap repos.
 
 ---
 
