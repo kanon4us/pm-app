@@ -19,13 +19,13 @@ export async function GET(
       .single(),
     supabase
       .from('sprints')
-      .select('clickup_sprint_id, starts_at')
-      .order('starts_at', { ascending: false })
+      .select('clickup_sprint_id, start_date')
+      .order('start_date', { ascending: false })
       .limit(1)
       .single(),
   ])
 
-  const sprintLabel = deriveSprintLabel(openSprint?.clickup_sprint_id, openSprint?.starts_at)
+  const sprintLabel = deriveSprintLabel(openSprint?.clickup_sprint_id, openSprint?.start_date)
 
   // This endpoint is intentionally unauthenticated — called from developer commit-msg hooks.
   // Returns only global experiment metadata (no PII). Cache-Control prevents stale tags.
@@ -39,13 +39,13 @@ export async function GET(
   )
 }
 
-function deriveSprintLabel(sprintId: string | null | undefined, startsAt: string | null | undefined): string {
+function deriveSprintLabel(sprintId: string | null | undefined, startDate: string | null | undefined): string {
   if (sprintId) {
     const match = sprintId.match(/(\d{4})-(\d{2})/)
     if (match) return `${match[1]}-${match[2]}`
   }
-  if (startsAt) {
-    const d = new Date(startsAt)
+  if (startDate) {
+    const d = new Date(startDate)
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
   }
   const now = new Date()
