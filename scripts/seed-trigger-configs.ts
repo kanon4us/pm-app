@@ -26,31 +26,36 @@ async function main() {
       continue
     }
 
-    const { data: list, error: listErr } = await supabase
+    const { data: lists } = await supabase
       .from('lists')
       .select('id')
       .eq('clickup_list_id', clickupListId)
-      .single()
+      .limit(1)
 
-    if (listErr || !list) {
+    const list = lists?.[0]
+    if (!list) {
       console.warn(`⚠  Skipping ${label}: no list row found for clickup_list_id=${clickupListId}`)
       console.warn('   Run Setup → Subscribe to Lists first.')
       continue
     }
 
-    const { error } = await supabase
-      .from('trigger_configs')
-      .upsert(
-        {
-          list_id: list.id,
-          destination_list_id: list.id,
-          pm_agent_action: action,
-          write_back_order: [],
-          write_back_config: {},
-          on_failure: 'continue',
-        },
-        { onConflict: 'destination_list_id' },
-      )
+    // Delete any existing row for this destination list, then insert fresh
+    // (partial unique indexes aren't supported by PostgREST onConflict)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('trigger_configs') as any)
+      .delete()
+      .eq('destination_list_id', list.id)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from('trigger_configs') as any)
+      .insert({
+        list_id: list.id,
+        destination_list_id: list.id,
+        pm_agent_action: action,
+        write_back_order: [],
+        write_back_config: {},
+        on_failure: 'continue',
+      })
 
     if (error) {
       console.error(`✗  ${label}:`, error.message)
