@@ -55,5 +55,36 @@ export function buildSlackClient(token: string) {
     addReaction: async (channel: string, timestamp: string, name: string): Promise<void> => {
       await slackFetch(token, 'reactions.add', { channel, timestamp, name })
     },
+
+    /** Look up a user's email and display name from their Slack profile. Returns nulls if unavailable. */
+    getUserProfile: async (userId: string): Promise<{ email: string | null; displayName: string | null }> => {
+      try {
+        const res = await slackFetch<{ user: { profile: { email?: string; display_name?: string; real_name?: string } } }>(
+          token,
+          'users.info',
+          { user: userId },
+        )
+        const profile = res.user.profile
+        return {
+          email: profile.email ?? null,
+          displayName: profile.display_name || profile.real_name || null,
+        }
+      } catch {
+        return { email: null, displayName: null }
+      }
+    },
+
+    /** Post a block-kit message to a channel, optionally as a thread reply. */
+    postBlocks: async (channel: string, text: string, blocks: object[], threadTs?: string): Promise<string> => {
+      const payload: Record<string, unknown> = { channel, text, blocks }
+      if (threadTs) payload.thread_ts = threadTs
+      const res = await slackFetch<{ ts: string }>(token, 'chat.postMessage', payload)
+      return res.ts
+    },
+
+    /** Open a modal view using a trigger_id from a block action. */
+    openModal: async (triggerId: string, view: object): Promise<void> => {
+      await slackFetch(token, 'views.open', { trigger_id: triggerId, view })
+    },
   }
 }
