@@ -112,8 +112,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     confidence?: number
   }
 
+  let parsedText = text.trim()
+  const fenceMatch = parsedText.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fenceMatch) parsedText = fenceMatch[1].trim()
+
   try {
-    analysis = JSON.parse(text)
+    analysis = JSON.parse(parsedText)
   } catch {
     console.error('[sop-analysis] Claude returned non-JSON:', text.slice(0, 300))
     return NextResponse.json({ result: 'error', reason: 'claude_parse_failure' })
