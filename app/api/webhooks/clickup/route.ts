@@ -138,34 +138,9 @@ async function handleSlackHandoff(
   const { buildSlackClient } = await import('@/lib/slack/client')
   const slack = buildSlackClient(token)
 
-  // Post handoff message
   await slack.postMessage(
     issue.channel_id,
     '✅ Dev team has claimed this ticket — handing off.',
     issue.thread_ts,
   )
-
-  // Post reporter feedback survey via Blocks
-  await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      channel: issue.channel_id,
-      thread_ts: issue.thread_ts,
-      blocks: [
-        {
-          type: 'section',
-          text: { type: 'mrkdwn', text: 'How helpful was the support bot during this process?' },
-        },
-        {
-          type: 'actions',
-          elements: [
-            { type: 'button', text: { type: 'plain_text', text: '🟢 Helpful' }, action_id: 'survey_helpful', value: issue.thread_ts },
-            { type: 'button', text: { type: 'plain_text', text: '🟡 Neutral' }, action_id: 'survey_neutral', value: issue.thread_ts },
-            { type: 'button', text: { type: 'plain_text', text: '🔴 Not Helpful' }, action_id: 'survey_not_helpful', value: issue.thread_ts },
-          ],
-        },
-      ],
-    }),
-  })
 }

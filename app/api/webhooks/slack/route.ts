@@ -12,6 +12,15 @@ import { fetchSlackFile, uploadToClickUp, generateVisualSummary } from '@/lib/is
 import { EMPTY_TICKET_DATA } from '@/lib/issue-triage/types'
 import type { SlackIssue } from '@/lib/issue-triage/types'
 
+const DEV_TEAM_IDS = new Set([
+  'U03MK0SEPH9', // Cam
+  'U047E6PJ5B9', // Ilya Mikhalev
+  'U06RWVCH924', // Michael Katskyi
+  'U07501EJ2SK', // Zaeem Asif
+  'U081QGB6ZC1', // Jahanara Ali
+  'U020PGH3RFW', // Chad Terry
+])
+
 interface SlackFile {
   id: string
   name: string
@@ -47,11 +56,28 @@ interface SlackPayload {
 
 interface SlackBlockAction {
   type: 'block_actions'
+  trigger_id: string
   user: { id: string }
   actions: Array<{ action_id: string; value?: string }>
 }
 
+interface SlackViewSubmission {
+  type: 'view_submission'
+  user: { id: string }
+  view: {
+    callback_id: string
+    private_metadata: string
+    state: {
+      values: {
+        liked: { liked_input: { value: string | null } }
+        disliked: { disliked_input: { value: string | null } }
+      }
+    }
+  }
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  console.log('[slack-webhook] POST received', req.headers.get('x-slack-signature') ? 'signed' : 'unsigned', new Date().toISOString())
   const contentType = req.headers.get('content-type') ?? ''
   const rawBody = await req.text()
 
@@ -67,9 +93,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
-    const action = JSON.parse(payloadStr) as SlackBlockAction
-    if (action.type === 'block_actions') {
-      after(async () => { await handleBlockAction(action) })
+    const parsed = JSON.parse(payloadStr) as SlackBlockAction | SlackViewSubmission
+    if (parsed.type === 'block_actions') {
+      after(async () => { await handleBlockAction(parsed as SlackBlockAction) })
+    } else if (parsed.type === 'view_submission') {
+      after(async () => { await handleViewSubmission(parsed as SlackViewSubmission) })
     }
     return NextResponse.json({ ok: true })
   }
@@ -113,6 +141,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Message events
   const msgEvent = event as SlackEvent
   if (msgEvent.bot_id || msgEvent.subtype === 'bot_message') return NextResponse.json({ ok: true })
+  if (msgEvent.subtype === 'channel_join' || msgEvent.subtype === 'channel_leave') return NextResponse.json({ ok: true })
   if (msgEvent.channel !== issuesChannel) return NextResponse.json({ ok: true })
   if (!msgEvent.user) return NextResponse.json({ ok: true })
 
@@ -129,6 +158,17 @@ async function processMessageEvent(event: SlackEvent): Promise<void> {
   const supabase = await getSupabaseServiceClient()
   const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
   const threadTs = event.thread_ts ?? event.ts
+
+  // Ignore thread replies that have no existing issue record — dev or others commenting
+  // on a thread the bot never processed (e.g. pre-bot messages)
+  if (!event.thread_ts === false && event.thread_ts !== event.ts) {
+    const isReply = event.thread_ts && event.thread_ts !== event.ts
+    if (isReply) {
+      const { data: check } = await supabase
+        .from('slack_issues').select('thread_ts').eq('thread_ts', threadTs).single()
+      if (!check) return
+    }
+  }
 
   const { data: existing } = await supabase
     .from('slack_issues').select('*').eq('thread_ts', threadTs).single()
@@ -154,13 +194,21 @@ async function processMessageEvent(event: SlackEvent): Promise<void> {
     return
   }
 
-  // Team member message: triage feedback (not reporter)
+  // Dev team member replied in an active gathering thread: hand off silently
+  if (issue && DEV_TEAM_IDS.has(event.user ?? '') && issue.status === 'gathering') {
+    await supabase.from('slack_issues')
+      .update({ status: 'complete', updated_at: new Date().toISOString() })
+      .eq('thread_ts', threadTs)
+    return
+  }
+
+  // Other non-reporter message (not dev team): triage feedback
   if (issue && event.user !== issue.reporter_id) {
     await handleTeamFeedback(issue, event, slack, supabase)
     return
   }
 
-  // New thread: create ticket immediately
+  // New top-level message: create ticket
   if (!issue) {
     await handleNewIssue(event, slack, supabase)
     return
@@ -200,8 +248,13 @@ async function handleNewIssue(
     }
   }
 
-  // Seed ticket with initial message
-  const seedTicketData = { ...EMPTY_TICKET_DATA, issue_summary: event.text.slice(0, 200) }
+  // Look up reporter profile from Slack
+  const reporterProfile = await slack.getUserProfile(event.user ?? '').catch(() => ({ email: null, displayName: null }))
+  const reporterFirstName = reporterProfile.displayName?.split(' ')[0] ?? null
+
+  // Strip Slack mention syntax and seed ticket with clean initial message
+  const cleanText = event.text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const seedTicketData = { ...EMPTY_TICKET_DATA, issue_summary: cleanText.slice(0, 200), reporter_email: reporterProfile.email ?? '' }
 
   const newIssueData = {
     thread_ts: event.ts,
@@ -241,38 +294,65 @@ async function handleNewIssue(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await supabase.from('slack_issues').insert({ ...newIssueData, clickup_task_id: task.id } as any)
 
+  // React with :admission_tickets: to signal the ticket was created
+  await slack.addReaction(event.channel, event.ts, 'admission_tickets').catch(() => undefined)
+
   const fullIssue: SlackIssue = { ...tempIssue, clickup_task_id: task.id }
 
   // Quick duplicate detection on initial message
   let dupStatus = '*No related tickets found at this time.*'
   let triageResult
   try {
-    triageResult = await detectDuplicate(fullIssue.ticket_data)
+    triageResult = await detectDuplicate(fullIssue.ticket_data, task.id)
     if (triageResult.duplicate_task_id) {
-      dupStatus = `⚠️ Possible duplicate of <${triageResult.duplicate_task_id}|existing ticket> — monitoring as we learn more.`
+      dupStatus = `⚠️ Possible duplicate of <https://app.clickup.com/t/${triageResult.duplicate_task_id}|existing ticket> — monitoring as we learn more.`
     }
   } catch (err) {
     console.warn('[slack-webhook] initial triage failed:', err)
   }
 
-  // Get first question from Claude
-  let firstQuestion = 'Can you tell me a bit more about what happened?'
-  try {
-    const intakeResult = await runIntakeTurn(fullIssue, event.text, [])
-    firstQuestion = intakeResult.bot_response
-    await supabase.from('slack_issues')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .update({ ticket_data: intakeResult.updated_schema as any, updated_at: new Date().toISOString() })
-      .eq('thread_ts', event.ts)
-  } catch (err) {
-    console.warn('[slack-webhook] initial intake turn failed:', err)
-  }
+  // Check if a dev team member has already replied before asking a question
+  const threadHistory = await slack.getThreadReplies(event.channel, event.ts).catch(() => [])
+  const devAlreadyReplied = threadHistory.some((m) => m.user && DEV_TEAM_IDS.has(m.user))
 
-  await slack.postMessage(
-    event.channel,
-    `I've opened a ticket for you: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}\n\n${firstQuestion}`,
-    event.ts,
-  )
+  if (devAlreadyReplied) {
+    await slack.postMessage(
+      event.channel,
+      `I've opened a ticket: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}`,
+      event.ts,
+    )
+  } else {
+    let firstQuestion = 'Can you tell me a bit more about what happened?'
+    try {
+      const intakeResult = await runIntakeTurn(fullIssue, event.text, [])
+      firstQuestion = intakeResult.bot_response
+      await supabase.from('slack_issues')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ ticket_data: intakeResult.updated_schema as any, updated_at: new Date().toISOString() })
+        .eq('thread_ts', event.ts)
+
+      // Update ClickUp task with the clean AI-generated summary and reporter name prefix
+      if (intakeResult.updated_schema.issue_summary) {
+        const namePrefix = reporterFirstName ? `[${reporterFirstName}] ` : ''
+        const taskName = `${namePrefix}${intakeResult.updated_schema.issue_summary}`.slice(0, 200)
+        const updatedIssue = { ...fullIssue, ticket_data: intakeResult.updated_schema }
+        await updateTicketDescription(task.id, updatedIssue).catch((err) =>
+          console.warn('[slack-webhook] initial ClickUp name update failed:', err)
+        )
+        await import('@/lib/clickup/client').then(({ buildClickUpClient }) =>
+          buildClickUpClient(process.env.CLICKUP_BOT_TOKEN ?? '').updateTask(task.id, { name: taskName })
+        ).catch((err) => console.warn('[slack-webhook] ClickUp name update failed:', err))
+      }
+    } catch (err) {
+      console.warn('[slack-webhook] initial intake turn failed:', err)
+    }
+
+    await slack.postMessage(
+      event.channel,
+      `I've opened a ticket for you: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}\n\n${firstQuestion}`,
+      event.ts,
+    )
+  }
 
   await recordObservation(event.ts, task.id, sop.version, 'ticket_created', {
     initialTriageConfidence: triageResult?.duplicate_confidence ?? 0,
@@ -289,6 +369,16 @@ async function handleGathering(
 ): Promise<void> {
   const sop = await getActiveSop()
   const history = await slack.getThreadReplies(event.channel, issue.thread_ts).catch(() => [])
+
+  // If any dev team member has replied, stop gathering — they've taken over
+  const devReplied = history.some((m) => m.user && DEV_TEAM_IDS.has(m.user))
+  if (devReplied) {
+    await supabase.from('slack_issues')
+      .update({ status: 'complete', updated_at: new Date().toISOString() })
+      .eq('thread_ts', issue.thread_ts)
+    return
+  }
+
   const result = await runIntakeTurn(issue, event.text, history)
 
   // Update ClickUp ticket in real-time
@@ -414,11 +504,49 @@ async function handleTeamFeedback(
 }
 
 async function handleReaction(event: SlackReactionEvent): Promise<void> {
+  // white_check_mark from a dev team member: post resolution survey tagging dev + reporter
+  if (event.reaction === 'white_check_mark' && DEV_TEAM_IDS.has(event.user)) {
+    const supabase = await getSupabaseServiceClient()
+    const { data: issueData } = await supabase
+      .from('slack_issues').select('*').eq('thread_ts', event.item.ts).single()
+    if (!issueData) return
+
+    const issue = issueData as unknown as SlackIssue
+    const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
+
+    await slack.postBlocks(
+      event.item.channel,
+      `✅ <@${event.user}> marked this resolved.`,
+      [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `✅ <@${event.user}> has marked this as resolved. <@${issue.reporter_id}> and <@${event.user}>, we'd love your feedback on the support experience.`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            { type: 'button', text: { type: 'plain_text', text: 'Leave Feedback' }, action_id: 'feedback_open', value: issue.thread_ts },
+          ],
+        },
+      ],
+      issue.thread_ts,
+    )
+
+    await supabase.from('slack_issues')
+      .update({ status: 'complete', updated_at: new Date().toISOString() })
+      .eq('thread_ts', issue.thread_ts)
+
+    return
+  }
+
+  // Signal reactions on bot messages (dev team quality feedback)
   const botUserId = process.env.SLACK_BOT_USER_ID
   if (!botUserId || event.item_user !== botUserId) return
 
   const SIGNAL_MAP: Record<string, string> = {
-    white_check_mark: 'positive',
     warning: 'missed_detail',
     x: 'misidentified',
   }
@@ -441,23 +569,50 @@ async function handleReaction(event: SlackReactionEvent): Promise<void> {
   )
 }
 
+async function handleViewSubmission(submission: SlackViewSubmission): Promise<void> {
+  if (submission.view.callback_id !== 'feedback_modal') return
+  const threadTs = submission.view.private_metadata
+  const liked = submission.view.state.values.liked.liked_input.value ?? ''
+  const disliked = submission.view.state.values.disliked.disliked_input.value ?? ''
+  const sop = await getActiveSop()
+  await recordObservation(threadTs, null, sop.version, 'human_feedback', {
+    source: 'survey',
+    respondedBy: submission.user.id,
+    liked,
+    disliked,
+  })
+}
+
 async function handleBlockAction(action: SlackBlockAction): Promise<void> {
   const actionId = action.actions[0]?.action_id
   const userId = action.user.id
   const sop = await getActiveSop()
 
-  // Reporter survey feedback
-  if (['survey_helpful', 'survey_neutral', 'survey_not_helpful'].includes(actionId)) {
-    const sentimentMap: Record<string, string> = {
-      survey_helpful: 'positive',
-      survey_neutral: 'neutral',
-      survey_not_helpful: 'negative',
-    }
+  // Feedback modal trigger
+  if (actionId === 'feedback_open') {
     const threadTs = action.actions[0]?.value ?? ''
-    await recordObservation(threadTs, null, sop.version, 'human_feedback', {
-      source: 'reporter',
-      sentiment: sentimentMap[actionId],
-      respondedBy: userId,
+    const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
+    await slack.openModal(action.trigger_id, {
+      type: 'modal',
+      callback_id: 'feedback_modal',
+      private_metadata: threadTs,
+      title: { type: 'plain_text', text: 'Ticket Feedback' },
+      submit: { type: 'plain_text', text: 'Submit' },
+      close: { type: 'plain_text', text: 'Cancel' },
+      blocks: [
+        {
+          type: 'input',
+          block_id: 'liked',
+          label: { type: 'plain_text', text: 'One thing you liked' },
+          element: { type: 'plain_text_input', action_id: 'liked_input', multiline: true, placeholder: { type: 'plain_text', text: 'e.g. Quick initial response' } },
+        },
+        {
+          type: 'input',
+          block_id: 'disliked',
+          label: { type: 'plain_text', text: 'One thing to improve' },
+          element: { type: 'plain_text_input', action_id: 'disliked_input', multiline: true, placeholder: { type: 'plain_text', text: 'e.g. Follow-up questions were too broad' } },
+        },
+      ],
     })
     return
   }
