@@ -37,14 +37,14 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       slack
         .postMessage(
           issue.channel_id,
-          "Still there? I'm ready to finish documenting this whenever you are. Just reply to this thread and we'll pick up where we left off.",
+          "Just checking in — if you still need help, reply here and we'll pick up where we left off. Otherwise we'll leave this ticket with the team.",
           issue.thread_ts,
         )
         .then(async () => {
           nudged++
           await supabase
             .from('slack_issues')
-            .update({ updated_at: new Date().toISOString() })
+            .update({ status: 'complete', updated_at: new Date().toISOString() })
             .eq('thread_ts', issue.thread_ts)
         })
         .catch((err: unknown) =>
