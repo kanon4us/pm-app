@@ -178,7 +178,7 @@ describe('POST /api/webhooks/clickup', () => {
 
     const insertTriggerQueue = jest.fn().mockResolvedValue({ data: null, error: null })
 
-    supabaseMock_taskMoved: {
+    {
       const chain = (table: string) => {
         const base = {
           select: jest.fn().mockReturnThis(),
