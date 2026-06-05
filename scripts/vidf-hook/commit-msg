@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# VIDF experiment tag hook — appends [vidf:v{N} | bundle:v{N} | sprint:{YYYY-MM}] to commit messages.
+# Exits 0 on any failure so it never blocks a commit.
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Skip if tag already present
+if echo "$COMMIT_MSG" | grep -qE '\[vidf:[^ ]+ \| bundle:v[0-9]+ \| sprint:[0-9]{4}-[0-9]{2}\]'; then
+  exit 0
+fi
+
+EMAIL=$(git config user.email 2>/dev/null)
+if [ -z "$EMAIL" ]; then
+  exit 0
+fi
+
+PM_APP_URL="${VISCAP_PM_APP_URL:-https://pm.viscapmedia.com}"
+RESPONSE=$(curl -s --max-time 3 "${PM_APP_URL}/api/developers/${EMAIL}/experiment" 2>/dev/null)
+
+if [ -z "$RESPONSE" ]; then
+  exit 0
+fi
+
+VERSION=$(echo "$RESPONSE" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+BUNDLE_VERSION=$(echo "$RESPONSE" | grep -o '"bundle_version":[0-9]*' | grep -o '[0-9]*$')
+SPRINT=$(echo "$RESPONSE" | grep -o '"sprint":"[^"]*"' | cut -d'"' -f4)
+
+if [ -z "$VERSION" ] || [ -z "$BUNDLE_VERSION" ] || [ -z "$SPRINT" ]; then
+  exit 0
+fi
+
+TAG="[vidf:${VERSION} | bundle:v${BUNDLE_VERSION} | sprint:${SPRINT}]"
+
+printf "\n%s" "$TAG" >> "$COMMIT_MSG_FILE"
+
+exit 0
