@@ -15,7 +15,8 @@ if [ -z "$EMAIL" ]; then
   exit 0
 fi
 
-PM_APP_URL="${VISCAP_PM_APP_URL:-https://pm.viscapmedia.com}"
+GIT_CONFIG_URL=$(git config viscap.pmAppUrl 2>/dev/null)
+PM_APP_URL="${VISCAP_PM_APP_URL:-${GIT_CONFIG_URL:-https://pm.viscapmedia.com}}"
 RESPONSE=$(curl -s --max-time 3 "${PM_APP_URL}/api/developers/${EMAIL}/experiment" 2>/dev/null)
 
 if [ -z "$RESPONSE" ]; then
