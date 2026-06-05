@@ -1,118 +1,90 @@
-/**
- * Integration tests for GET /api/developers/[email]/experiment
- */
-
-const mockFrom = jest.fn()
-
-jest.mock('@/lib/supabase/server', () => ({
-  getSupabaseServiceClient: jest.fn().mockResolvedValue({
-    from: mockFrom,
-  }),
-}))
-
 import { GET } from '@/app/api/developers/[email]/experiment/route'
 import { NextRequest } from 'next/server'
 
-const VALID_KEY = 'test-key'
+jest.mock('@/lib/supabase/server', () => ({
+  getSupabaseServiceClient: jest.fn(),
+}))
 
-beforeEach(() => {
-  process.env.VIDF_HOOK_API_KEY = VALID_KEY
-  jest.clearAllMocks()
-})
-
-function makeRequest(email: string, key?: string) {
-  const url = `http://localhost/api/developers/${encodeURIComponent(email)}/experiment`
-  return new NextRequest(url, {
-    headers: key ? { Authorization: `Bearer ${key}` } : {},
-  })
+function makeRequest(email: string) {
+  return new NextRequest(`http://localhost/api/developers/${email}/experiment`)
 }
 
-function mockDbFound(row: Record<string, unknown>) {
-  const chain = { eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: row, error: null }) }
-  mockFrom.mockReturnValue({ select: jest.fn().mockReturnValue(chain) })
-}
-
-function mockDbNotFound() {
-  const chain = {
-    eq: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
+function makeSupabaseMock(overrides: { version?: number; clickupSprintId?: string; startsAt?: string } = {}) {
+  return {
+    from: jest.fn().mockImplementation((table: string) => {
+      const base = {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: null }),
+      }
+      if (table === 'bundle_prompt_versions') {
+        return { ...base, single: jest.fn().mockResolvedValue({ data: { version: overrides.version ?? 2 } }) }
+      }
+      if (table === 'sprints') {
+        return {
+          ...base,
+          single: jest.fn().mockResolvedValue({
+            data: {
+              clickup_sprint_id: overrides.clickupSprintId ?? null,
+              starts_at: overrides.startsAt ?? '2026-06-01T00:00:00Z',
+            },
+          }),
+        }
+      }
+      return base
+    }),
   }
-  const upsertChain = {
-    select: jest.fn().mockReturnValue({
-      single: jest.fn().mockResolvedValue({
-        data: {
-          id: 'new-id', github_email: 'new@example.com', github_username: null,
-          vidf_tag: 'pre', bundle_version: 'v0', sop_version: 'v0', sprint: '2026-04',
-          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-        },
-        error: null,
-      })
-    })
-  }
-  mockFrom
-    .mockReturnValueOnce({ select: jest.fn().mockReturnValue(chain) })
-    .mockReturnValueOnce({ upsert: jest.fn().mockReturnValue(upsertChain) })
-}
-
-function mockDbError() {
-  const chain = {
-    eq: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: null, error: { code: '500', message: 'connection refused' } }),
-  }
-  mockFrom.mockReturnValue({ select: jest.fn().mockReturnValue(chain) })
 }
 
 describe('GET /api/developers/[email]/experiment', () => {
-  it('returns 401 with no API key', async () => {
-    const res = await GET(makeRequest('dev@example.com'), { params: Promise.resolve({ email: 'dev@example.com' }) })
-    expect(res.status).toBe(401)
-  })
+  it('returns experiment context with version, bundle_version, and sprint', async () => {
+    const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
+    getSupabaseServiceClient.mockResolvedValue(makeSupabaseMock({ version: 3, startsAt: '2026-07-01T00:00:00Z' }))
 
-  it('returns 401 with wrong API key', async () => {
-    const res = await GET(makeRequest('dev@example.com', 'wrong-key'), { params: Promise.resolve({ email: 'dev@example.com' }) })
-    expect(res.status).toBe(401)
-  })
+    const req = makeRequest('dev@example.com')
+    const res = await GET(req, { params: Promise.resolve({ email: 'dev@example.com' }) })
 
-  it('returns experiment data for known developer', async () => {
-    mockDbFound({
-      id: 'uuid-1', github_email: 'dev@viscap.ai', github_username: 'devviscap',
-      vidf_tag: 'v1', bundle_version: 'v1.0', sop_version: 'v1', sprint: '2026-04',
-      created_at: '2026-04-01T00:00:00Z', updated_at: '2026-04-01T00:00:00Z',
-    })
-    const res = await GET(makeRequest('dev@viscap.ai', VALID_KEY), { params: Promise.resolve({ email: 'dev@viscap.ai' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.tag).toBe('v1')
-    expect(body.bundle_version).toBe('v1.0')
-    expect(body.sop_version).toBe('v1')
-    expect(body.sprint).toBe('2026-04')
+    expect(body.version).toBe('v1')
+    expect(body.bundle_version).toBe(3)
+    expect(body.sprint).toBe('2026-07')
   })
 
-  it('auto-registers unknown developer with pre-vidf defaults', async () => {
-    mockDbNotFound()
-    const res = await GET(makeRequest('new@example.com', VALID_KEY), { params: Promise.resolve({ email: 'new@example.com' }) })
-    expect(res.status).toBe(200)
+  it('returns sprint from clickup_sprint_id when it contains a date', async () => {
+    const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
+    getSupabaseServiceClient.mockResolvedValue(
+      makeSupabaseMock({ clickupSprintId: 'sprint-2026-08-planning', startsAt: '2026-06-01T00:00:00Z' })
+    )
+
+    const req = makeRequest('dev@example.com')
+    const res = await GET(req, { params: Promise.resolve({ email: 'dev@example.com' }) })
+
     const body = await res.json()
-    expect(body.tag).toBe('pre')
-    expect(body.bundle_version).toBe('v0')
+    expect(body.sprint).toBe('2026-08')
   })
 
-  it('returns 500 on non-PGRST116 database error', async () => {
-    mockDbError()
-    const res = await GET(makeRequest('dev@viscap.ai', VALID_KEY), { params: Promise.resolve({ email: 'dev@viscap.ai' }) })
-    expect(res.status).toBe(500)
-    const body = await res.json()
-    expect(body.error).toBe('Database error')
-  })
+  it('falls back to current month when no sprint data', async () => {
+    const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
+    const mock = {
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: null }),
+      }),
+    }
+    getSupabaseServiceClient.mockResolvedValue(mock)
 
-  it('returns the commit tag string', async () => {
-    mockDbFound({
-      id: 'uuid-1', github_email: 'dev@viscap.ai', github_username: null,
-      vidf_tag: 'pre', bundle_version: 'v0', sop_version: 'v0', sprint: '2026-04',
-      created_at: '2026-04-01T00:00:00Z', updated_at: '2026-04-01T00:00:00Z',
-    })
-    const res = await GET(makeRequest('dev@viscap.ai', VALID_KEY), { params: Promise.resolve({ email: 'dev@viscap.ai' }) })
+    const req = makeRequest('dev@example.com')
+    const res = await GET(req, { params: Promise.resolve({ email: 'dev@example.com' }) })
+
     const body = await res.json()
-    expect(body.commit_tag).toBe('[vidf:pre | bundle:v0 | sop:v0 | sprint:2026-04]')
+    expect(body.version).toBe('v1')
+    expect(body.bundle_version).toBe(1) // default when no active version
+    expect(body.sprint).toMatch(/^\d{4}-\d{2}$/) // current month format
   })
 })

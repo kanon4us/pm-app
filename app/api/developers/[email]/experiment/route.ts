@@ -1,73 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 
-type RouteContext = { params: Promise<{ email: string }> }
+const EXPERIMENT_VERSION = 'v1'
 
-function getAuthKey(request: NextRequest): string | null {
-  const auth = request.headers.get('authorization')
-  if (!auth?.startsWith('Bearer ')) return null
-  return auth.slice(7)
-}
-
-export async function GET(request: NextRequest, context: RouteContext) {
-  const apiKey = getAuthKey(request)
-  if (!apiKey || apiKey !== process.env.VIDF_HOOK_API_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { email } = await context.params
-  const decodedEmail = decodeURIComponent(email)
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ email: string }> },
+) {
+  await params // resolve params — email not used in v1, tag context is global
 
   const supabase = await getSupabaseServiceClient()
 
-  const { data: existing, error } = await supabase
-    .from('developer_experiments')
-    .select('*')
-    .eq('github_email', decodedEmail)
-    .single()
+  const [{ data: activeVersion }, { data: openSprint }] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('bundle_prompt_versions') as any)
+      .select('version')
+      .eq('status', 'active')
+      .single(),
+    supabase
+      .from('sprints')
+      .select('clickup_sprint_id, starts_at')
+      .order('starts_at', { ascending: false })
+      .limit(1)
+      .single(),
+  ])
 
-  let record = existing
-
-  // Non-PGRST116 errors are real database errors — surface them
-  if (error && error.code !== 'PGRST116') {
-    console.error('[VIDF] developer_experiments lookup error:', error)
-    return NextResponse.json({ error: 'Database error' }, { status: 500 })
-  }
-
-  // PGRST116 = not found — auto-register with pre-VIDF defaults
-  if (!record) {
-    const sprint = new Date().toISOString().slice(0, 7)
-    const { data: created, error: upsertError } = await supabase
-      .from('developer_experiments')
-      .upsert({
-        github_email: decodedEmail,
-        vidf_tag: 'pre',
-        bundle_version: 'v0',
-        sop_version: 'v0',
-        sprint,
-      })
-      .select()
-      .single()
-
-    if (upsertError) {
-      console.error('[VIDF] developer_experiments upsert error:', upsertError)
-      return NextResponse.json({ error: 'Failed to register developer' }, { status: 500 })
-    }
-
-    record = created
-  }
-
-  if (!record) {
-    return NextResponse.json({ error: 'Failed to retrieve experiment data' }, { status: 500 })
-  }
-
-  const commitTag = `[vidf:${record.vidf_tag} | bundle:${record.bundle_version} | sop:${record.sop_version} | sprint:${record.sprint}]`
+  const sprintLabel = deriveSprintLabel(openSprint?.clickup_sprint_id, openSprint?.starts_at)
 
   return NextResponse.json({
-    tag: record.vidf_tag,
-    bundle_version: record.bundle_version,
-    sop_version: record.sop_version,
-    sprint: record.sprint,
-    commit_tag: commitTag,
+    version: EXPERIMENT_VERSION,
+    bundle_version: activeVersion?.version ?? 1,
+    sprint: sprintLabel,
   })
+}
+
+function deriveSprintLabel(sprintId: string | null | undefined, startsAt: string | null | undefined): string {
+  if (sprintId) {
+    const match = sprintId.match(/(\d{4})-(\d{2})/)
+    if (match) return `${match[1]}-${match[2]}`
+  }
+  if (startsAt) {
+    const d = new Date(startsAt)
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+  }
+  const now = new Date()
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
 }
