@@ -36,9 +36,10 @@ export function Tag({ children }: any) {
   return <span>{children}</span>
 }
 
-// Typography.Title renders an <h3>
+// Typography.Title renders an <h3>, Typography.Text renders a <span>
 export const Typography = {
   Title: ({ children, level }: any) => React.createElement(`h${level ?? 1}`, {}, children),
+  Text: ({ children }: any) => <span>{children}</span>,
 }
 
 // Card renders a <div> with its title and children
