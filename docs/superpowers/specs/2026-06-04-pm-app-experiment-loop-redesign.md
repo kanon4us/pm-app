@@ -136,7 +136,8 @@ CREATE TABLE bundle_prompt_versions (
   version INT NOT NULL UNIQUE,
   prompt_text TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
-  proposed_text TEXT,
+  proposed_prompt_text TEXT,
+  change_summary TEXT,
   activated_at TIMESTAMPTZ,
   approved_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -153,7 +154,7 @@ One row has `status = 'active'` at any time. Bundle generation always fetches th
 
 ### Route: `/feedback?token={signed-token}` (no auth, token-gated)
 
-The PM shares a signed URL at sprint close (via ClickUp comment or Slack). The token encodes the sprint ID and expires after 7 days. This prevents exposure of task names and bundle versions to unauthenticated visitors. Token is a HMAC-signed JWT using `FEEDBACK_TOKEN_SECRET` env var.
+The PM shares a signed URL at sprint close (via ClickUp comment or Slack). The token is a Node `crypto` HMAC containing `sprint_id` and `expires_at` (Unix timestamp, 7 days from generation), signed with `FEEDBACK_TOKEN_SECRET`. Validation: verify HMAC signature, then check `Date.now() < expires_at`. On failure: show "Invalid or expired link" — no task data returned.
 
 **Page flow:**
 1. Developer follows the PM-shared URL — token is validated server-side, sprint ID extracted. If token is missing or expired, page shows an "Invalid or expired link" message.
@@ -186,17 +187,17 @@ Empty until PM clicks "Analyze & Propose Changes".
 1. Fetch all `bundle_feedback` for active version
 2. Fetch active `bundle_prompt_versions` row
 3. Send to Claude: analyze feedback, return the **complete rewritten prompt text** + a bullet-point summary of what changed and why (no diff format — full text replacement avoids patch application errors)
-4. Store proposed text in `proposed_diff` column (repurposed as `proposed_text` — rename column in migration 017) on active version row
-5. Return proposed text + change summary to UI
+4. Store result in `proposed_prompt_text` and `change_summary` on the active version row
+5. Return both fields to UI
 
-Right panel shows the full proposed prompt text (scrollable) with the change summary above it. Two buttons: **Approve** / **Reject**.
+Right panel shows `change_summary` above a scrollable `proposed_prompt_text` block. Two buttons: **Approve** / **Reject**.
 
 ### `POST /api/experiments/approve-prompt`
-1. Set current active version `status = 'archived'`
-2. Insert new row: `prompt_text = proposed_text`, `status = 'active'`, `version = prev + 1`, `activated_at = now()`, `approved_by = session.user.email`
-3. Clear `proposed_text` on archived row (no longer needed)
+Single transaction:
+1. Set current active version `status = 'archived'`, clear `proposed_prompt_text` and `change_summary`
+2. Insert new row: `prompt_text = proposed_prompt_text`, `status = 'active'`, `version = prev + 1`, `activated_at = now()`, `approved_by = session.user.email`
 
-**Reject:** Clear `proposed_text` on current row, reset right panel.
+**Reject:** Clear `proposed_prompt_text` and `change_summary` on current row, reset right panel.
 
 ---
 
@@ -217,18 +218,21 @@ No auth. Returns:
 Derives from: active `bundle_prompt_versions` row, current open sprint (`sprints` table), hardcoded experiment version `v1`.
 
 ### `.github/workflows/vidf-validate.yml`
-Runs on `pull_request`. Uses `git log --no-merges` to exclude merge commits (conflict resolution merges from main would otherwise fail the check). Validates every non-merge commit in the PR branch contains tag pattern `[vidf:* | bundle:v* | sprint:*]`. Fails with clear message listing the offending commit SHAs. Only activates when `.vidf-enabled` file exists in repo root — opt-in to avoid breaking other Viscap repos.
+Runs on `pull_request`. Commit enumeration:
+```bash
+git log origin/main..HEAD --no-merges --oneline
+```
+This isolates only commits introduced in the feature branch, excluding merge commits from upstream. Validates each commit message against `[vidf:* | bundle:v* | sprint:*]`. Fails with a message listing offending commit SHAs. Only activates when `.vidf-enabled` file exists in repo root — opt-in to avoid breaking other Viscap repos.
 
 ---
 
 ## Implementation Order
 
-1. Webhook handler fix (blocking everything)
-2. Seed trigger configs (needed for queue to work)
-3. Trigger Config UI (PM-facing correctness)
-4. DB migrations — `bundle_feedback` + `bundle_prompt_versions` (foundation for 5 and 6)
-5. Sprint feedback UI
-6. Bundle prompt versioning flow
-7. VIDF git hook + GitHub Action
+1. **Webhook fix + Seed trigger configs — deploy together (atomic).** The webhook fix must not go live before valid `trigger_configs` rows exist. Deploy migration 014 + the seed script output + the updated route handler as a single unit. An empty config layer would silently discard incoming ClickUp events.
+2. Trigger Config UI (PM-facing correctness — no deploy dependency)
+3. DB migrations — `bundle_feedback` + `bundle_prompt_versions` (foundation for 4 and 5)
+4. Sprint feedback UI (depends on migration in step 3)
+5. Bundle prompt versioning flow (depends on migration in step 3)
+6. VIDF git hook + GitHub Action
 
-Each workstream ships as an independent PR.
+Each workstream ships as an independent PR except 1+2 (webhook + seed), which ship together.
