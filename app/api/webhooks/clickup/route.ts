@@ -14,28 +14,89 @@ export async function POST(req: NextRequest) {
 
   const payload = JSON.parse(rawBody) as Record<string, unknown>
   const event = parseWebhookEvent(payload)
-  if (!event) return NextResponse.json({ ok: true }) // Unsupported event — ack and ignore
+  if (!event) return NextResponse.json({ ok: true })
 
   const supabase = await getSupabaseServiceClient()
 
-  // Find the task by ClickUp task ID
+  if (event.type === 'taskMoved') {
+    if (!event.listId) return NextResponse.json({ ok: true })
+
+    // Resolve destination list by ClickUp list ID
+    const { data: destList } = await supabase
+      .from('lists')
+      .select('id')
+      .eq('clickup_list_id', event.listId)
+      .single()
+
+    if (!destList) {
+      await handleSlackHandoff(event.taskId, event.type, event.listId, supabase)
+      return NextResponse.json({ ok: true })
+    }
+
+    // Find or auto-import the task
+    let { data: task } = await supabase
+      .from('tasks')
+      .select('id, list_id, status')
+      .eq('clickup_task_id', event.taskId)
+      .single()
+
+    if (!task) {
+      const { data: token } = await supabase
+        .from('oauth_tokens').select('access_token').eq('provider', 'clickup').limit(1).single()
+      if (token) {
+        try {
+          const cuTask = await buildClickUpClient(token.access_token).getTask(event.taskId)
+          const { data: inserted } = await supabase.from('tasks').insert({
+            clickup_task_id: cuTask.id,
+            list_id: destList.id,
+            name: cuTask.name,
+            custom_fields: (cuTask.custom_fields ?? []) as unknown as Json,
+            synced_at: new Date().toISOString(),
+          }).select('id, list_id, status').single()
+          task = inserted
+        } catch (err) {
+          console.warn('[webhook] auto-import failed for task', event.taskId, err)
+        }
+      }
+      if (!task) return NextResponse.json({ ok: true })
+    }
+
+    // Update list_id only — preserve status
+    await supabase.from('tasks')
+      .update({ list_id: destList.id, synced_at: new Date().toISOString() })
+      .eq('id', task.id)
+
+    // Find trigger configs for this destination list
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: configs } = await (supabase.from('trigger_configs') as any)
+      .select('*')
+      .eq('destination_list_id', destList.id)
+
+    if (configs?.length) {
+      await supabase.from('trigger_queue').insert(
+        configs.map((config: { id: string }) => ({ task_id: task!.id, config_id: config.id, status: 'pending' as const }))
+      )
+    }
+
+    await handleSlackHandoff(event.taskId, event.type, event.listId, supabase)
+    return NextResponse.json({ ok: true })
+  }
+
+  // taskStatusUpdated — existing behavior unchanged
   let { data: task } = await supabase
     .from('tasks')
     .select('id, list_id, status')
     .eq('clickup_task_id', event.taskId)
     .single()
 
-  // Task not tracked yet — auto-import if it belongs to a subscribed list
   if (!task) {
     const { data: token } = await supabase
       .from('oauth_tokens').select('access_token').eq('provider', 'clickup').limit(1).single()
-
     if (token) {
       try {
         const cuTask = await buildClickUpClient(token.access_token).getTask(event.taskId)
         const { data: list } = await supabase
           .from('lists').select('id').eq('clickup_list_id', cuTask.list.id).single()
-
         if (list) {
           const { data: inserted } = await supabase.from('tasks').insert({
             clickup_task_id: cuTask.id,
@@ -51,39 +112,29 @@ export async function POST(req: NextRequest) {
         console.warn('[webhook] auto-import failed for task', event.taskId, err)
       }
     }
-
-    if (!task) return NextResponse.json({ ok: true }) // Not in a subscribed list
+    if (!task) return NextResponse.json({ ok: true })
   }
 
-  // Find matching trigger configs for this status transition
   const { data: configs } = await supabase
     .from('trigger_configs')
     .select('*')
     .eq('list_id', task.list_id)
     .eq('to_status', event.toStatus)
 
-  if (!configs?.length) {
-    // Update task status and return — no trigger configured
-    await supabase.from('tasks').update({ status: event.toStatus, synced_at: new Date().toISOString() }).eq('id', task.id)
-    await handleSlackHandoff(event.taskId, event.type, event.listId, supabase)
-    return NextResponse.json({ ok: true })
+  await supabase.from('tasks')
+    .update({ status: event.toStatus, synced_at: new Date().toISOString() })
+    .eq('id', task.id)
+
+  if (configs?.length) {
+    const triggers = configs
+      .filter((c) => !c.from_status || c.from_status === task!.status)
+      .map((config) => ({ task_id: task!.id, config_id: config.id, status: 'pending' as const }))
+    if (triggers.length > 0) {
+      await supabase.from('trigger_queue').insert(triggers)
+    }
   }
 
-  // Update task status
-  await supabase.from('tasks').update({ status: event.toStatus, synced_at: new Date().toISOString() }).eq('id', task.id)
-
-  // Enqueue one trigger per matching config (filter by from_status if set)
-  const triggers = configs
-    .filter((c) => !c.from_status || c.from_status === task.status)
-    .map((config) => ({ task_id: task.id, config_id: config.id, status: 'pending' as const }))
-
-  if (triggers.length > 0) {
-    await supabase.from('trigger_queue').insert(triggers)
-  }
-
-  // Parallel: check if this task is tracked in slack_issues for bot handoff
   await handleSlackHandoff(event.taskId, event.type, event.listId, supabase)
-
   return NextResponse.json({ ok: true })
 }
 
@@ -101,7 +152,6 @@ async function handleSlackHandoff(
 
   if (!slackIssue) return
 
-  // Ticket returned to New Tickets list → dev sent it back for more info
   const newTicketsListId = process.env.CLICKUP_NEW_TICKETS_LIST_ID
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const issue = slackIssue as any
@@ -123,7 +173,6 @@ async function handleSlackHandoff(
     return
   }
 
-  // Already handed off — don't re-trigger
   if (issue.handoff_status === 'taken') return
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
