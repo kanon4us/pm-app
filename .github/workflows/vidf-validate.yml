@@ -1,0 +1,50 @@
+name: VIDF Tag Validation
+
+on:
+  pull_request:
+    branches: ['**']
+
+jobs:
+  validate-vidf-tags:
+    name: Validate VIDF commit tags
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for .vidf-enabled
+        id: check_enabled
+        run: |
+          if [ -f ".vidf-enabled" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate VIDF tags on all feature commits
+        if: steps.check_enabled.outputs.enabled == 'true'
+        run: |
+          MISSING=()
+          while IFS= read -r line; do
+            SHA="${line%% *}"
+            MSG="${line#* }"
+            if ! echo "$MSG" | grep -qE '\[vidf:[^ ]+ \| bundle:v[0-9]+ \| sprint:[0-9]{4}-[0-9]{2}\]'; then
+              MISSING+=("$SHA: $MSG")
+            fi
+          done < <(git log origin/${{ github.base_ref }}..HEAD --no-merges --oneline)
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::The following commits are missing VIDF tags:"
+            for item in "${MISSING[@]}"; do
+              echo "  $item"
+            done
+            echo ""
+            echo "Expected format: [vidf:v1 | bundle:v3 | sprint:2026-06]"
+            echo "Install the VIDF hook: bash scripts/vidf-hook/install-git-hook.sh"
+            exit 1
+          fi
+
+          echo "✓ All commits contain valid VIDF tags."
