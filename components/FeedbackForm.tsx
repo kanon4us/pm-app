@@ -32,6 +32,15 @@ export function FeedbackForm({ tasks, token }: Props) {
 
   const handleSubmit = async () => {
     if (!email.trim()) { setError('Email is required'); return }
+    const allRated = tasks.every((t) =>
+      (ratings[t.id]?.kickoff ?? 0) >= 1 &&
+      (ratings[t.id]?.stories ?? 0) >= 1 &&
+      (ratings[t.id]?.skill ?? 0) >= 1
+    )
+    if (!allRated) {
+      setError('Please rate all three dimensions for each task before submitting.')
+      return
+    }
     setLoading(true)
     setError(null)
 
