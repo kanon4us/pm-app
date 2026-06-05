@@ -27,11 +27,16 @@ export async function GET(
 
   const sprintLabel = deriveSprintLabel(openSprint?.clickup_sprint_id, openSprint?.starts_at)
 
-  return NextResponse.json({
-    version: EXPERIMENT_VERSION,
-    bundle_version: activeVersion?.version ?? 1,
-    sprint: sprintLabel,
-  })
+  // This endpoint is intentionally unauthenticated — called from developer commit-msg hooks.
+  // Returns only global experiment metadata (no PII). Cache-Control prevents stale tags.
+  return NextResponse.json(
+    {
+      version: EXPERIMENT_VERSION,
+      bundle_version: activeVersion?.version ?? 1,
+      sprint: sprintLabel,
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }
 
 function deriveSprintLabel(sprintId: string | null | undefined, startsAt: string | null | undefined): string {

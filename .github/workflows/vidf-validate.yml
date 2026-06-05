@@ -34,7 +34,7 @@ jobs:
             if ! echo "$MSG" | grep -qE '\[vidf:[^ ]+ \| bundle:v[0-9]+ \| sprint:[0-9]{4}-[0-9]{2}\]'; then
               MISSING+=("$SHA: $MSG")
             fi
-          done < <(git log origin/${{ github.base_ref }}..HEAD --no-merges --oneline)
+          done < <(git log "origin/${{ github.base_ref }}"..HEAD --no-merges --oneline)
 
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "::error::The following commits are missing VIDF tags:"

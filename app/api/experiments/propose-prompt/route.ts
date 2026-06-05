@@ -34,21 +34,27 @@ export async function POST(_req: NextRequest) {
     `Response ${i + 1}: Kickoff=${f.kickoff_prompt_rating}/5, UserStories=${f.user_stories_rating}/5, DevSkill=${f.dev_skill_rating}/5${f.comments ? `, Comments: "${f.comments}"` : ''}`
   ).join('\n')
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 8192,
-    system: `You are analyzing developer feedback on AI-generated resource bundles to improve the prompt that generates them.
+  let message
+  try {
+    message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8192,
+      system: `You are analyzing developer feedback on AI-generated resource bundles to improve the prompt that generates them.
 The bundle consists of: spec.md, assessment.md, plan.md, dev-skill.md, qa-skill.md, user-stories.md, help-resources.md, kickoff-prompt.md.
 Your job is to propose targeted improvements to the bundle-generation prompt based on the feedback patterns.
 Respond with valid JSON only: { "proposed_prompt_text": "...", "change_summary": "..." }
 The change_summary should be a bulleted list of specific changes made and the reasoning for each.`,
-    messages: [
-      {
-        role: 'user',
-        content: `Current bundle-generation prompt:\n\n${activeVersion.prompt_text}\n\n---\n\nDeveloper feedback (${feedback.length} responses):\n\n${feedbackSummary}\n\nPropose specific, minimal improvements to the prompt. Return JSON only.`,
-      },
-    ],
-  })
+      messages: [
+        {
+          role: 'user',
+          content: `Current bundle-generation prompt:\n\n${activeVersion.prompt_text}\n\n---\n\nDeveloper feedback (${feedback.length} responses):\n\n${feedbackSummary}\n\nPropose specific, minimal improvements to the prompt. Return JSON only.`,
+        },
+      ],
+    })
+  } catch (err) {
+    console.error('[propose-prompt] Anthropic API error:', err)
+    return NextResponse.json({ error: 'Failed to call Claude API' }, { status: 500 })
+  }
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
   let parsed: { proposed_prompt_text: string; change_summary: string }

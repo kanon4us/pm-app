@@ -44,7 +44,12 @@ export async function POST(_req: NextRequest) {
     })
 
   if (insertError) {
-    return NextResponse.json({ error: 'Failed to insert new version' }, { status: 500 })
+    // Compensate: restore the archived version to active so we don't lose the active prompt
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('bundle_prompt_versions') as any)
+      .update({ status: 'active' })
+      .eq('id', activeVersion.id)
+    return NextResponse.json({ error: 'Failed to insert new version — active version restored' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, new_version: activeVersion.version + 1 })
