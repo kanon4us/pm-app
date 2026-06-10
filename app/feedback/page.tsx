@@ -1,5 +1,4 @@
-import { Layout, Typography } from 'antd'
-import { FeedbackForm } from '@/components/FeedbackForm'
+import { FeedbackView } from '@/components/FeedbackView'
 import { verifyFeedbackToken } from '@/lib/feedback/token'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 
@@ -11,11 +10,7 @@ export default async function FeedbackPage({
   const { token } = await searchParams
 
   if (!token) {
-    return (
-      <Layout style={{ minHeight: '100vh', background: '#010409', padding: '48px 32px' }}>
-        <Typography.Text style={{ color: '#f85149' }}>Invalid or expired link.</Typography.Text>
-      </Layout>
-    )
+    return <FeedbackView error="Invalid or expired link." />
   }
 
   let sprintId: string
@@ -23,11 +18,7 @@ export default async function FeedbackPage({
     const payload = verifyFeedbackToken(token)
     sprintId = payload.sprint_id
   } catch {
-    return (
-      <Layout style={{ minHeight: '100vh', background: '#010409', padding: '48px 32px' }}>
-        <Typography.Text style={{ color: '#f85149' }}>Invalid or expired link.</Typography.Text>
-      </Layout>
-    )
+    return <FeedbackView error="Invalid or expired link." />
   }
 
   const supabase = await getSupabaseServiceClient()
@@ -58,21 +49,5 @@ export default async function FeedbackPage({
       }
     })
 
-  return (
-    <Layout style={{ minHeight: '100vh', background: '#010409', padding: '48px 32px', maxWidth: 800 }}>
-      <Typography.Title level={3} style={{ color: '#e6edf3', marginBottom: 4 }}>
-        Sprint Bundle Feedback
-      </Typography.Title>
-      <Typography.Text style={{ color: '#8b949e', display: 'block', marginBottom: 32 }}>
-        Rate the resource bundles from this sprint. Your feedback improves future bundles.
-      </Typography.Text>
-      {formTasks.length === 0 ? (
-        <Typography.Text style={{ color: '#8b949e' }}>
-          No bundled tasks found for this sprint.
-        </Typography.Text>
-      ) : (
-        <FeedbackForm tasks={formTasks} token={token} />
-      )}
-    </Layout>
-  )
+  return <FeedbackView tasks={formTasks} token={token} />
 }

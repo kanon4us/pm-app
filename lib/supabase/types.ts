@@ -55,9 +55,9 @@ export interface Database {
         Relationships: []
       }
       trigger_configs: {
-        Row: { id: string; list_id: string; from_status: string | null; to_status: string; pm_agent_action: string; write_back_order: string[]; write_back_config: Json; on_failure: 'continue' | 'stop'; created_at: string }
-        Insert: { id?: string; list_id: string; to_status: string; pm_agent_action: string; from_status?: string | null; write_back_order?: string[]; write_back_config?: Json; on_failure?: 'continue' | 'stop' }
-        Update: { to_status?: string; pm_agent_action?: string; from_status?: string | null; write_back_order?: string[]; write_back_config?: Json; on_failure?: 'continue' | 'stop' }
+        Row: { id: string; list_id: string; destination_list_id: string | null; from_status: string | null; to_status: string | null; pm_agent_action: string; write_back_order: string[]; write_back_config: Json; on_failure: 'continue' | 'stop'; created_at: string }
+        Insert: { id?: string; list_id: string; destination_list_id?: string | null; to_status?: string | null; pm_agent_action: string; from_status?: string | null; write_back_order?: string[]; write_back_config?: Json; on_failure?: 'continue' | 'stop' }
+        Update: { destination_list_id?: string | null; to_status?: string | null; pm_agent_action?: string; from_status?: string | null; write_back_order?: string[]; write_back_config?: Json; on_failure?: 'continue' | 'stop' }
         Relationships: []
       }
       trigger_queue: {

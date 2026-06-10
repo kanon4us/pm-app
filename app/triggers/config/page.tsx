@@ -1,5 +1,4 @@
-import { Layout, Typography } from 'antd'
-import { TriggerConfigTable } from '@/components/TriggerConfigTable'
+import { TriggerConfigView } from '@/components/TriggerConfigView'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { auth } from '@/lib/auth'
 import type { Tables } from '@/lib/supabase/types'
@@ -38,15 +37,5 @@ export default async function TriggerConfigPage() {
     }
   }
 
-  return (
-    <Layout style={{ minHeight: '100vh', background: '#010409', padding: '24px 32px' }}>
-      <Typography.Title level={3} style={{ color: '#e6edf3', marginBottom: 4 }}>
-        Trigger Config
-      </Typography.Title>
-      <Typography.Text style={{ color: '#8b949e', display: 'block', marginBottom: 24 }}>
-        Automatic actions triggered when tasks are moved between ClickUp lists.
-      </Typography.Text>
-      <TriggerConfigTable configs={configs} />
-    </Layout>
-  )
+  return <TriggerConfigView configs={configs} />
 }
