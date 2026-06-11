@@ -19,6 +19,7 @@ export function AppNav() {
           { key: '/triggers/config', label: <Link href="/triggers/config">Trigger Config</Link> },
           { key: '/experiments', label: <Link href="/experiments">Experiments</Link> },
           { key: '/setup', label: <Link href="/setup">Setup</Link> },
+          { key: '/settings', label: <Link href="/settings">Settings</Link> },
         ]}
       />
     </Layout.Sider>
