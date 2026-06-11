@@ -12,6 +12,9 @@ const PUBLIC_PATHS = [
   '/api/webhooks/slack',
   '/api/cron/slack-stale-check',
   '/api/cron/sop-analysis',
+  // /api/bot/* is authenticated by BOT_JWT_SECRET (lib/bot/auth.ts), not by session —
+  // requests come from viscap-ai-cloud-functions with a signed HS256 JWT.
+  '/api/bot',
 ]
 
 function isSafeRedirect(url: string): boolean {
