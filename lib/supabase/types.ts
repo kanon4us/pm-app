@@ -8,6 +8,17 @@ export interface Database {
         Args: { mappings: Record<string, string> }
         Returns: number
       }
+      create_user_story_with_prototype: {
+        Args: {
+          p_workflow_id: string
+          p_title: string
+          p_as_a: string
+          p_i_want: string
+          p_so_that: string
+          p_figma_url: string
+        }
+        Returns: string
+      }
     }
     Tables: {
       users: {

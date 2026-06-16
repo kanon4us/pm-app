@@ -3,15 +3,22 @@ import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 
 // GET /api/workflows - List all workflows
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = await getSupabaseServiceClient()
 
+  // Check for summary mode (lightweight for dropdowns)
+  const { searchParams } = new URL(request.url)
+  const selectFields = searchParams.get('select') || '*'
+  const summaryMode = searchParams.get('summary') === 'true'
+
+  const fields = summaryMode ? 'id, name' : selectFields
+
   const { data: workflows, error } = await supabase
     .from('workflows_registry')
-    .select('*')
+    .select(fields)
     .order('name', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
