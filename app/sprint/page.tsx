@@ -591,11 +591,14 @@ export default function SprintPage() {
 
   function handleApproveScores() {
     if (!conversation) return
+    // finalizeProposal can be null in scoring_review (e.g. reached via "Skip to
+    // roles", or a finalize response without proposal fields). Fall back to the
+    // conversation's top-level proposal and always advance — a previous "null
+    // guard" early-return here made the Approve button silently do nothing.
     const fp = conversation.finalizeProposal
-    if (!fp) return
-    setRoleSelections(setupRolesFromProposal(fp.proposedRoles ?? []))
-    setConfirmedEffort(fp.proposedEffort?.days ?? confirmedEffort)
-    setConfirmedRisk(fp.proposedRisk?.multiplier ?? confirmedRisk)
+    setRoleSelections(setupRolesFromProposal(fp?.proposedRoles ?? []))
+    setConfirmedEffort(fp?.proposedEffort?.days ?? conversation.proposedEffort?.days ?? confirmedEffort)
+    setConfirmedRisk(fp?.proposedRisk?.multiplier ?? conversation.proposedRisk?.multiplier ?? confirmedRisk)
     setRippleEffect(null)
     setCritiqueText('')
     setAssessPhase('roles')
