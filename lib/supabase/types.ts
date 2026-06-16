@@ -42,10 +42,10 @@ export interface Database {
           name: string; status: string; custom_fields: Json; fvi_score: number | null
           cost_effort: number | null; cost_risk: number | null; inverted_influence: number | null
           git_branch: string | null; is_feature_flagged: boolean; synced_at: string | null; created_at: string
-          kickoff_gate_overrides: Json | null; mapped_fields: Json
+          kickoff_gate_overrides: Json | null; mapped_fields: Json; is_archived: boolean
         }
-        Insert: { id?: string; clickup_task_id: string; list_id: string; name: string; status?: string; custom_fields?: Json; kickoff_gate_overrides?: Json | null; mapped_fields?: Json }
-        Update: { status?: string; custom_fields?: Json; fvi_score?: number | null; cost_effort?: number | null; cost_risk?: number | null; inverted_influence?: number | null; git_branch?: string | null; is_feature_flagged?: boolean; sprint_id?: string | null; synced_at?: string | null; kickoff_gate_overrides?: Json | null; mapped_fields?: Json }
+        Insert: { id?: string; clickup_task_id: string; list_id: string; name: string; status?: string; custom_fields?: Json; kickoff_gate_overrides?: Json | null; mapped_fields?: Json; is_archived?: boolean }
+        Update: { status?: string; custom_fields?: Json; fvi_score?: number | null; cost_effort?: number | null; cost_risk?: number | null; inverted_influence?: number | null; git_branch?: string | null; is_feature_flagged?: boolean; sprint_id?: string | null; synced_at?: string | null; kickoff_gate_overrides?: Json | null; mapped_fields?: Json; is_archived?: boolean }
         Relationships: []
       }
       sprints: {

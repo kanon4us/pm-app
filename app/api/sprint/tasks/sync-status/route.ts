@@ -19,7 +19,7 @@ export async function POST() {
 
   const { data: tasks } = await supabase
     .from('tasks')
-    .select('id, clickup_task_id, list_id, status')
+    .select('id, clickup_task_id, list_id, status, is_archived')
 
   if (!tasks || tasks.length === 0) return NextResponse.json({ updated: 0 })
 
@@ -48,8 +48,28 @@ export async function POST() {
     })
   )
 
+  // Detect archived tasks (present in DB but missing from ClickUp response)
+  const activeTaskIds = new Set(statusMap.keys())
+  const archivedTasks = tasks.filter(t => !activeTaskIds.has(t.clickup_task_id))
+  const archivedIds = archivedTasks.map(t => t.id)
+
+  // Detect reactivated tasks (were archived, now back in ClickUp)
+  const reactivatedTasks = tasks.filter(t => 
+    activeTaskIds.has(t.clickup_task_id) && t.is_archived
+  )
+  const reactivatedIds = reactivatedTasks.map(t => t.id)
+
+  // Batch update archived status
+  if (archivedIds.length > 0) {
+    await supabase.from('tasks').update({ is_archived: true }).in('id', archivedIds)
+  }
+
+  if (reactivatedIds.length > 0) {
+    await supabase.from('tasks').update({ is_archived: false }).in('id', reactivatedIds)
+  }
+
   // Update only tasks whose status changed
-  let updated = 0
+  let updated = archivedIds.length + reactivatedIds.length
   await Promise.all(
     tasks.map(async (t) => {
       const newStatus = statusMap.get(t.clickup_task_id)

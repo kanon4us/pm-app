@@ -10,7 +10,7 @@ export async function GET() {
   const supabase = await getSupabaseServiceClient()
 
   const [{ data: tasks }, { data: lists }] = await Promise.all([
-    supabase.from('tasks').select('id, clickup_task_id, name, status, sprint_id, fvi_score, cost_effort, cost_risk, inverted_influence, is_feature_flagged, git_branch, custom_fields, list_id').order('created_at', { ascending: true }),
+    supabase.from('tasks').select('id, clickup_task_id, name, status, sprint_id, fvi_score, cost_effort, cost_risk, inverted_influence, is_feature_flagged, git_branch, custom_fields, list_id, is_archived').eq('is_archived', false).order('created_at', { ascending: true }),
     supabase.from('lists').select('id, name'),
   ])
 
