@@ -9,10 +9,16 @@ export async function GET() {
 
   const supabase = await getSupabaseServiceClient()
 
-  const [{ data: tasks }, { data: lists }] = await Promise.all([
+  const [{ data: tasks, error: tasksError }, { data: lists, error: listsError }] = await Promise.all([
     supabase.from('tasks').select('id, clickup_task_id, name, status, sprint_id, fvi_score, cost_effort, cost_risk, inverted_influence, is_feature_flagged, git_branch, custom_fields, list_id, is_archived').eq('is_archived', false).order('created_at', { ascending: true }),
     supabase.from('lists').select('id, name'),
   ])
+
+  // Surface DB errors instead of silently returning an empty list. (A swallowed
+  // "column does not exist" error here previously made the Sprint Planner show
+  // zero tasks when the is_archived migration had not been applied.)
+  if (tasksError) return NextResponse.json({ error: tasksError.message }, { status: 500 })
+  if (listsError) return NextResponse.json({ error: listsError.message }, { status: 500 })
 
   const listNames = new Map((lists ?? []).map((l) => [l.id, l.name]))
 

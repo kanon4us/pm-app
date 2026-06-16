@@ -67,8 +67,22 @@ export function buildClickUpClient(token: string) {
     getSpaces: (teamId: string) =>
       clickupFetch<{ spaces: ClickUpSpace[] }>(token, `/team/${teamId}/space?archived=false`).then((r) => r.spaces),
 
-    getTasks: (listId: string) =>
-      clickupFetch<{ tasks: ClickUpTask[] }>(token, `/list/${listId}/task?archived=false`).then((r) => r.tasks),
+    // ClickUp returns at most 100 tasks per page. Paginate to completion —
+    // callers rely on this being the COMPLETE active task set (e.g. sync
+    // detects archived tasks by their absence, so a partial page would wrongly
+    // flag real tasks as archived).
+    getTasks: async (listId: string): Promise<ClickUpTask[]> => {
+      const all: ClickUpTask[] = []
+      for (let page = 0; page < 200; page++) {
+        const res = await clickupFetch<{ tasks: ClickUpTask[]; last_page?: boolean }>(
+          token,
+          `/list/${listId}/task?archived=false&page=${page}`
+        )
+        all.push(...res.tasks)
+        if (res.last_page || res.tasks.length === 0) break
+      }
+      return all
+    },
 
     getTask: (taskId: string) =>
       clickupFetch<ClickUpTask>(token, `/task/${taskId}`),

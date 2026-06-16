@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
+import { detectArchivalChanges } from '@/lib/clickup/archive-detection'
 
 // POST /api/sprint/tasks/sync-status — refresh task statuses from ClickUp into Supabase
 export async function POST() {
@@ -33,8 +34,11 @@ export async function POST() {
     byList.set(t.list_id, group)
   }
 
-  // Build a clickup_task_id → new status map
+  // Build a clickup_task_id → new status map, tracking which lists we actually
+  // fetched successfully. A failed list fetch must NOT cause its tasks to be
+  // treated as archived (see archival logic below).
   const statusMap = new Map<string, string>()
+  const fetchedListIds = new Set<string>()
   await Promise.all(
     [...byList.keys()].map(async (listId) => {
       try {
@@ -42,22 +46,19 @@ export async function POST() {
         for (const ct of cuTasks) {
           statusMap.set(ct.id, ct.status.status)
         }
+        fetchedListIds.add(listId)
       } catch {
-        // Non-fatal: skip lists that fail (e.g. deleted lists)
+        // Non-fatal: skip lists that fail (e.g. deleted lists). Their tasks are
+        // intentionally left untouched rather than being marked archived.
       }
     })
   )
 
-  // Detect archived tasks (present in DB but missing from ClickUp response)
+  // Decide archival/reactivation. Only tasks whose list was fetched
+  // successfully can be archived — see detectArchivalChanges for why a partial
+  // fetch must not mass-archive (and blank the Sprint Planner).
   const activeTaskIds = new Set(statusMap.keys())
-  const archivedTasks = tasks.filter(t => !activeTaskIds.has(t.clickup_task_id))
-  const archivedIds = archivedTasks.map(t => t.id)
-
-  // Detect reactivated tasks (were archived, now back in ClickUp)
-  const reactivatedTasks = tasks.filter(t => 
-    activeTaskIds.has(t.clickup_task_id) && t.is_archived
-  )
-  const reactivatedIds = reactivatedTasks.map(t => t.id)
+  const { archivedIds, reactivatedIds } = detectArchivalChanges({ tasks, activeTaskIds, fetchedListIds })
 
   // Batch update archived status
   if (archivedIds.length > 0) {
