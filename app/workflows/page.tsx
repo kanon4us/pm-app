@@ -30,7 +30,8 @@ export default function WorkflowsPage() {
     setLoading(true)
     try {
       const res = await apiFetch('/api/workflows')
-      setWorkflows(res.workflows)
+      const data = await res.json()
+      setWorkflows(data.workflows)
     } catch (error: any) {
       message.error(`Failed to load workflows: ${error.message}`)
     } finally {

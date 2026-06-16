@@ -5,11 +5,12 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 // PUT /api/workflows/[id] - Update a workflow
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { id } = await params
   const body = await request.json()
   const { name, description, sop_impacted, education_impacted, scribehow_impacted, is_deprecated } = body
 
@@ -30,7 +31,7 @@ export async function PUT(
   const { data: workflow, error } = await supabase
     .from('workflows_registry')
     .update(updateData)
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single()
 
@@ -51,18 +52,19 @@ export async function PUT(
 // DELETE /api/workflows/[id] - Delete a workflow
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { id } = await params
   const supabase = await getSupabaseServiceClient()
 
   // Check if workflow is referenced in assessments
   const { data: references, error: refError } = await supabase
     .from('assessment_workflows')
     .select('id')
-    .eq('workflow_id', params.id)
+    .eq('workflow_id', id)
     .limit(1)
 
   if (refError) return NextResponse.json({ error: refError.message }, { status: 500 })
@@ -77,7 +79,7 @@ export async function DELETE(
   const { error } = await supabase
     .from('workflows_registry')
     .delete()
-    .eq('id', params.id)
+    .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
