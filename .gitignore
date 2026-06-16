@@ -46,3 +46,6 @@ next-env.d.ts
 
 # git worktrees
 .worktrees/
+
+# Hermes agent sandbox temp dirs
+.hermes-tmp.*/
