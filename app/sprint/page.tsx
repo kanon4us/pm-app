@@ -13,6 +13,7 @@ import { AssessmentButton } from '@/app/sprint/components/AssessmentButton'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
 import { vaultBranchName } from '@/lib/github/vault'
 import { FREQ_LABELS } from '@/lib/fvi'
+import { resolveApproveScores } from '@/lib/sprint/approve-scores'
 
 // ── Assessment types ──────────────────────────────────────────────────────────
 
@@ -590,18 +591,21 @@ export default function SprintPage() {
   }
 
   function handleApproveScores() {
-    if (!conversation) return
-    // finalizeProposal can be null in scoring_review (e.g. reached via "Skip to
-    // roles", or a finalize response without proposal fields). Fall back to the
-    // conversation's top-level proposal and always advance — a previous "null
-    // guard" early-return here made the Approve button silently do nothing.
-    const fp = conversation.finalizeProposal
-    setRoleSelections(setupRolesFromProposal(fp?.proposedRoles ?? []))
-    setConfirmedEffort(fp?.proposedEffort?.days ?? conversation.proposedEffort?.days ?? confirmedEffort)
-    setConfirmedRisk(fp?.proposedRisk?.multiplier ?? conversation.proposedRisk?.multiplier ?? confirmedRisk)
+    // resolveApproveScores always advances to the roles phase when a
+    // conversation exists — including when finalizeProposal is null (a reachable
+    // scoring_review state). A previous "null guard" early-return here made the
+    // Approve button silently do nothing; see lib/sprint/approve-scores.ts.
+    const action = resolveApproveScores(conversation, {
+      effortDays: confirmedEffort,
+      riskMultiplier: confirmedRisk,
+    })
+    if (action.kind === 'noop') return
+    setRoleSelections(setupRolesFromProposal(action.roles))
+    setConfirmedEffort(action.effortDays)
+    setConfirmedRisk(action.riskMultiplier)
     setRippleEffect(null)
     setCritiqueText('')
-    setAssessPhase('roles')
+    setAssessPhase(action.phase)
   }
 
   async function archiveRun(conversationId: string) {
