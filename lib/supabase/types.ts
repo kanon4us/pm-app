@@ -131,6 +131,24 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      workflow_relationships: {
+        Row: { workflow_id: string; related_workflow_id: string; relationship_type: 'related' | 'depends_on' | 'enables'; created_at: string }
+        Insert: { workflow_id: string; related_workflow_id: string; relationship_type?: 'related' | 'depends_on' | 'enables' }
+        Update: never
+        Relationships: []
+      }
+      workflow_user_stories: {
+        Row: { id: string; workflow_id: string; title: string; as_a: string; i_want: string; so_that: string; display_order: number; created_at: string; updated_at: string }
+        Insert: { id?: string; workflow_id: string; title: string; as_a: string; i_want: string; so_that: string; display_order?: number }
+        Update: { title?: string; as_a?: string; i_want?: string; so_that?: string; display_order?: number }
+        Relationships: []
+      }
+      workflow_story_prototypes: {
+        Row: { id: string; user_story_id: string; variant_name: string; figma_url: string | null; figma_frame_id: string | null; figma_thumbnail_url: string | null; description: string | null; is_primary: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; user_story_id: string; variant_name: string; figma_url?: string | null; figma_frame_id?: string | null; figma_thumbnail_url?: string | null; description?: string | null; is_primary?: boolean }
+        Update: { variant_name?: string; figma_url?: string | null; figma_frame_id?: string | null; figma_thumbnail_url?: string | null; description?: string | null; is_primary?: boolean }
+        Relationships: []
+      }
       bundle_generations: {
         Row: { id: string; task_id: string; conversation_id: string; generated_by: string; vault_branch: string | null; vault_spec_url: string | null; files_written: string[]; clickup_fields_written: string[]; clickup_comment_posted: boolean; error_details: Json | null; created_at: string; completed_at: string | null }
         Insert: { id?: string; task_id: string; conversation_id: string; generated_by: string; vault_branch?: string | null; vault_spec_url?: string | null; files_written?: string[]; clickup_fields_written?: string[]; clickup_comment_posted?: boolean; error_details?: Json | null }
