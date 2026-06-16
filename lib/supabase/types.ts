@@ -108,6 +108,18 @@ export interface Database {
         Update: { status?: 'in_progress' | 'complete' | 'abandoned'; proposed_scores?: Json | null; final_scores?: Json | null; effort?: number | null; risk?: number | null; fvi_score?: number | null; vault_spec_content?: string | null; affected_workflows?: Json | null; is_archived?: boolean; completed_at?: string | null }
         Relationships: []
       }
+      workflows_registry: {
+        Row: { id: string; name: string; description: string | null; sop_impacted: boolean; education_impacted: boolean; scribehow_impacted: boolean; is_deprecated: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; name: string; description?: string | null; sop_impacted?: boolean; education_impacted?: boolean; scribehow_impacted?: boolean; is_deprecated?: boolean }
+        Update: { name?: string; description?: string | null; sop_impacted?: boolean; education_impacted?: boolean; scribehow_impacted?: boolean; is_deprecated?: boolean }
+        Relationships: []
+      }
+      assessment_workflows: {
+        Row: { id: string; assessment_id: string; workflow_id: string; created_at: string }
+        Insert: { id?: string; assessment_id: string; workflow_id: string }
+        Update: never
+        Relationships: []
+      }
       bundle_generations: {
         Row: { id: string; task_id: string; conversation_id: string; generated_by: string; vault_branch: string | null; vault_spec_url: string | null; files_written: string[]; clickup_fields_written: string[]; clickup_comment_posted: boolean; error_details: Json | null; created_at: string; completed_at: string | null }
         Insert: { id?: string; task_id: string; conversation_id: string; generated_by: string; vault_branch?: string | null; vault_spec_url?: string | null; files_written?: string[]; clickup_fields_written?: string[]; clickup_comment_posted?: boolean; error_details?: Json | null }
