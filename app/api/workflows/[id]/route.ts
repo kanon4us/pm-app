@@ -16,7 +16,7 @@ export async function PUT(
 
   const supabase = await getSupabaseServiceClient()
 
-  const updateData: Record<string, any> = {}
+  const updateData: Record<string, string | boolean | null> = {}
   if (name !== undefined) updateData.name = name.trim()
   if (description !== undefined) updateData.description = description?.trim() || null
   if (sop_impacted !== undefined) updateData.sop_impacted = sop_impacted

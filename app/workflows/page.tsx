@@ -7,6 +7,8 @@ import { apiFetch } from '@/lib/fetch'
 const { Content } = Layout
 const { Title } = Typography
 
+const errMsg = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
 interface Workflow {
   id: string
   name: string
@@ -32,8 +34,8 @@ export default function WorkflowsPage() {
       const res = await apiFetch('/api/workflows')
       const data = await res.json()
       setWorkflows(data.workflows)
-    } catch (error: any) {
-      message.error(`Failed to load workflows: ${error.message}`)
+    } catch (error) {
+      message.error(`Failed to load workflows: ${errMsg(error)}`)
     } finally {
       setLoading(false)
     }
@@ -77,8 +79,8 @@ export default function WorkflowsPage() {
 
       setModalVisible(false)
       loadWorkflows()
-    } catch (error: any) {
-      message.error(`Failed to save workflow: ${error.message}`)
+    } catch (error) {
+      message.error(`Failed to save workflow: ${errMsg(error)}`)
     }
   }
 
@@ -89,8 +91,8 @@ export default function WorkflowsPage() {
       })
       message.success('Workflow deleted successfully')
       loadWorkflows()
-    } catch (error: any) {
-      message.error(`Failed to delete workflow: ${error.message}`)
+    } catch (error) {
+      message.error(`Failed to delete workflow: ${errMsg(error)}`)
     }
   }
 
@@ -102,8 +104,8 @@ export default function WorkflowsPage() {
       })
       message.success(workflow.is_deprecated ? 'Workflow reactivated' : 'Workflow deprecated')
       loadWorkflows()
-    } catch (error: any) {
-      message.error(`Failed to update workflow: ${error.message}`)
+    } catch (error) {
+      message.error(`Failed to update workflow: ${errMsg(error)}`)
     }
   }
 
@@ -128,7 +130,7 @@ export default function WorkflowsPage() {
     {
       title: 'Impacts',
       key: 'impacts',
-      render: (_: any, record: Workflow) => (
+      render: (_: unknown, record: Workflow) => (
         <Space size={4}>
           {record.sop_impacted && <Tag color="blue">SOP</Tag>}
           {record.education_impacted && <Tag color="purple">Education</Tag>}
@@ -139,7 +141,7 @@ export default function WorkflowsPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: Workflow) => (
+      render: (_: unknown, record: Workflow) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit

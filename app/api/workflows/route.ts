@@ -9,12 +9,15 @@ export async function GET(request: NextRequest) {
 
   const supabase = await getSupabaseServiceClient()
 
-  // Check for summary mode (lightweight for dropdowns)
+  // Summary mode returns a lightweight projection for dropdowns; otherwise
+  // return an explicit column allowlist. The projection is never taken from
+  // client input to avoid exposing arbitrary/embedded columns.
   const { searchParams } = new URL(request.url)
-  const selectFields = searchParams.get('select') || '*'
   const summaryMode = searchParams.get('summary') === 'true'
 
-  const fields = summaryMode ? 'id, name' : selectFields
+  const fields = summaryMode
+    ? 'id, name'
+    : 'id, name, description, sop_impacted, education_impacted, scribehow_impacted, is_deprecated, created_at, updated_at'
 
   const { data: workflows, error } = await supabase
     .from('workflows_registry')
