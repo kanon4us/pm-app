@@ -33,10 +33,12 @@ Existing tooling (`scripts/check-vault-sources.py`, `scripts/backfill_readme_fro
 - **Question generation** per stable doc, driven by deterministic audit heuristics + LLM phrasing.
 - **Author routing** and **Slack Block Kit** delivery of questions.
 - **Answer handling** → link-safe changes committed to a per-author weekly branch → one consolidated PR.
-- Document lifecycle state recorded **in frontmatter** (`last_reviewed`, `review_status`).
+- Document lifecycle state recorded **in frontmatter** (`last_reviewed`, `review_status`, `audience`).
+- **Support-first protection** — docs in support-critical paths get escalated heuristics (§8), an `audience` tag is *captured* during review (§9), and unanswered support docs are escalated, not silently rolled over (§11/§13).
 
 ### Out of scope (deferred)
 - **Approve → branch / cascade / ClickUp wiring** when an inbox RFC is approved as a future feature → **Piece 2 (Inbox Triage & Approval)**. v1 only *tags* the doc and records the decision.
+- **Consuming `audience`** — the support/assessment retrieval agent actually *restricting its search* by `audience` → **Piece 3**. Piece 1 only *captures* the tag and *alerts* on stale support docs; it does not change what any agent retrieves.
 - **Assessment runtime scoping** (narrowing what each assessment loads) → **Piece 3**.
 - **Auto-merge** of overlapping docs. v1 may *propose* a merge target and stage a draft, but a human performs/approves the merge in the PR. No blind content merges.
 - Net-new full-vault one-time prune as a separate batch (the weekly cadence subsumes it over time).
@@ -108,6 +110,14 @@ Deterministic audit heuristics decide *which* questions are worth asking; the LL
 
 Most carry a deterministic button action; "Reply with text" is the LLM escape hatch.
 
+### Support Path Tier
+
+Not all doc debt carries equal risk: an orphan in `Dev Docs/` is clutter, but a stale or duplicate doc in a **support-critical path** directly degrades the answers Claude gives on live tickets. The audit module (`lib/vault/audit.ts`) carries a configurable `support_critical_paths` list — default `SOPs/`, `Manual/`, `Feature Overview/` (the last is borderline product-doc; included by default, easily removed). Docs under these paths get **escalated** treatment:
+
+- **Overlap → forced merge variant.** Any duplicate/overlap detected inside a support-critical path skips the soft "merge or distinct?" phrasing for the aggressive **"Merge into canonical"** question (resolved via the merge modal, §10).
+- **Staleness → support-framed phrasing.** A support-critical doc that is stale (or has an empty `last_reviewed`) is phrased for clarity over open-endedness: instead of *"Is this needed?"*, the card reads *"Claude uses this document to answer live support tickets. Is this protocol still accurate?"*
+- **Untagged audience → required tag.** A doc in `SOPs/` or `Manual/` missing an `audience` field (§9) triggers a required **[Tag as Support] / [Tag as Engineering]** action on its card. (Still subject to the DM cap / digest path, §10 — it cannot flood.)
+
 ## 9. State model
 
 **Durable document state → frontmatter** (read identically by the PM app and the Python audit):
@@ -117,8 +127,11 @@ Most carry a deterministic button action; "Reply with text" is the LLM escape ha
 review_status: stable        # stable | reviewed | snoozed | active
 last_reviewed: 2026-06-16    # date the author last answered for this doc
 owner: chad                  # optional; routes future questions
+audience: support            # support | engineering | internal — the retrieval boundary piece 3 consumes
 ---
 ```
+
+`audience` is *captured* here (via the required tag action in §8 for support-critical docs) but only *consumed* in piece 3, where the support agent restricts retrieval by it (§15 records the working policy).
 
 **Ephemeral interaction state → a disposable store** (`vault_review_sessions` table or KV): maps a Slack interaction (`block_id` / message ts) → doc path → author → the shared weekly branch → open question, plus the doc's **blob SHA at question-generation time** (the optimistic-lock baseline, §13) and each author's **"done" flag**. Cleared when the weekly PR opens. This is UI plumbing for a stateless webhook, *not* a shadow copy of vault state.
 
@@ -146,12 +159,17 @@ One Block Kit card per stable doc, sent as a DM:
 
 **DM volume cap.** At most **5 individual cards per author per cycle** (configurable). Any overflow collapses into a single **digest card** listing the remaining docs, each line carrying **one button that opens a Slack modal** for that doc (so the digest is actionable, not a dead-end). A PM-app triage view remains an optional stretch, not required for v1.
 
+**Merge modal (overlap/duplicate docs).** The modal's larger surface handles the multi-file merge case the inline card can't. It renders the conflicting file names as references and offers targeted resolutions:
+- **[ Keep both — distinct scopes ]** — keeps both files and sets their `audience` fields so they don't collide in retrieval (e.g. one `support`, one `engineering`).
+- **[ Mark live target as canonical ]** — keeps the canonical doc and marks the messy draft `status: legacy` (or `orphan`) so the support bot ignores it; optionally stages a content-merge draft for human completion in the PR (no blind merge, per §3).
+
 ## 11. PR strategy
 
 - **One shared branch per week** for the whole team: `vault-consolidation/<isoweek>` (e.g. `vault-consolidation/2026-W25`).
 - Every author's answered questions commit to this single branch, so edits are **cumulative and linear**. This is deliberate: a backlink rewrite from one author's action (e.g. archiving a heavily-linked glossary term) often modifies files "owned" by others; isolated per-author branches would diverge and conflict on those shared targets. A shared branch makes link-graph rewrites conflict-free before the human gate.
 - **One consolidated weekly PR**, body **grouped by author** so each person still owns and can review their own section; authors can be added as reviewers for their portion.
-- **End-of-window trigger — earliest of two:** the PR opens when **all flagged authors have set their "done" flag**, OR a **close-out cron fires** (default ~2 days after the question cron, configurable) — whichever comes first. The deadline guarantees forward progress so one unresponsive author can't strand everyone else's reviewed changes; the all-done path just opens it sooner. Docs left unanswered simply roll to the next cycle.
+- **End-of-window trigger — earliest of two:** the PR opens when **all flagged authors have set their "done" flag**, OR a **close-out cron fires** (default ~2 days after the question cron, configurable) — whichever comes first. The deadline guarantees forward progress so one unresponsive author can't strand everyone else's reviewed changes; the all-done path just opens it sooner. Most docs left unanswered simply roll to the next cycle.
+- **Stale Support Risks block.** Unanswered docs with `audience: support` are the exception — a week of stagnation there means a week of potentially wrong customer answers. At close-out, these are listed in an explicit **"⚠ Stale Support Risks"** block pinned at the **top of the PR body**, and the close-out cron **pings the PM fallback in Slack** with the list. They are surfaced, never silently rolled over.
 - The PR is the single human gate that protects the link graph — nothing lands unreviewed in v1.
 - *Tradeoff accepted:* one team PR instead of per-author PRs, in exchange for conflict-free cumulative link rewrites.
 
@@ -168,7 +186,7 @@ Moves, merges, and deletes must not silently break the Obsidian link graph (the 
 - **Function timeout** — avoided by the cron→queue fan-out; each doc is its own retried job.
 - **Multi-author week** — resolved by the owner-precedence rule (§7).
 - **Unmapped / departed author** — falls through to the PM fallback.
-- **No answer** — no change is made; the doc stays `stable` and re-surfaces next cycle. After N unanswered cycles it escalates to the PM (threshold is a future rule, §15). Snooze is an explicit author action, never automatic.
+- **No answer** — no change is made; the doc stays `stable` and re-surfaces next cycle. After N unanswered cycles it escalates to the PM (threshold is a future rule, §15). **Exception:** `audience: support` docs are escalated immediately at close-out via the Stale Support Risks block (§11), not left to silently roll over. Snooze is an explicit author action, never automatic.
 - **Snooze** — an explicit author action that sets `review_status: snoozed` with a 7-day expiry; excluded from the next cycle.
 - **Concurrent human edit** — if a doc receives a new commit mid-cycle it becomes `active` and drops out of the next cycle's gate until it stabilizes again.
 - **Stale interaction (optimistic locking)** — a card may sit in a DM for days. The card carries the doc's **blob SHA** captured at question-generation. On a button click, `/api/bot/slack/interactions` re-reads the file's current blob SHA **in the weekly branch** (which may already have changed from an earlier action this cycle, so `main` is not sufficient). On mismatch it **rejects the mutation**, replaces the card with a warning ("This doc changed since this card was generated — regenerating next cycle"), and commits nothing. This prevents an answer from acting on content the author never saw.
@@ -182,6 +200,7 @@ Moves, merges, and deletes must not silently break the Obsidian link graph (the 
 - **Snapshot + backlink map** — tests that the cron builds a correct global backlink map and that consumers read it without further GitHub calls.
 - **Frontmatter editor** — tests that a surgical key update leaves the rest of the YAML block and the doc body byte-for-byte intact.
 - **DM cap** — tests that >5 flagged docs for one author collapse into a single digest card.
+- **Support path tier** — tests that docs under `support_critical_paths` get the forced-merge / support-framed phrasing and the required audience-tag action; and that an unanswered `audience: support` doc lands in the Stale Support Risks block + PM ping at close-out.
 - **Change detection** — tests over a fixture git history (since-date filtering, rename/delete handling).
 - The deterministic core is fully unit-testable; the Slack UI and cron wiring get thin integration coverage.
 
@@ -191,5 +210,7 @@ Moves, merges, and deletes must not silently break the Obsidian link graph (the 
 - **Change-report richness** — plain git digest vs. an LLM one-line summary per changed area.
 
 Resolved by review and now fixed in the design: end-of-window trigger (§11 — earliest of all-done / deadline), branch-write concurrency (§13 — serialized write path), and the Slack 3 s ack (§10).
+
+Recorded for piece 3 (the `audience` consumer): a **customer-facing** support bot restricts retrieval to `audience: support`, excludes `internal`, and does **not** fall back to `audience: engineering` — on a miss it escalates to a human with any engineering matches attached *to the human*, never surfaced to the customer. An **internal** support agent may use `engineering` as a labeled secondary fallback. Piece 1 only captures the `audience` tag that makes this enforceable.
 
 Plan-level decisions (not design-blocking, deferred to the implementation plan): the queue provider (Upstash QStash vs Vercel Queues), exact retry/backoff parameters, and the concrete close-out deadline value.
