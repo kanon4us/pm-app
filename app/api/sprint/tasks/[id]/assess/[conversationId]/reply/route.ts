@@ -9,7 +9,7 @@ export const maxDuration = 300
 
 type Params = { params: Promise<{ id: string; conversationId: string }> }
 
-const CLAUDE_MODEL = 'claude-opus-4-6'
+const CLAUDE_MODEL = 'claude-sonnet-4-6'
 
 // POST /api/sprint/tasks/[id]/assess/[conversationId]/reply
 // Normal mode body: { answer: string, objectiveId: number }
