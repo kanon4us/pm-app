@@ -423,6 +423,59 @@ export default function SprintPage() {
     }
   }
 
+  // Resume an in-progress assessment: reload the proposed scores + workflows
+  // persisted so far and reopen at the score-review step (phase-specific state
+  // like the current interview question isn't persisted, so we land here rather
+  // than starting a fresh run).
+  async function resumeAssessment(conversationId: string) {
+    if (!detailTask) return
+    setAssessError('')
+    setConversation(null)
+    setCurrentAnswer('')
+    setConfirmResult(null)
+    setBundleResult(null)
+    setBundleError('')
+    setDesignReview(null)
+    setDesignReviewLoading(false)
+    setDivergenceOpen(false)
+    setCritiqueText('')
+    setRippleEffect(null)
+    setReassessChoice(null)
+    setAssessOpen(true)
+    setAssessPhase('loading')
+    try {
+      const res = await apiFetch(`/api/sprint/tasks/${detailTask.id}/assess/${conversationId}/resume`)
+      const data = await res.json()
+      if (!res.ok) { setAssessError(data.error ?? 'Could not resume assessment'); setAssessPhase('idle'); return }
+      setConversation({
+        conversationId,
+        proposedScores: (data.proposedScores ?? []) as ProposedScore[],
+        currentQuestion: null,
+        totalEstimatedQuestions: 0,
+        questionsAnswered: 0,
+        overlappingTasks: [],
+        costOfNotBuilding: '',
+        workflowGapAssessment: '',
+        proposedRisk: { level: 'Standard', multiplier: 1.2, reasoning: '' },
+        proposedEffort: { days: 3, reasoning: '' },
+        isReassessment: false,
+        previousScoreSummary: null,
+        figmaThumbUrl: null,
+        figmaLink: '',
+        vaultConnected: false,
+        vaultFilesRead: [],
+        finalizeProposal: null,
+        affectedWorkflows: data.affectedWorkflows ?? [],
+      })
+      setConfirmedEffort(3)
+      setConfirmedRisk(1.2)
+      setAssessPhase('scoring_review')
+    } catch (e) {
+      setAssessError(e instanceof Error ? e.message : 'Could not resume assessment')
+      setAssessPhase('idle')
+    }
+  }
+
   async function initAssessment(opts?: { considerNotes?: boolean; specificFeedback?: string }) {
     if (!detailTask) return
     try {
@@ -1137,10 +1190,13 @@ export default function SprintPage() {
                 return (
                   <>
                     {inProgressRun && (
-                      <div style={{ background: '#161b22', border: '1px solid #f0883e', borderRadius: 6, padding: '8px 10px', marginTop: 8 }}>
+                      <div style={{ background: '#161b22', border: '1px solid #f0883e', borderRadius: 6, padding: '8px 10px', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <Typography.Text style={{ color: '#f0883e', fontSize: 11 }}>
-                          ⚠ An assessment is in progress (started {new Date(inProgressRun.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}). Resume capability coming soon.
+                          ⚠ An assessment is in progress (started {new Date(inProgressRun.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}). Resume to review and finish it.
                         </Typography.Text>
+                        <Button size="small" type="primary" onClick={() => resumeAssessment(inProgressRun.conversationId)}>
+                          Resume →
+                        </Button>
                       </div>
                     )}
 
