@@ -52,9 +52,11 @@ The "wait days for a human to reply" is **not** a paused function — it is an e
 1. **`/api/cron/vault-consolidation`** (Vercel cron, weekly) — the trigger. Does **one** bulk fetch of the vault (tree + frontmatter), builds a **global backlink map**, and stores this as a single **run snapshot** (KV/Blob, keyed by `runId`). Then enumerates changes and stable docs and fans out, doing **no** per-doc processing inline (avoids the function timeout *and* a flood of GitHub API calls).
 2. **Queue** (Upstash QStash or Vercel Queues) — one message per stable doc, processed independently with retries. Each message carries a **reference** (`runId` + doc path), **not** the backlink map inline — keeping messages small (well under the ~1 MB queue payload cap) and the map computed once.
 3. **`/api/vault/consolidation/process`** (queue consumer) — for one doc: read the run snapshot (single cache read, no GitHub calls), run audit heuristics against it, generate questions (LLM only where needed), resolve author, send the Slack Block Kit card. The card carries the doc's current **blob SHA** (from the snapshot) for optimistic locking (§13).
-4. **`/api/bot/slack/interactions`** (Slack interactivity webhook) — handles button clicks / text replies; re-checks the doc's blob SHA before mutating (§13); commits the resulting change to the **shared weekly branch**; patches frontmatter; updates the card.
-5. **Change-report publisher** — posts the weekly digest to a Slack channel.
-6. **Audit module** (`lib/vault/audit.ts`) — deterministic classification shared by the consumer (and portable to/from the Python script's logic).
+4. **`/api/bot/slack/interactions`** (Slack interactivity webhook) — **acks Slack within 3 s** (§10), then hands the work to the serialized write path; the async step re-checks the doc's blob SHA before mutating (§13), commits to the **shared weekly branch**, patches frontmatter, and updates the card via `response_url`.
+5. **Serialized write path** — a single-concurrency (FIFO, parallelism = 1) queue through which **all** weekly-branch commits funnel, with retry + backoff on non-fast-forward `422` (§13). The only writer to the branch.
+6. **`/api/cron/vault-consolidation-closeout`** (Vercel cron, ~2 days after the question cron) — opens the consolidated weekly PR if all authors are done or the deadline has arrived (§11); idempotent.
+7. **Change-report publisher** — posts the weekly digest to a Slack channel.
+8. **Audit module** (`lib/vault/audit.ts`) — deterministic classification shared by the consumer (and portable to/from the Python script's logic).
 
 ## 5. Weekly flow
 
@@ -135,17 +137,21 @@ One Block Kit card per stable doc, sent as a DM:
 ```
 
 - Each button is a `block_action` → `/api/bot/slack/interactions`.
-- The webhook resolves `block_id` → doc/author/branch + baseline blob SHA via the ephemeral store, **verifies the SHA still matches** the file in the weekly branch (§13), then applies the change, patches frontmatter, and updates the card in place (✓).
+- **The webhook must ack within 3 s.** Slack rejects interactions not answered in 3000 ms. So the webhook returns `200 OK` immediately, then does the GitHub work **off the request path** (re-queued to the serialized write path, §13) and updates the card asynchronously via Slack's `response_url` (valid ~30 min). No GitHub round-trip happens inline.
+- On the async path it resolves `block_id` → doc/author/branch + baseline blob SHA via the ephemeral store, **verifies the SHA still matches** the file in the weekly branch (§13), applies the change, patches frontmatter, and updates the card in place (✓).
 - "Reply" opens a text input; only that path invokes the LLM to interpret intent.
-- A final "Done for this week" control sets the author's done flag (it does not open a PR by itself).
+- A final "Done for this week" control sets the author's done flag (it does not open a PR by itself; see §11).
 
-**DM volume cap.** At most **5 individual cards per author per cycle** (configurable). Any overflow collapses into a single **digest card** — a concise list of the remaining docs with compact controls (and, as an optional stretch, a link to a PM-app triage view). This prevents flooding an author who owns dozens of old stubs.
+**LLM output is constrained, never raw Block Kit.** When the LLM phrases a question, it is restricted via **tool-use with a strict `input_schema`** to return *only* the raw strings (question text, button labels). Our code builds the Block Kit JSON deterministically and enforces Slack's element limits (section text ≤ 3000 chars, button text ≤ 75 chars — truncate with ellipsis). The model never emits Block Kit structure, so it cannot break card rendering.
+
+**DM volume cap.** At most **5 individual cards per author per cycle** (configurable). Any overflow collapses into a single **digest card** listing the remaining docs, each line carrying **one button that opens a Slack modal** for that doc (so the digest is actionable, not a dead-end). A PM-app triage view remains an optional stretch, not required for v1.
 
 ## 11. PR strategy
 
 - **One shared branch per week** for the whole team: `vault-consolidation/<isoweek>` (e.g. `vault-consolidation/2026-W25`).
 - Every author's answered questions commit to this single branch, so edits are **cumulative and linear**. This is deliberate: a backlink rewrite from one author's action (e.g. archiving a heavily-linked glossary term) often modifies files "owned" by others; isolated per-author branches would diverge and conflict on those shared targets. A shared branch makes link-graph rewrites conflict-free before the human gate.
-- **One consolidated weekly PR** opens at cycle end (when all flagged authors have set their "done" flag, or at a deadline). Its body is **grouped by author** so each person still owns and can review their own section; authors can be added as reviewers for their portion.
+- **One consolidated weekly PR**, body **grouped by author** so each person still owns and can review their own section; authors can be added as reviewers for their portion.
+- **End-of-window trigger — earliest of two:** the PR opens when **all flagged authors have set their "done" flag**, OR a **close-out cron fires** (default ~2 days after the question cron, configurable) — whichever comes first. The deadline guarantees forward progress so one unresponsive author can't strand everyone else's reviewed changes; the all-done path just opens it sooner. Docs left unanswered simply roll to the next cycle.
 - The PR is the single human gate that protects the link graph — nothing lands unreviewed in v1.
 - *Tradeoff accepted:* one team PR instead of per-author PRs, in exchange for conflict-free cumulative link rewrites.
 
@@ -166,6 +172,7 @@ Moves, merges, and deletes must not silently break the Obsidian link graph (the 
 - **Snooze** — an explicit author action that sets `review_status: snoozed` with a 7-day expiry; excluded from the next cycle.
 - **Concurrent human edit** — if a doc receives a new commit mid-cycle it becomes `active` and drops out of the next cycle's gate until it stabilizes again.
 - **Stale interaction (optimistic locking)** — a card may sit in a DM for days. The card carries the doc's **blob SHA** captured at question-generation. On a button click, `/api/bot/slack/interactions` re-reads the file's current blob SHA **in the weekly branch** (which may already have changed from an earlier action this cycle, so `main` is not sufficient). On mismatch it **rejects the mutation**, replaces the card with a warning ("This doc changed since this card was generated — regenerating next cycle"), and commits nothing. This prevents an answer from acting on content the author never saw.
+- **Concurrent branch writes** — because all answers commit to one shared weekly branch, two simultaneous clicks would both push against the same head and the second gets a non-fast-forward `422`. All branch mutations therefore go through a **single-concurrency (FIFO, parallelism = 1) write queue**, serializing commits. A push rejected as non-fast-forward is **retried against the new head with exponential backoff**. The optimistic-lock SHA check (above) runs *inside* this serialized step, against the latest branch state.
 
 ## 14. Testing
 
@@ -180,8 +187,9 @@ Moves, merges, and deletes must not silently break the Obsidian link graph (the 
 
 ## 15. Open questions / future rules
 
-- **Additional consolidation rules** beyond the 7-day stability gate (the user noted more will come): e.g. size thresholds, doc-type-specific cadences, "N weeks unreviewed → escalate to PM."
+- **Additional consolidation rules** beyond the 7-day stability gate (more will come): e.g. size thresholds, doc-type-specific cadences, "N weeks unreviewed → escalate to PM."
 - **Change-report richness** — plain git digest vs. an LLM one-line summary per changed area.
-- **End-of-window** — does "Done for this week" require an explicit click, or auto-open the PR after a deadline?
 
-These do not block v1 and are captured for the implementation plan / piece-2 design.
+Resolved by review and now fixed in the design: end-of-window trigger (§11 — earliest of all-done / deadline), branch-write concurrency (§13 — serialized write path), and the Slack 3 s ack (§10).
+
+Plan-level decisions (not design-blocking, deferred to the implementation plan): the queue provider (Upstash QStash vs Vercel Queues), exact retry/backoff parameters, and the concrete close-out deadline value.
