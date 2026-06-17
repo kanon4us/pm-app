@@ -16,7 +16,19 @@ jobs:
         with:
           fetch-depth: 2
 
+      # Opt-in gate: only enforce when a .vidf-enabled file is present in the
+      # repo — matches vidf-validate.yml so the two VIDF workflows are consistent.
+      - name: Check for .vidf-enabled
+        id: check_enabled
+        run: |
+          if [ -f ".vidf-enabled" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check VIDF tag in commit messages
+        if: steps.check_enabled.outputs.enabled == 'true'
         env:
           VIDF_ENFORCE_DATE: ${{ vars.VIDF_ENFORCE_DATE }}
         run: |
