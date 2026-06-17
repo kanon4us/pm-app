@@ -11,7 +11,7 @@ export const maxDuration = 300
 
 type Params = { params: Promise<{ id: string }> }
 
-const CLAUDE_MODEL = 'claude-opus-4-6'
+const CLAUDE_MODEL = 'claude-sonnet-4-6'
 
 // POST /api/sprint/tasks/[id]/assess/init
 // Gathers vault context + other tasks, pre-scores all 7 objectives, generates first question.
@@ -258,7 +258,7 @@ ${reassessmentContext}`
     response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 8192,
-      thinking: { type: 'enabled', budget_tokens: 6000 },
+      thinking: { type: 'adaptive' },
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     })
