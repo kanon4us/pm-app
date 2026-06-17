@@ -49,10 +49,10 @@ The process runs **inside the PM app** (Next.js on Vercel), reusing the existing
 The "wait days for a human to reply" is **not** a paused function — it is an event-driven callback. Slack button clicks POST to an interactions webhook that acts independently; all durable state lives in **frontmatter + the author's branch**, so there is nothing to "resume." Event-driven + externalized state is simpler than a durable-workflow runtime and avoids a framework migration. The existing `slack-chatbot` covers delivery; no Chat SDK swap.
 
 ### Components
-1. **`/api/cron/vault-consolidation`** (Vercel cron, weekly) — the trigger. Enumerates changes and stable docs; fans out, does **not** process docs inline (avoids the function timeout).
-2. **Queue** (Upstash QStash or Vercel Queues) — one message per stable doc, processed independently with retries.
-3. **`/api/vault/consolidation/process`** (queue consumer) — for one doc: run audit heuristics, generate questions (LLM only where needed), resolve author, send the Slack Block Kit card.
-4. **`/api/bot/slack/interactions`** (Slack interactivity webhook) — handles button clicks / text replies; commits the resulting change to the author's weekly branch; patches frontmatter; updates the card.
+1. **`/api/cron/vault-consolidation`** (Vercel cron, weekly) — the trigger. Does **one** bulk fetch of the vault (tree + frontmatter), builds a **global backlink map**, and stores this as a single **run snapshot** (KV/Blob, keyed by `runId`). Then enumerates changes and stable docs and fans out, doing **no** per-doc processing inline (avoids the function timeout *and* a flood of GitHub API calls).
+2. **Queue** (Upstash QStash or Vercel Queues) — one message per stable doc, processed independently with retries. Each message carries a **reference** (`runId` + doc path), **not** the backlink map inline — keeping messages small (well under the ~1 MB queue payload cap) and the map computed once.
+3. **`/api/vault/consolidation/process`** (queue consumer) — for one doc: read the run snapshot (single cache read, no GitHub calls), run audit heuristics against it, generate questions (LLM only where needed), resolve author, send the Slack Block Kit card. The card carries the doc's current **blob SHA** (from the snapshot) for optimistic locking (§13).
+4. **`/api/bot/slack/interactions`** (Slack interactivity webhook) — handles button clicks / text replies; re-checks the doc's blob SHA before mutating (§13); commits the resulting change to the **shared weekly branch**; patches frontmatter; updates the card.
 5. **Change-report publisher** — posts the weekly digest to a Slack channel.
 6. **Audit module** (`lib/vault/audit.ts`) — deterministic classification shared by the consumer (and portable to/from the Python script's logic).
 
@@ -65,14 +65,17 @@ Vercel cron (weekly)
  2. CHANGE REPORT     digest posted to a Slack channel (read-only)
  3. STABILITY GATE    docs whose latest commit is > 7 days old, excluding review_status: snoozed
                       and docs already reviewed since this cycle started
- 4. FAN OUT           one queue message per stable doc
+ 4. SNAPSHOT + FAN OUT build run snapshot (tree + frontmatter + backlink map); one queue message per
+                      stable doc, each carrying { runId, docPath } only
  ── per doc (queue consumer) ──
- 5. AUDIT + QUESTIONS heuristics (orphan? duplicate? inbox? no-provenance? stale?) → question set; LLM phrases
+ 5. AUDIT + QUESTIONS read snapshot; heuristics (orphan? duplicate? inbox? no-provenance? stale?) → question
+                      set; LLM phrases; cap 5 cards/author (overflow → digest card)
  6. AUTHOR ROUTING    owner: frontmatter → else last committer → else PM fallback; git email → Slack ID
- 7. SLACK DM          Block Kit card with action buttons
+ 7. SLACK DM          Block Kit card with action buttons; card carries the doc's blob SHA
  ── per answer (interactions webhook) ──
- 8. APPLY             commit change to vault-consolidation/<author>-<isoweek>; patch frontmatter
- 9. CLOSE OUT         author clicks "Done for this week" → open one consolidated PR
+ 8. APPLY             verify blob SHA unchanged in weekly branch (else abort+warn); commit to
+                      vault-consolidation/<isoweek>; patch frontmatter
+ 9. CLOSE OUT         per-author "done" flag; one shared weekly PR opens at cycle end
 ```
 
 ## 6. Change detection (git, not mtime)
@@ -115,9 +118,11 @@ owner: chad                  # optional; routes future questions
 ---
 ```
 
-**Ephemeral interaction state → a disposable store** (`vault_review_sessions` table or KV): maps a Slack interaction (`block_id` / message ts) → doc path → author → weekly branch → open question. Cleared when the consolidated PR opens. This is UI plumbing for a stateless webhook, *not* a shadow copy of vault state.
+**Ephemeral interaction state → a disposable store** (`vault_review_sessions` table or KV): maps a Slack interaction (`block_id` / message ts) → doc path → author → the shared weekly branch → open question, plus the doc's **blob SHA at question-generation time** (the optimistic-lock baseline, §13) and each author's **"done" flag**. Cleared when the weekly PR opens. This is UI plumbing for a stateless webhook, *not* a shadow copy of vault state.
 
 The rule: **durable truth in frontmatter; in-flight routing in the disposable store.**
+
+**Frontmatter writes must be surgical.** The programmatic frontmatter editor touches only the keys it owns (`review_status`, `last_reviewed`, `owner`) and preserves the rest of the YAML block (key order, comments, spacing) and **everything below it** (the doc body, Obsidian block properties, trailing newlines) byte-for-byte. Use a frontmatter-preserving editor, not a naive YAML load/dump that reorders keys or strips structure — the vault's Obsidian conventions (`CLAUDE.md`) depend on it.
 
 ## 10. Slack interaction model
 
@@ -130,16 +135,19 @@ One Block Kit card per stable doc, sent as a DM:
 ```
 
 - Each button is a `block_action` → `/api/bot/slack/interactions`.
-- The webhook resolves `block_id` → doc/author/branch via the ephemeral store, applies the change, patches frontmatter, and updates the card in place (✓).
+- The webhook resolves `block_id` → doc/author/branch + baseline blob SHA via the ephemeral store, **verifies the SHA still matches** the file in the weekly branch (§13), then applies the change, patches frontmatter, and updates the card in place (✓).
 - "Reply" opens a text input; only that path invokes the LLM to interpret intent.
-- A final "Done for this week" control opens the consolidated PR.
+- A final "Done for this week" control sets the author's done flag (it does not open a PR by itself).
+
+**DM volume cap.** At most **5 individual cards per author per cycle** (configurable). Any overflow collapses into a single **digest card** — a concise list of the remaining docs with compact controls (and, as an optional stretch, a link to a PM-app triage view). This prevents flooding an author who owns dozens of old stubs.
 
 ## 11. PR strategy
 
-- **One branch per author per week:** `vault-consolidation/<author>-<isoweek>` (e.g. `vault-consolidation/chad-2026-W25`).
-- Each answered question commits its specific file change to that branch.
-- "Done for this week" (or an end-of-window timer) opens **one consolidated PR** per author summarizing their weekly cleanups.
-- The PR is the human gate that protects the link graph — nothing lands unreviewed in v1.
+- **One shared branch per week** for the whole team: `vault-consolidation/<isoweek>` (e.g. `vault-consolidation/2026-W25`).
+- Every author's answered questions commit to this single branch, so edits are **cumulative and linear**. This is deliberate: a backlink rewrite from one author's action (e.g. archiving a heavily-linked glossary term) often modifies files "owned" by others; isolated per-author branches would diverge and conflict on those shared targets. A shared branch makes link-graph rewrites conflict-free before the human gate.
+- **One consolidated weekly PR** opens at cycle end (when all flagged authors have set their "done" flag, or at a deadline). Its body is **grouped by author** so each person still owns and can review their own section; authors can be added as reviewers for their portion.
+- The PR is the single human gate that protects the link graph — nothing lands unreviewed in v1.
+- *Tradeoff accepted:* one team PR instead of per-author PRs, in exchange for conflict-free cumulative link rewrites.
 
 ## 12. Link safety
 
@@ -156,13 +164,17 @@ Moves, merges, and deletes must not silently break the Obsidian link graph (the 
 - **Unmapped / departed author** — falls through to the PM fallback.
 - **No answer** — no change is made; the doc stays `stable` and re-surfaces next cycle. After N unanswered cycles it escalates to the PM (threshold is a future rule, §15). Snooze is an explicit author action, never automatic.
 - **Snooze** — an explicit author action that sets `review_status: snoozed` with a 7-day expiry; excluded from the next cycle.
-- **Concurrent human edit** — if a doc receives a new commit mid-cycle it becomes `active` and drops out of consolidation until it stabilizes again.
+- **Concurrent human edit** — if a doc receives a new commit mid-cycle it becomes `active` and drops out of the next cycle's gate until it stabilizes again.
+- **Stale interaction (optimistic locking)** — a card may sit in a DM for days. The card carries the doc's **blob SHA** captured at question-generation. On a button click, `/api/bot/slack/interactions` re-reads the file's current blob SHA **in the weekly branch** (which may already have changed from an earlier action this cycle, so `main` is not sufficient). On mismatch it **rejects the mutation**, replaces the card with a warning ("This doc changed since this card was generated — regenerating next cycle"), and commits nothing. This prevents an answer from acting on content the author never saw.
 
 ## 14. Testing
 
 - **Audit module** (`lib/vault/audit.ts`) — unit tests over fixture doc sets asserting each classification (orphan, duplicate, empty, stale, no-provenance).
 - **Author routing** — unit tests for the owner → last-committer → PM precedence.
-- **Interaction handler** — tests that a given `block_action` produces the correct frontmatter patch + branch commit (GitHub API mocked).
+- **Interaction handler** — tests that a given `block_action` produces the correct frontmatter patch + branch commit (GitHub API mocked), and that a **blob-SHA mismatch aborts** with no commit (optimistic locking, §13).
+- **Snapshot + backlink map** — tests that the cron builds a correct global backlink map and that consumers read it without further GitHub calls.
+- **Frontmatter editor** — tests that a surgical key update leaves the rest of the YAML block and the doc body byte-for-byte intact.
+- **DM cap** — tests that >5 flagged docs for one author collapse into a single digest card.
 - **Change detection** — tests over a fixture git history (since-date filtering, rename/delete handling).
 - The deterministic core is fully unit-testable; the Slack UI and cron wiring get thin integration coverage.
 
