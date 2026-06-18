@@ -11,20 +11,23 @@ const SIGNIFICANCE_THRESHOLD = 0.30 // 30% anomaly rate
 
 const ANALYSIS_PROMPT = `You are an SOP improvement analyst for a Slack support bot at Viscap Media.
 
-Given a week of structured observations and the last 5 rejected proposals (so you don't repeat them), identify whether there is a significant pattern that warrants an SOP change.
+You are given a window of structured observations, the verbatim human feedback collected during that window (reporter and dev-team survey responses, and dev-team reaction signals), and the last 5 rejected proposals (so you don't repeat them). Decide whether there is a pattern worth an SOP change.
 
-A pattern is significant if it meets ALL of:
-1. At least ${MIN_OBSERVATIONS} relevant observations
-2. An anomaly rate > ${SIGNIFICANCE_THRESHOLD * 100}% (e.g., override_rate, disengagement_rate, misidentification_rate)
-3. Not already proposed and rejected within the last 5 proposals without significantly more data
+A pattern is significant if EITHER:
+1. A recurring theme appears across the human feedback — multiple responses raising the same complaint, request, or praise about how the bot behaves; OR
+2. A behavioral anomaly rate exceeds ${SIGNIFICANCE_THRESHOLD * 100}% (e.g., override_rate, disengagement_rate, misidentification_rate, escalation_rate) across at least ${MIN_OBSERVATIONS} relevant observations.
 
-If significant: propose a specific, testable change to ONE section of the SOP (intake_prompt, escalation_rules, or duplicate_thresholds).
+Ignore patterns already proposed and rejected within the last 5 proposals unless there is materially more supporting data now.
+
+The human feedback is the primary signal — read it closely. Even a single, specific, actionable piece of feedback that clearly maps to one SOP section can warrant a proposal; recurring themes are stronger.
+
+If significant: propose a specific, testable change to ONE section of the SOP (intake_prompt, escalation_rules, or duplicate_thresholds). Ground it in the feedback — quote or paraphrase the responses that motivated it in pattern_summary.
 If not significant: respond with has_significant_pattern: false.
 
 Respond with valid JSON only:
 {
   "has_significant_pattern": true | false,
-  "pattern_summary": "one sentence",
+  "pattern_summary": "one or two sentences, citing the feedback that drove this",
   "proposed_changes": { "sop_field": { "old": ..., "new": ... } },
   "expected_outcome": "one sentence",
   "confidence": 0.0
@@ -84,10 +87,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     eventCounts[obs.event_type] = (eventCounts[obs.event_type] ?? 0) + 1
   }
 
+  // The verbatim human feedback is the primary signal — pass it through, not just counts.
+  const humanFeedback = (observations as Array<{ event_type: string; created_at: string; payload: unknown }>)
+    .filter((obs) => obs.event_type === 'human_feedback')
+    .map((obs) => ({ at: obs.created_at, ...(obs.payload as Record<string, unknown>) }))
+
   const anthropic = new Anthropic({ apiKey })
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 1024,
+    model: 'claude-opus-4-8',
+    max_tokens: 4096,
+    thinking: { type: 'adaptive' },
     system: ANALYSIS_PROMPT,
     messages: [{
       role: 'user',
@@ -96,7 +105,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         observation_window_days: ANALYSIS_WINDOW_DAYS,
         event_counts: eventCounts,
         total_observations: observations.length,
+        human_feedback: humanFeedback,
         last_5_rejections: rejectedProposals ?? [],
+        current_intake_prompt: sop.intake_prompt,
         current_escalation_rules: sop.escalation_rules,
         current_duplicate_thresholds: sop.duplicate_thresholds,
       }),
