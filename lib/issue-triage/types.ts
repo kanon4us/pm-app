@@ -50,6 +50,7 @@ export interface SlackIssueMetadata {
   file_ids: string[]
   vault_snippets_used: string[]
   triage_reasoning: string
+  nudges?: NudgeState
 }
 
 export interface SlackIssue {
@@ -96,6 +97,28 @@ export interface EscalationRules {
   maxTurns: number
   disengagementThreshold: number
   minConfidenceMovementPerTurn: number
+  // Stale-ticket nudging — consumed by the slack-stale-check cron (all optional;
+  // fall back to DEFAULT_STALE_RULES in lib/issue-triage/stale-nudge.ts).
+  stalledTicketNudgeHours?: number
+  devNudgeRepeatHours?: number
+  maxResolutionHours?: number
+  businessHoursTimezone?: string
+  businessHoursStart?: number
+  businessHoursEnd?: number
+  // Tickets with no human activity for this many hours are treated as abandoned
+  // and are not nudged (avoids carpet-bombing long-dead threads).
+  abandonmentHours?: number
+}
+
+/** Per-ticket stale-nudge bookkeeping, persisted under slack_issues.metadata.nudges. */
+export interface NudgeState {
+  reporterNudgedAt?: string
+  devEscalatedAt?: string
+  lastDevNudgeAt?: string
+  devNudgeCount?: number
+  reactionNudgedDevs?: string[]
+  resolutionNudgedAt?: string
+  overdueFlaggedAt?: string
 }
 
 export interface DuplicateThresholds {
@@ -141,3 +164,4 @@ export type ObservationEventType =
   | 'reporter_disengaged'
   | 'handoff_complete'
   | 'human_feedback'
+  | 'stale_nudge'

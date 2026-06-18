@@ -54,14 +54,17 @@ Ignore patterns already proposed and rejected within the last 5 proposals unless
 
 The human feedback is the primary signal — read it closely. Even a single, specific, actionable piece of feedback that clearly maps to one SOP section can warrant a proposal; recurring themes are stronger.
 
-If significant: propose a specific, testable change to ONE section of the SOP (intake_prompt, escalation_rules, or duplicate_thresholds). Ground it in the feedback — quote or paraphrase the responses that motivated it in pattern_summary.
 If not significant: respond with has_significant_pattern: false.
+
+If significant, classify what the fix requires. The bot only reads three config sections (intake_prompt, escalation_rules, duplicate_thresholds), and only as data — it cannot gain genuinely new behavior (time-based nudging, new event handling, new integrations) just by changing those values. If the improvement can be achieved purely by editing one of those three sections, set "requires_code": false and fill "proposed_changes". If it needs NEW bot behavior/code, set "requires_code": true, leave "proposed_changes" as {}, and describe what to build in "feature_summary". Ground it in the feedback in pattern_summary.
 
 Respond with valid JSON only:
 {
   "has_significant_pattern": true | false,
+  "requires_code": true | false,
   "pattern_summary": "one or two sentences, citing the feedback that drove this",
   "proposed_changes": { "sop_field": { "old": ..., "new": ... } },
+  "feature_summary": "if requires_code: what to build (else empty string)",
   "expected_outcome": "one sentence",
   "confidence": 0.0
 }`
@@ -143,14 +146,21 @@ async function main() {
   }
 
   // 5. Insert proposal
+  const requiresCode = analysis.requires_code === true
   const insertRes = await sb('sop_proposals', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({
       sop_version: sop.version,
-      proposed_changes: analysis.proposed_changes ?? {},
+      proposed_changes: requiresCode ? {} : (analysis.proposed_changes ?? {}),
       pattern_summary: analysis.pattern_summary ?? '',
-      supporting_data: { event_counts: eventCounts, total: observations.length, catchup_window_days: WINDOW_DAYS },
+      supporting_data: {
+        event_counts: eventCounts,
+        total: observations.length,
+        catchup_window_days: WINDOW_DAYS,
+        requires_code: requiresCode,
+        feature_summary: analysis.feature_summary ?? '',
+      },
       rejection_history: rejected ?? [],
       claude_confidence: analysis.confidence ?? 0,
       status: 'pending_review',
@@ -170,20 +180,36 @@ async function main() {
     : ''
 
   // 7. Post to the improvements channel
-  const slackText = [
-    `🤖 *SOP Improvement Proposal — v${sop.version} → v${sop.version + 1}*  _(catch-up over last ${WINDOW_DAYS} days)_`,
-    '',
-    `*Pattern:* ${analysis.pattern_summary}`,
-    '',
-    `*Proposed changes:* ${JSON.stringify(analysis.proposed_changes, null, 2)}`,
-    '',
-    `*Expected outcome:* ${analysis.expected_outcome}`,
-    `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
-    conflictBlock,
-    '',
-    `_(Reply with Approve or Reject)_`,
-    `Proposal ID: \`${proposal.id}\``,
-  ].join('\n')
+  const slackText = (requiresCode
+    ? [
+        `🛠️ *Feature Request — needs engineering (not a config change)*  _(catch-up over last ${WINDOW_DAYS} days)_`,
+        '',
+        `*Pattern:* ${analysis.pattern_summary}`,
+        '',
+        `*What to build:* ${analysis.feature_summary}`,
+        '',
+        `*Expected outcome:* ${analysis.expected_outcome}`,
+        `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
+        '',
+        `_The bot can't do this by editing config — approving logs it as an engineering task._`,
+        `_(Reply with Approve to log it, or Reject.)_`,
+        `Proposal ID: \`${proposal.id}\``,
+      ]
+    : [
+        `🤖 *SOP Improvement Proposal — v${sop.version} → v${sop.version + 1}*  _(catch-up over last ${WINDOW_DAYS} days)_`,
+        '',
+        `*Pattern:* ${analysis.pattern_summary}`,
+        '',
+        `*Proposed changes:* ${JSON.stringify(analysis.proposed_changes, null, 2)}`,
+        '',
+        `*Expected outcome:* ${analysis.expected_outcome}`,
+        `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
+        conflictBlock,
+        '',
+        `_(Reply with Approve or Reject)_`,
+        `Proposal ID: \`${proposal.id}\``,
+      ]
+  ).join('\n')
 
   const slackRes = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',

@@ -11,15 +11,7 @@ import { getActiveSop } from '@/lib/issue-triage/sop'
 import { fetchSlackFile, uploadToClickUp, generateVisualSummary } from '@/lib/issue-triage/media'
 import { EMPTY_TICKET_DATA } from '@/lib/issue-triage/types'
 import type { SlackIssue } from '@/lib/issue-triage/types'
-
-const DEV_TEAM_IDS = new Set([
-  'U03MK0SEPH9', // Cam
-  'U047E6PJ5B9', // Ilya Mikhalev
-  'U06RWVCH924', // Michael Katskyi
-  'U07501EJ2SK', // Zaeem Asif
-  'U081QGB6ZC1', // Jahanara Ali
-  'U020PGH3RFW', // Chad Terry
-])
+import { DEV_TEAM_IDS } from '@/lib/issue-triage/dev-team'
 
 interface SlackFile {
   id: string
@@ -637,6 +629,19 @@ async function handleBlockAction(action: SlackBlockAction): Promise<void> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from('sop_proposals' as any).select('*').eq('id', proposalId).single()
       if (!proposal) return
+
+      // Feature requests (requires_code) have no config edit to apply — approving
+      // just logs them as an engineering task; never mutate the SOP.
+      const supportingData = (proposal as unknown as { supporting_data?: { requires_code?: boolean } }).supporting_data
+      if (supportingData?.requires_code) {
+        await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from('sop_proposals' as any)
+          .update({ status: 'approved', resolved_by: userId, resolved_at: new Date().toISOString() })
+          .eq('id', proposalId)
+        await slack.postMessage(channel, `✅ Logged as an engineering task — no SOP config change applied. Track this as code work.`)
+        return
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase.from('bot_sops') as any).update({ status: 'archived' }).eq('status', 'active')

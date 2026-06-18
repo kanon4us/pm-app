@@ -21,14 +21,22 @@ Ignore patterns already proposed and rejected within the last 5 proposals unless
 
 The human feedback is the primary signal — read it closely. Even a single, specific, actionable piece of feedback that clearly maps to one SOP section can warrant a proposal; recurring themes are stronger.
 
-If significant: propose a specific, testable change to ONE section of the SOP (intake_prompt, escalation_rules, or duplicate_thresholds). Ground it in the feedback — quote or paraphrase the responses that motivated it in pattern_summary.
 If not significant: respond with has_significant_pattern: false.
+
+If significant, classify what the fix requires:
+- The bot only reads three config sections (intake_prompt, escalation_rules, duplicate_thresholds), and only as data — it cannot gain genuinely new behavior (time-based nudging, new event handling, new integrations, new Slack actions) just by changing those values.
+- If the improvement can be achieved purely by editing one of those three sections that existing code already consumes, set "requires_code": false and fill "proposed_changes" with a specific, testable edit to ONE section.
+- If it needs NEW bot behavior or code, set "requires_code": true, leave "proposed_changes" as {}, and describe what to build in "feature_summary" (treat this as an engineering ticket, not a config tweak).
+
+Either way, ground it in the feedback — quote or paraphrase the responses that motivated it in pattern_summary.
 
 Respond with valid JSON only:
 {
   "has_significant_pattern": true | false,
+  "requires_code": true | false,
   "pattern_summary": "one or two sentences, citing the feedback that drove this",
   "proposed_changes": { "sop_field": { "old": ..., "new": ... } },
+  "feature_summary": "if requires_code: what to build, as an eng ticket (else empty string)",
   "expected_outcome": "one sentence",
   "confidence": 0.0
 }`
@@ -117,8 +125,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const text = response.content.find((b) => b.type === 'text')?.text ?? ''
   let analysis: {
     has_significant_pattern: boolean
+    requires_code?: boolean
     pattern_summary?: string
     proposed_changes?: Record<string, unknown>
+    feature_summary?: string
     expected_outcome?: string
     confidence?: number
   }
@@ -138,14 +148,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ result: 'no_patterns' })
   }
 
-  // Create proposal
+  const requiresCode = analysis.requires_code === true
+
+  // Create proposal. For feature requests (requires_code) there is no config edit
+  // to apply on approval — the flag + feature_summary ride in supporting_data so
+  // the approve handler routes it to engineering instead of mutating the SOP.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: proposal, error: insertError } = await (supabase.from('sop_proposals') as any)
     .insert({
       sop_version: sop.version,
-      proposed_changes: analysis.proposed_changes ?? {},
+      proposed_changes: requiresCode ? {} : (analysis.proposed_changes ?? {}),
       pattern_summary: analysis.pattern_summary ?? '',
-      supporting_data: { event_counts: eventCounts, total: observations.length },
+      supporting_data: {
+        event_counts: eventCounts,
+        total: observations.length,
+        requires_code: requiresCode,
+        feature_summary: analysis.feature_summary ?? '',
+      },
       rejection_history: rejectedProposals ?? [],
       claude_confidence: analysis.confidence ?? 0,
       status: 'pending_review',
@@ -182,23 +201,37 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       ? `\n\n${conflictWarnings.join('\n')}\n_Review these directives before approving — the analysis layer cannot modify manual_directives._`
       : ''
 
-    await slack.postMessage(
-      channel,
-      [
-        `🤖 *SOP Improvement Proposal — v${sop.version} → v${sop.version + 1}*`,
-        '',
-        `*Pattern:* ${analysis.pattern_summary}${priorRejectionsNote}`,
-        '',
-        `*Proposed changes:* ${JSON.stringify(analysis.proposed_changes, null, 2)}`,
-        '',
-        `*Expected outcome:* ${analysis.expected_outcome}`,
-        `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
-        conflictBlock,
-        '',
-        `_(Reply with Approve or Reject — interactive buttons coming in Phase C UI)_`,
-        `Proposal ID: \`${(proposal as { id: string }).id}\``,
-      ].join('\n'),
-    )
+    const lines = requiresCode
+      ? [
+          `🛠️ *Feature Request — needs engineering (not a config change)*`,
+          '',
+          `*Pattern:* ${analysis.pattern_summary}${priorRejectionsNote}`,
+          '',
+          `*What to build:* ${analysis.feature_summary}`,
+          '',
+          `*Expected outcome:* ${analysis.expected_outcome}`,
+          `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
+          '',
+          `_The bot can't do this by editing config — approving logs it as an engineering task; it will NOT change bot behavior on its own._`,
+          `_(Reply with Approve to log it, or Reject.)_`,
+          `Proposal ID: \`${(proposal as { id: string }).id}\``,
+        ]
+      : [
+          `🤖 *SOP Improvement Proposal — v${sop.version} → v${sop.version + 1}*`,
+          '',
+          `*Pattern:* ${analysis.pattern_summary}${priorRejectionsNote}`,
+          '',
+          `*Proposed changes:* ${JSON.stringify(analysis.proposed_changes, null, 2)}`,
+          '',
+          `*Expected outcome:* ${analysis.expected_outcome}`,
+          `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
+          conflictBlock,
+          '',
+          `_(Reply with Approve or Reject — interactive buttons coming in Phase C UI)_`,
+          `Proposal ID: \`${(proposal as { id: string }).id}\``,
+        ]
+
+    await slack.postMessage(channel, lines.join('\n'))
   }
 
   return NextResponse.json({ result: 'proposal_created', proposalId: (proposal as { id: string }).id })

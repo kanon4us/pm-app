@@ -56,6 +56,23 @@ export function buildSlackClient(token: string) {
       await slackFetch(token, 'reactions.add', { channel, timestamp, name })
     },
 
+    /** Get reactions on a single message. Returns [] if unavailable. */
+    getReactions: async (
+      channel: string,
+      timestamp: string,
+    ): Promise<Array<{ name: string; count: number; users: string[] }>> => {
+      try {
+        const res = await slackFetch<{ message?: { reactions?: Array<{ name: string; count: number; users: string[] }> } }>(
+          token,
+          'reactions.get',
+          { channel, timestamp, full: true },
+        )
+        return res.message?.reactions ?? []
+      } catch {
+        return []
+      }
+    },
+
     /** Look up a user's email and display name from their Slack profile. Returns nulls if unavailable. */
     getUserProfile: async (userId: string): Promise<{ email: string | null; displayName: string | null }> => {
       try {
