@@ -83,8 +83,42 @@ export function buildSlackClient(token: string) {
     },
 
     /** Open a modal view using a trigger_id from a block action. */
-    openModal: async (triggerId: string, view: object): Promise<void> => {
+    openModal: async (triggerId: string, view: Record<string, unknown>): Promise<{ ok: boolean }> => {
       await slackFetch(token, 'views.open', { trigger_id: triggerId, view })
+      return { ok: true }
+    },
+
+    /**
+     * Send a DM to a Slack user by posting to chat.postMessage with channel = userId.
+     * Slack accepts a user ID directly as the channel for a DM.
+     */
+    dm: async (
+      userId: string,
+      blocks: Record<string, unknown>[],
+      text: string,
+    ): Promise<{ ok: boolean; ts?: string; channel?: string }> => {
+      const res = await slackFetch<{ ok: boolean; ts?: string; channel?: string }>(
+        token,
+        'chat.postMessage',
+        { channel: userId, blocks, text },
+      )
+      return { ok: res.ok, ts: res.ts, channel: res.channel }
+    },
+
+    /**
+     * Update a message in-place by POSTing to a Slack response_url.
+     * Response URLs are pre-authorized — no Authorization header is sent.
+     */
+    updateViaResponseUrl: async (
+      responseUrl: string,
+      blocks: Record<string, unknown>[],
+      text: string,
+    ): Promise<void> => {
+      await fetch(responseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replace_original: true, blocks, text }),
+      })
     },
   }
 }
