@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/vault-consolidation",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/vault-consolidation-closeout",
+      "schedule": "0 9 * * 3"
     }
   ]
 }
