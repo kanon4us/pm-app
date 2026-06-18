@@ -348,6 +348,18 @@ export interface Database {
         }
         Relationships: []
       }
+      vault_review_sessions: {
+        Row: { id: string; run_id: string; doc_path: string; author_email: string; author_slack_id: string | null; branch: string; base_blob_sha: string; question_id: string; status: string; slack_channel: string | null; slack_message_ts: string | null; created_at: string }
+        Insert: { id?: string; run_id: string; doc_path: string; author_email: string; author_slack_id?: string | null; branch: string; base_blob_sha: string; question_id: string; status?: string; slack_channel?: string | null; slack_message_ts?: string | null; created_at?: string }
+        Update: { run_id?: string; doc_path?: string; author_email?: string; author_slack_id?: string | null; branch?: string; base_blob_sha?: string; question_id?: string; status?: string; slack_channel?: string | null; slack_message_ts?: string | null }
+        Relationships: []
+      }
+      vault_review_runs: {
+        Row: { run_id: string; started_at: string; snapshot_ref: string | null; pr_url: string | null; author_done: Json }
+        Insert: { run_id: string; started_at?: string; snapshot_ref?: string | null; pr_url?: string | null; author_done?: Json }
+        Update: { started_at?: string; snapshot_ref?: string | null; pr_url?: string | null; author_done?: Json }
+        Relationships: []
+      }
     }
   }
 }
