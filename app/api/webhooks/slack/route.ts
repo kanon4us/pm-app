@@ -96,8 +96,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const parsed = JSON.parse(payloadStr) as SlackBlockAction | SlackViewSubmission
     if (parsed.type === 'block_actions') {
       after(async () => { await handleBlockAction(parsed as SlackBlockAction) })
-    } else if (parsed.type === 'view_submission') {
+      return NextResponse.json({ ok: true })
+    }
+    if (parsed.type === 'view_submission') {
       after(async () => { await handleViewSubmission(parsed as SlackViewSubmission) })
+      // Slack closes a modal only on an empty 200 (or a valid response_action).
+      // A non-empty body like {ok:true} is read as an invalid response_action and
+      // surfaces "We had some trouble connecting. Try again?" in the modal.
+      return new NextResponse(null, { status: 200 })
     }
     return NextResponse.json({ ok: true })
   }
