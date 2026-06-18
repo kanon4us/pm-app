@@ -1,5 +1,5 @@
 // lib/vault/questions.ts
-import type { AuditResult, Question, QuestionSet } from './types'
+import type { AuditResult, QuestionSet } from './types'
 
 export function buildQuestions(a: AuditResult): QuestionSet {
   const qs: QuestionSet = []
