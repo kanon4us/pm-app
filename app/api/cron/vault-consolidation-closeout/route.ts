@@ -43,7 +43,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const runId = isoWeek(new Date())
-  const token = process.env.GITHUB_VAULT_TOKEN ?? ''
+  const token = process.env.GITHUB_TOKEN ?? ''
   const supabase = await getSupabaseServiceClient()
 
   // ── 1. Load vault_review_runs row ─────────────────────────────────────────

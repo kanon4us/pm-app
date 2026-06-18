@@ -153,7 +153,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const runId = isoWeek(new Date())
-  const token = process.env.GITHUB_VAULT_TOKEN ?? ''
+  const token = process.env.GITHUB_TOKEN ?? ''
 
   // 1. Build snapshot via injected (real) GitHub deps
   const deps = buildGithubDeps(token)
