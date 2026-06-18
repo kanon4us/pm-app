@@ -25,3 +25,9 @@ create table if not exists vault_review_runs (
   pr_url text,                          -- set when the consolidated PR opens
   author_done jsonb not null default '{}'::jsonb  -- { "<email>": true }
 );
+
+create table if not exists vault_run_snapshots (
+  run_id text primary key,
+  payload jsonb not null,
+  created_at timestamptz not null default now()
+);

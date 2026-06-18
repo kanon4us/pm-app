@@ -360,6 +360,12 @@ export interface Database {
         Update: { started_at?: string; snapshot_ref?: string | null; pr_url?: string | null; author_done?: Json }
         Relationships: []
       }
+      vault_run_snapshots: {
+        Row: { run_id: string; payload: Json; created_at: string }
+        Insert: { run_id: string; payload: Json; created_at?: string }
+        Update: { payload?: Json }
+        Relationships: []
+      }
     }
   }
 }
