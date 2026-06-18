@@ -201,7 +201,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       ? `\n\n${conflictWarnings.join('\n')}\n_Review these directives before approving — the analysis layer cannot modify manual_directives._`
       : ''
 
-    const lines = requiresCode
+    const bodyLines = requiresCode
       ? [
           `🛠️ *Feature Request — needs engineering (not a config change)*`,
           '',
@@ -212,9 +212,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           `*Expected outcome:* ${analysis.expected_outcome}`,
           `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
           '',
-          `_The bot can't do this by editing config — approving logs it as an engineering task; it will NOT change bot behavior on its own._`,
-          `_(Reply with Approve to log it, or Reject.)_`,
-          `Proposal ID: \`${(proposal as { id: string }).id}\``,
+          `_The bot can't do this by editing config — approving logs an engineering task; it won't change bot behavior on its own._`,
         ]
       : [
           `🤖 *SOP Improvement Proposal — v${sop.version} → v${sop.version + 1}*`,
@@ -226,12 +224,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           `*Expected outcome:* ${analysis.expected_outcome}`,
           `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
           conflictBlock,
-          '',
-          `_(Reply with Approve or Reject — interactive buttons coming in Phase C UI)_`,
-          `Proposal ID: \`${(proposal as { id: string }).id}\``,
         ]
 
-    await slack.postMessage(channel, lines.join('\n'))
+    const proposalId = (proposal as { id: string }).id
+    let body = bodyLines.join('\n')
+    if (body.length > 2900) body = body.slice(0, 2900) + '\n…(truncated)'
+
+    await slack.postBlocks(channel, `SOP proposal ${proposalId}`, [
+      { type: 'section', text: { type: 'mrkdwn', text: body } },
+      {
+        type: 'actions',
+        elements: [
+          { type: 'button', text: { type: 'plain_text', text: 'Approve' }, style: 'primary', action_id: 'sop_approve', value: proposalId },
+          { type: 'button', text: { type: 'plain_text', text: 'Reject' }, style: 'danger', action_id: 'sop_reject', value: proposalId },
+        ],
+      },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: `Proposal ID: \`${proposalId}\`` }] },
+    ])
   }
 
   return NextResponse.json({ result: 'proposal_created', proposalId: (proposal as { id: string }).id })

@@ -31,6 +31,7 @@ jest.mock('@/lib/issue-triage/sop', () => ({
 jest.mock('@/lib/slack/client', () => ({
   buildSlackClient: jest.fn().mockReturnValue({
     postMessage: jest.fn().mockResolvedValue('ts'),
+    postBlocks: jest.fn().mockResolvedValue('ts'),
   }),
 }))
 

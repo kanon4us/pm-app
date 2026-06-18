@@ -49,6 +49,7 @@ interface SlackPayload {
 interface SlackBlockAction {
   type: 'block_actions'
   trigger_id: string
+  response_url?: string
   user: { id: string }
   actions: Array<{ action_id: string; value?: string }>
 }
@@ -60,10 +61,7 @@ interface SlackViewSubmission {
     callback_id: string
     private_metadata: string
     state: {
-      values: {
-        liked: { liked_input: { value: string | null } }
-        disliked: { disliked_input: { value: string | null } }
-      }
+      values: Record<string, Record<string, { value: string | null }>>
     }
   }
 }
@@ -568,23 +566,42 @@ async function handleReaction(event: SlackReactionEvent): Promise<void> {
 }
 
 async function handleViewSubmission(submission: SlackViewSubmission): Promise<void> {
-  if (submission.view.callback_id !== 'feedback_modal') return
-  const threadTs = submission.view.private_metadata
-  const liked = submission.view.state.values.liked.liked_input.value ?? ''
-  const disliked = submission.view.state.values.disliked.disliked_input.value ?? ''
-  const sop = await getActiveSop()
-  await recordObservation(threadTs, null, sop.version, 'human_feedback', {
-    source: 'survey',
-    respondedBy: submission.user.id,
-    liked,
-    disliked,
-  })
+  const values = submission.view.state.values
+  const field = (block: string, action: string) => values[block]?.[action]?.value ?? ''
+
+  if (submission.view.callback_id === 'feedback_modal') {
+    const threadTs = submission.view.private_metadata
+    const sop = await getActiveSop()
+    await recordObservation(threadTs, null, sop.version, 'human_feedback', {
+      source: 'survey',
+      respondedBy: submission.user.id,
+      liked: field('liked', 'liked_input'),
+      disliked: field('disliked', 'disliked_input'),
+    })
+    return
+  }
+
+  if (submission.view.callback_id === 'sop_decision_modal') {
+    let meta: { proposalId?: string; decision?: 'approve' | 'reject'; responseUrl?: string } = {}
+    try { meta = JSON.parse(submission.view.private_metadata || '{}') } catch { /* malformed metadata */ }
+    if (!meta.proposalId || !meta.decision) return
+
+    const result = await resolveSopProposal(meta.proposalId, meta.decision, submission.user.id, field('reason', 'reason_input'))
+    const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
+    const channel = process.env.SLACK_BOT_IMPROVEMENTS_CHANNEL_ID ?? ''
+    if (channel) await slack.postMessage(channel, result).catch(() => undefined)
+    // Replace the original proposal message so the buttons can't be clicked again.
+    if (meta.responseUrl) {
+      await slack
+        .updateViaResponseUrl(meta.responseUrl, [{ type: 'section', text: { type: 'mrkdwn', text: result } }], result)
+        .catch(() => undefined)
+    }
+    return
+  }
 }
 
 async function handleBlockAction(action: SlackBlockAction): Promise<void> {
   const actionId = action.actions[0]?.action_id
-  const userId = action.user.id
-  const sop = await getActiveSop()
 
   // Feedback modal trigger
   if (actionId === 'feedback_open') {
@@ -615,68 +632,111 @@ async function handleBlockAction(action: SlackBlockAction): Promise<void> {
     return
   }
 
-  // SOP Approve/Reject
+  // SOP Approve/Reject → open a decision modal that captures a reason/notes.
+  // The actual resolution happens on modal submit (handleViewSubmission).
   if (actionId === 'sop_approve' || actionId === 'sop_reject') {
     const proposalId = action.actions[0]?.value
     if (!proposalId) return
-
-    const supabase = await getSupabaseServiceClient()
+    const decision: 'approve' | 'reject' = actionId === 'sop_approve' ? 'approve' : 'reject'
     const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
-    const channel = process.env.SLACK_BOT_IMPROVEMENTS_CHANNEL_ID ?? ''
-
-    if (actionId === 'sop_approve') {
-      const { data: proposal } = await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('sop_proposals' as any).select('*').eq('id', proposalId).single()
-      if (!proposal) return
-
-      // Feature requests (requires_code) have no config edit to apply — approving
-      // just logs them as an engineering task; never mutate the SOP.
-      const supportingData = (proposal as unknown as { supporting_data?: { requires_code?: boolean } }).supporting_data
-      if (supportingData?.requires_code) {
-        await supabase
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .from('sop_proposals' as any)
-          .update({ status: 'approved', resolved_by: userId, resolved_at: new Date().toISOString() })
-          .eq('id', proposalId)
-        await slack.postMessage(channel, `✅ Logged as an engineering task — no SOP config change applied. Track this as code work.`)
-        return
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('bot_sops') as any).update({ status: 'archived' }).eq('status', 'active')
-
-      const changes = (proposal as unknown as { proposed_changes: Record<string, { old: unknown; new: unknown }> }).proposed_changes
-      const newSopData: Record<string, unknown> = {
-        version: sop.version + 1,
-        intake_prompt: sop.intake_prompt,
-        escalation_rules: sop.escalation_rules,
-        duplicate_thresholds: sop.duplicate_thresholds,
-        manual_directives: sop.manual_directives,
-        status: 'active',
-        change_summary: (proposal as unknown as { pattern_summary: string }).pattern_summary,
-        approved_by: userId,
-        approved_at: new Date().toISOString(),
-      }
-      for (const [key, change] of Object.entries(changes)) {
-        newSopData[key] = change.new
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('bot_sops') as any).insert(newSopData)
-      await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('sop_proposals' as any)
-        .update({ status: 'approved', resolved_by: userId, resolved_at: new Date().toISOString() })
-        .eq('id', proposalId)
-
-      await slack.postMessage(channel, `✅ SOP v${sop.version + 1} is now active.`)
-    } else {
-      await supabase
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from('sop_proposals' as any)
-        .update({ status: 'rejected', resolved_by: userId, resolved_at: new Date().toISOString() })
-        .eq('id', proposalId)
-      await slack.postMessage(channel, `SOP proposal rejected. The current SOP remains active.`)
-    }
+    await slack.openModal(action.trigger_id, {
+      type: 'modal',
+      callback_id: 'sop_decision_modal',
+      private_metadata: JSON.stringify({ proposalId, decision, responseUrl: action.response_url ?? '' }),
+      title: { type: 'plain_text', text: decision === 'approve' ? 'Approve proposal' : 'Reject proposal' },
+      submit: { type: 'plain_text', text: decision === 'approve' ? 'Approve' : 'Reject' },
+      close: { type: 'plain_text', text: 'Cancel' },
+      blocks: [
+        {
+          type: 'input',
+          block_id: 'reason',
+          optional: true,
+          label: { type: 'plain_text', text: decision === 'approve' ? 'Notes (optional)' : 'Reason for rejecting' },
+          element: {
+            type: 'plain_text_input',
+            action_id: 'reason_input',
+            multiline: true,
+            placeholder: {
+              type: 'plain_text',
+              text: decision === 'approve'
+                ? 'Any context to record with this change'
+                : "Why not? This is fed back to the bot so it doesn't re-propose the same thing.",
+            },
+          },
+        },
+      ],
+    })
+    return
   }
+}
+
+/**
+ * Apply a PM's approve/reject decision to a proposal. Idempotent: a proposal that
+ * is no longer pending_review is left untouched. Returns a human-readable result
+ * line for posting to the improvements channel / updating the original message.
+ */
+async function resolveSopProposal(
+  proposalId: string,
+  decision: 'approve' | 'reject',
+  userId: string,
+  pmResponse: string,
+): Promise<string> {
+  const supabase = await getSupabaseServiceClient()
+  const { data: proposal } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .from('sop_proposals' as any).select('*').eq('id', proposalId).single()
+  if (!proposal) return 'SOP proposal not found.'
+
+  const p = proposal as unknown as {
+    status: string
+    proposed_changes: Record<string, { old: unknown; new: unknown }>
+    pattern_summary: string
+    supporting_data?: { requires_code?: boolean }
+  }
+  if (p.status !== 'pending_review') {
+    return `This proposal was already *${p.status}* — no change made.`
+  }
+
+  const resolved = { resolved_by: userId, resolved_at: new Date().toISOString(), pm_response: pmResponse || null }
+  const reasonLine = pmResponse ? `\n*${decision === 'approve' ? 'Notes' : 'Reason'}:* ${pmResponse}` : ''
+
+  if (decision === 'reject') {
+    await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from('sop_proposals' as any).update({ status: 'rejected', ...resolved }).eq('id', proposalId)
+    return `🚫 Proposal rejected by <@${userId}>. The current SOP stays active.${reasonLine}`
+  }
+
+  // Approve. Feature requests have no config to apply — just log them.
+  if (p.supporting_data?.requires_code) {
+    await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from('sop_proposals' as any).update({ status: 'approved', ...resolved }).eq('id', proposalId)
+    return `✅ Logged as an engineering task by <@${userId}> — no SOP config change applied.${reasonLine}`
+  }
+
+  // Config change: archive the active SOP and publish the next version.
+  const sop = await getActiveSop()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('bot_sops') as any).update({ status: 'archived' }).eq('status', 'active')
+  const newSopData: Record<string, unknown> = {
+    version: sop.version + 1,
+    intake_prompt: sop.intake_prompt,
+    escalation_rules: sop.escalation_rules,
+    duplicate_thresholds: sop.duplicate_thresholds,
+    manual_directives: sop.manual_directives,
+    status: 'active',
+    change_summary: p.pattern_summary,
+    approved_by: userId,
+    approved_at: new Date().toISOString(),
+  }
+  for (const [key, change] of Object.entries(p.proposed_changes ?? {})) {
+    newSopData[key] = change.new
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('bot_sops') as any).insert(newSopData)
+  await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .from('sop_proposals' as any).update({ status: 'approved', ...resolved }).eq('id', proposalId)
+  return `✅ Approved by <@${userId}> — SOP v${sop.version + 1} is now active.${reasonLine}`
 }

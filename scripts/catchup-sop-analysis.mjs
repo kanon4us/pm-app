@@ -180,7 +180,7 @@ async function main() {
     : ''
 
   // 7. Post to the improvements channel
-  const slackText = (requiresCode
+  let body = (requiresCode
     ? [
         `🛠️ *Feature Request — needs engineering (not a config change)*  _(catch-up over last ${WINDOW_DAYS} days)_`,
         '',
@@ -191,9 +191,7 @@ async function main() {
         `*Expected outcome:* ${analysis.expected_outcome}`,
         `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
         '',
-        `_The bot can't do this by editing config — approving logs it as an engineering task._`,
-        `_(Reply with Approve to log it, or Reject.)_`,
-        `Proposal ID: \`${proposal.id}\``,
+        `_The bot can't do this by editing config — approving logs an engineering task._`,
       ]
     : [
         `🤖 *SOP Improvement Proposal — v${sop.version} → v${sop.version + 1}*  _(catch-up over last ${WINDOW_DAYS} days)_`,
@@ -205,16 +203,26 @@ async function main() {
         `*Expected outcome:* ${analysis.expected_outcome}`,
         `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
         conflictBlock,
-        '',
-        `_(Reply with Approve or Reject)_`,
-        `Proposal ID: \`${proposal.id}\``,
       ]
   ).join('\n')
+  if (body.length > 2900) body = body.slice(0, 2900) + '\n…(truncated)'
+
+  const blocks = [
+    { type: 'section', text: { type: 'mrkdwn', text: body } },
+    {
+      type: 'actions',
+      elements: [
+        { type: 'button', text: { type: 'plain_text', text: 'Approve' }, style: 'primary', action_id: 'sop_approve', value: proposal.id },
+        { type: 'button', text: { type: 'plain_text', text: 'Reject' }, style: 'danger', action_id: 'sop_reject', value: proposal.id },
+      ],
+    },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: `Proposal ID: \`${proposal.id}\`` }] },
+  ]
 
   const slackRes = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: { Authorization: `Bearer ${SLACK_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel: CHANNEL, text: slackText }),
+    body: JSON.stringify({ channel: CHANNEL, text: `SOP proposal ${proposal.id}`, blocks }),
   })
   const slackJson = await slackRes.json()
   if (!slackJson.ok) throw new Error(`Slack post failed: ${slackJson.error}`)
