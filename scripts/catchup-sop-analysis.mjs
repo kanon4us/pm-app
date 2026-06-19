@@ -14,7 +14,16 @@
 //   node scripts/catchup-sop-analysis.mjs --commit   # insert proposal + post to Slack
 
 import { readFileSync } from 'node:fs'
+import { deflateSync } from 'node:zlib'
 import Anthropic from '@anthropic-ai/sdk'
+
+// Render raw Mermaid to a public PNG URL via mermaid.ink (pako format).
+function mermaidInkUrl(code) {
+  const src = (code ?? '').trim().replace(/^```(?:mermaid)?\s*|\s*```$/g, '').trim()
+  if (!src) return null
+  const payload = JSON.stringify({ code: src, mermaid: { theme: 'neutral' } })
+  return `https://mermaid.ink/img/pako:${deflateSync(Buffer.from(payload, 'utf8'), { level: 9 }).toString('base64url')}`
+}
 
 const COMMIT = process.argv.includes('--commit')
 const WINDOW_DAYS = 60 // covers the full ~1-month backlog with margin
@@ -58,6 +67,8 @@ If not significant: respond with has_significant_pattern: false.
 
 If significant, classify what the fix requires. The bot only reads three config sections (intake_prompt, escalation_rules, duplicate_thresholds), and only as data — it cannot gain genuinely new behavior (time-based nudging, new event handling, new integrations) just by changing those values. If the improvement can be achieved purely by editing one of those three sections, set "requires_code": false and fill "proposed_changes". If it needs NEW bot behavior/code, set "requires_code": true, leave "proposed_changes" as {}, and describe what to build in "feature_summary". Ground it in the feedback in pattern_summary.
 
+Also produce two Mermaid flowcharts of the bot's intake → triage → escalation flow: current_sop_diagram (current SOP, using the real escalation/duplicate values) and proposed_sop_diagram (with your change applied; for requires_code, the proposed new behavior). Both: valid \`flowchart TD\` syntax, raw Mermaid only (no code fences, no commentary), ≤15 nodes, short labels; make changed nodes/edges obvious in the proposed one.
+
 Respond with valid JSON only:
 {
   "has_significant_pattern": true | false,
@@ -65,6 +76,8 @@ Respond with valid JSON only:
   "pattern_summary": "one or two sentences, citing the feedback that drove this",
   "proposed_changes": { "sop_field": { "old": ..., "new": ... } },
   "feature_summary": "if requires_code: what to build (else empty string)",
+  "current_sop_diagram": "mermaid flowchart TD source for the current SOP",
+  "proposed_sop_diagram": "mermaid flowchart TD source for the proposed SOP",
   "expected_outcome": "one sentence",
   "confidence": 0.0
 }`
@@ -108,7 +121,7 @@ async function main() {
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
   const resp = await anthropic.messages.create({
     model: 'claude-opus-4-8',
-    max_tokens: 4096,
+    max_tokens: 6000,
     thinking: { type: 'adaptive' },
     system: ANALYSIS_PROMPT,
     messages: [{
@@ -207,8 +220,15 @@ async function main() {
   ).join('\n')
   if (body.length > 2900) body = body.slice(0, 2900) + '\n…(truncated)'
 
+  const currentUrl = mermaidInkUrl(analysis.current_sop_diagram)
+  const proposedUrl = mermaidInkUrl(analysis.proposed_sop_diagram)
+  const diagramBlocks = []
+  if (currentUrl) diagramBlocks.push({ type: 'image', image_url: currentUrl, alt_text: 'Current SOP flow', title: { type: 'plain_text', text: 'Current SOP' } })
+  if (proposedUrl) diagramBlocks.push({ type: 'image', image_url: proposedUrl, alt_text: 'Proposed SOP flow', title: { type: 'plain_text', text: 'Proposed SOP' } })
+
   const blocks = [
     { type: 'section', text: { type: 'mrkdwn', text: body } },
+    ...diagramBlocks,
     {
       type: 'actions',
       elements: [

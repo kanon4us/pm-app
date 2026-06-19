@@ -1,5 +1,6 @@
 // app/api/cron/sop-analysis/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { deflateSync } from 'node:zlib'
 import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { getActiveSop } from '@/lib/issue-triage/sop'
@@ -8,6 +9,17 @@ import { buildSlackClient } from '@/lib/slack/client'
 const ANALYSIS_WINDOW_DAYS = 7
 const MIN_OBSERVATIONS = 10
 const SIGNIFICANCE_THRESHOLD = 0.30 // 30% anomaly rate
+
+// Render raw Mermaid source to a public PNG URL via mermaid.ink (pako format,
+// same encoding mermaid.live uses). Slack can't render Mermaid itself, so we post
+// the rendered image. Returns null if the source is empty.
+export function mermaidInkUrl(code?: string): string | null {
+  const src = (code ?? '').trim().replace(/^```(?:mermaid)?\s*|\s*```$/g, '').trim()
+  if (!src) return null
+  const payload = JSON.stringify({ code: src, mermaid: { theme: 'neutral' } })
+  const data = deflateSync(Buffer.from(payload, 'utf8'), { level: 9 }).toString('base64url')
+  return `https://mermaid.ink/img/pako:${data}`
+}
 
 const ANALYSIS_PROMPT = `You are an SOP improvement analyst for a Slack support bot at Viscap Media.
 
@@ -30,6 +42,11 @@ If significant, classify what the fix requires:
 
 Either way, ground it in the feedback — quote or paraphrase the responses that motivated it in pattern_summary.
 
+Also produce two Mermaid flowcharts of the bot's intake → triage → escalation flow:
+- current_sop_diagram: how the bot behaves under the CURRENT SOP (use the real values from current_escalation_rules / current_duplicate_thresholds).
+- proposed_sop_diagram: the same flow with your change applied (for a requires_code item, show the proposed new behavior/branch).
+Rules for both: valid \`flowchart TD\` syntax, raw Mermaid source ONLY (no markdown code fences, no commentary), at most ~15 nodes, short node labels. In proposed_sop_diagram, make the changed nodes/edges obvious (e.g. a "NEW:"/"CHANGED:" label prefix).
+
 Respond with valid JSON only:
 {
   "has_significant_pattern": true | false,
@@ -37,6 +54,8 @@ Respond with valid JSON only:
   "pattern_summary": "one or two sentences, citing the feedback that drove this",
   "proposed_changes": { "sop_field": { "old": ..., "new": ... } },
   "feature_summary": "if requires_code: what to build, as an eng ticket (else empty string)",
+  "current_sop_diagram": "mermaid flowchart TD source for the current SOP",
+  "proposed_sop_diagram": "mermaid flowchart TD source for the proposed SOP",
   "expected_outcome": "one sentence",
   "confidence": 0.0
 }`
@@ -103,7 +122,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const anthropic = new Anthropic({ apiKey })
   const response = await anthropic.messages.create({
     model: 'claude-opus-4-8',
-    max_tokens: 4096,
+    max_tokens: 6000,
     thinking: { type: 'adaptive' },
     system: ANALYSIS_PROMPT,
     messages: [{
@@ -129,6 +148,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     pattern_summary?: string
     proposed_changes?: Record<string, unknown>
     feature_summary?: string
+    current_sop_diagram?: string
+    proposed_sop_diagram?: string
     expected_outcome?: string
     confidence?: number
   }
@@ -230,8 +251,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     let body = bodyLines.join('\n')
     if (body.length > 2900) body = body.slice(0, 2900) + '\n…(truncated)'
 
+    // Old vs proposed SOP flow, rendered from the analyst's Mermaid via mermaid.ink.
+    const currentUrl = mermaidInkUrl(analysis.current_sop_diagram)
+    const proposedUrl = mermaidInkUrl(analysis.proposed_sop_diagram)
+    const diagramBlocks: Record<string, unknown>[] = []
+    if (currentUrl) diagramBlocks.push({ type: 'image', image_url: currentUrl, alt_text: 'Current SOP flow', title: { type: 'plain_text', text: 'Current SOP' } })
+    if (proposedUrl) diagramBlocks.push({ type: 'image', image_url: proposedUrl, alt_text: 'Proposed SOP flow', title: { type: 'plain_text', text: 'Proposed SOP' } })
+
     await slack.postBlocks(channel, `SOP proposal ${proposalId}`, [
       { type: 'section', text: { type: 'mrkdwn', text: body } },
+      ...diagramBlocks,
       {
         type: 'actions',
         elements: [
