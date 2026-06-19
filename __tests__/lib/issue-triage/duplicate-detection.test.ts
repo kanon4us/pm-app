@@ -139,3 +139,46 @@ describe('detectDuplicate', () => {
     )
   })
 })
+
+describe('detectDuplicate reporter closed-history', () => {
+  beforeEach(() => {
+    mockCreate.mockReset()
+    mockGetTasks.mockReset()
+    mockGetTasks.mockResolvedValue([])
+  })
+
+  const okResponse = {
+    content: [{
+      type: 'text',
+      text: JSON.stringify({
+        duplicate_task_id: null,
+        duplicate_confidence: 0,
+        workaround_found: false,
+        workaround_text: null,
+        has_user_facing_docs: false,
+        documentation_gap: false,
+        routing_decision: 'escalate_to_michael',
+        routing_reasoning: 'n/a',
+      }),
+    }],
+  }
+
+  it('injects the closed-history block into the user turn when provided', async () => {
+    mockCreate.mockResolvedValue(okResponse)
+    await detectDuplicate(
+      { ...EMPTY_TICKET_DATA, issue_summary: 'x' },
+      undefined,
+      'This reporter has these RECENTLY RESOLVED tickets...\n[C1] (DONE 3d ago) pdf export fails',
+    )
+    const userTurn = mockCreate.mock.calls[0][0].messages[0].content as string
+    expect(userTurn).toContain('RECENTLY RESOLVED')
+    expect(userTurn).toContain('[C1]')
+  })
+
+  it('omits the block when no history is passed', async () => {
+    mockCreate.mockResolvedValue(okResponse)
+    await detectDuplicate({ ...EMPTY_TICKET_DATA, issue_summary: 'x' })
+    const userTurn = mockCreate.mock.calls[0][0].messages[0].content as string
+    expect(userTurn).not.toContain('RECENTLY RESOLVED')
+  })
+})
