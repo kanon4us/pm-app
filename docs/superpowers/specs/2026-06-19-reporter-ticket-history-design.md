@@ -39,9 +39,11 @@ Identity is keyed on the Slack `reporter_id` (stable user id).
 ## Scope
 
 - "All open + recently closed" per reporter. **Open**: keep all. **Closed**: only
-  those closed within the last 30 days.
-- Thread display capped at **8** tickets with a "+N more" line; the triage prompt
-  feed is uncapped (closed-only, expected to be small).
+  those closed within the last 30 days. The `slack_issues` fetch is bounded by
+  `FETCH_LIMIT` as a safety valve.
+- Thread display reserves slots (up to 5 open + 3 closed) so resolutions aren't
+  buried, with a per-group "+N open, +M closed not shown" trailer; the triage
+  prompt feed is uncapped (closed-only, expected to be small).
 
 ## Architecture
 
