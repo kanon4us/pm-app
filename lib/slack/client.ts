@@ -99,6 +99,11 @@ export function buildSlackClient(token: string) {
       return res.ts
     },
 
+    /** Post a message only the given user can see (e.g. "you're not on the dev team"). */
+    postEphemeral: async (channel: string, user: string, text: string): Promise<void> => {
+      await slackFetch(token, 'chat.postEphemeral', { channel, user, text })
+    },
+
     /** Open a modal view using a trigger_id from a block action. */
     openModal: async (triggerId: string, view: Record<string, unknown>): Promise<{ ok: boolean }> => {
       await slackFetch(token, 'views.open', { trigger_id: triggerId, view })

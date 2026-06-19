@@ -27,6 +27,12 @@ export interface Database {
         Update: { email?: string; clickup_workspace_id?: string | null }
         Relationships: []
       }
+      dev_team_members: {
+        Row: { id: string; name: string; slack_id: string; clickup_email: string | null; active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; name: string; slack_id: string; clickup_email?: string | null; active?: boolean }
+        Update: { name?: string; slack_id?: string; clickup_email?: string | null; active?: boolean; updated_at?: string }
+        Relationships: []
+      }
       oauth_tokens: {
         Row: {
           id: string; user_id: string; provider: 'clickup' | 'figma' | 'webflow' | 'github'

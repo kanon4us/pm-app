@@ -19,6 +19,7 @@ export function AppNav() {
           { key: '/workflows', label: <Link href="/workflows">Workflows</Link> },
           { key: '/triggers/config', label: <Link href="/triggers/config">Trigger Config</Link> },
           { key: '/experiments', label: <Link href="/experiments">Experiments</Link> },
+          { key: '/dev-team', label: <Link href="/dev-team">Dev Team</Link> },
           { key: '/setup', label: <Link href="/setup">Setup</Link> },
           { key: '/settings', label: <Link href="/settings">Settings</Link> },
         ]}

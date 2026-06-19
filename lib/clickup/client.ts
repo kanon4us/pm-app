@@ -1,9 +1,14 @@
 const CLICKUP_BASE = 'https://api.clickup.com/api/v2'
 
+export interface ClickUpMember {
+  user: { id: number; username: string | null; email: string }
+}
+
 export interface ClickUpTeam {
   id: string
   name: string
   spaces: ClickUpSpace[]
+  members?: ClickUpMember[]
 }
 
 export interface ClickUpSpace {
@@ -95,11 +100,26 @@ export function buildClickUpClient(token: string) {
         body: JSON.stringify({ endpoint, events: ['taskStatusUpdated'] }),
       }),
 
-    updateTask: (taskId: string, body: { description?: string; name?: string }) =>
+    updateTask: (
+      taskId: string,
+      body: { description?: string; name?: string; status?: string; assignees?: { add?: number[]; rem?: number[] } },
+    ) =>
       clickupFetch<ClickUpTask>(token, `/task/${taskId}`, {
         method: 'PUT',
         body: JSON.stringify(body),
       }),
+
+    /** All workspace members across the bot's team(s), as { id, email } for assignee resolution. */
+    getMembers: async (): Promise<Array<{ id: number; email: string }>> => {
+      const teams = await clickupFetch<{ teams: ClickUpTeam[] }>(token, '/team').then((r) => r.teams)
+      const out: Array<{ id: number; email: string }> = []
+      for (const team of teams) {
+        for (const m of team.members ?? []) {
+          if (m.user?.email) out.push({ id: m.user.id, email: m.user.email })
+        }
+      }
+      return out
+    },
 
     createTaskComment: (taskId: string, commentText: string) =>
       clickupFetch<{ id: string }>(token, `/task/${taskId}/comment`, {

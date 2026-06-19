@@ -11,7 +11,16 @@ import { getActiveSop } from '@/lib/issue-triage/sop'
 import { fetchSlackFile, uploadToClickUp, generateVisualSummary } from '@/lib/issue-triage/media'
 import { EMPTY_TICKET_DATA } from '@/lib/issue-triage/types'
 import type { SlackIssue } from '@/lib/issue-triage/types'
-import { DEV_TEAM_IDS } from '@/lib/issue-triage/dev-team'
+import { getDevTeamIds, clickupEmailForSlackId } from '@/lib/issue-triage/dev-team'
+import { buildClickUpClient } from '@/lib/clickup/client'
+import {
+  ASSIGN_ACTION_ID,
+  STATUS_ACTION_ID,
+  ticketControlsBlock,
+  rebuildTicketBlocks,
+  hasAssignButton,
+  resolveClickUpUserId,
+} from '@/lib/issue-triage/ticket-actions'
 import { validateIntakePromptChange } from '@/lib/issue-triage/sop-proposal-guard'
 
 interface SlackFile {
@@ -52,9 +61,9 @@ interface SlackBlockAction {
   trigger_id: string
   response_url?: string
   channel?: { id: string }
-  message?: { ts: string }
+  message?: { ts: string; thread_ts?: string; blocks?: unknown[] }
   user: { id: string }
-  actions: Array<{ action_id: string; value?: string }>
+  actions: Array<{ action_id: string; value?: string; selected_option?: { value: string } }>
 }
 
 interface SlackViewSubmission {
@@ -194,7 +203,7 @@ async function processMessageEvent(event: SlackEvent): Promise<void> {
   }
 
   // Dev team member replied in an active gathering thread: hand off silently
-  if (issue && DEV_TEAM_IDS.has(event.user ?? '') && issue.status === 'gathering') {
+  if (issue && (await getDevTeamIds()).has(event.user ?? '') && issue.status === 'gathering') {
     await supabase.from('slack_issues')
       .update({ status: 'complete', updated_at: new Date().toISOString() })
       .eq('thread_ts', threadTs)
@@ -312,12 +321,17 @@ async function handleNewIssue(
 
   // Check if a dev team member has already replied before asking a question
   const threadHistory = await slack.getThreadReplies(event.channel, event.ts).catch(() => [])
-  const devAlreadyReplied = threadHistory.some((m) => m.user && DEV_TEAM_IDS.has(m.user))
+  const devIds = await getDevTeamIds()
+  const devAlreadyReplied = threadHistory.some((m) => m.user && devIds.has(m.user))
 
   if (devAlreadyReplied) {
-    await slack.postMessage(
+    await slack.postBlocks(
       event.channel,
-      `I've opened a ticket: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}`,
+      `I've opened a ticket: ${task.url}`,
+      [
+        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}` } },
+        ticketControlsBlock({ includeAssign: true }),
+      ],
       event.ts,
     )
   } else {
@@ -346,9 +360,13 @@ async function handleNewIssue(
       console.warn('[slack-webhook] initial intake turn failed:', err)
     }
 
-    await slack.postMessage(
+    await slack.postBlocks(
       event.channel,
-      `I've opened a ticket for you: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}\n\n${firstQuestion}`,
+      `I've opened a ticket for you: ${task.url}`,
+      [
+        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket for you: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}\n\n${firstQuestion}` } },
+        ticketControlsBlock({ includeAssign: true }),
+      ],
       event.ts,
     )
   }
@@ -370,7 +388,8 @@ async function handleGathering(
   const history = await slack.getThreadReplies(event.channel, issue.thread_ts).catch(() => [])
 
   // If any dev team member has replied, stop gathering — they've taken over
-  const devReplied = history.some((m) => m.user && DEV_TEAM_IDS.has(m.user))
+  const devIds = await getDevTeamIds()
+  const devReplied = history.some((m) => m.user && devIds.has(m.user))
   if (devReplied) {
     await supabase.from('slack_issues')
       .update({ status: 'complete', updated_at: new Date().toISOString() })
@@ -504,7 +523,7 @@ async function handleTeamFeedback(
 
 async function handleReaction(event: SlackReactionEvent): Promise<void> {
   // white_check_mark from a dev team member: post resolution survey tagging dev + reporter
-  if (event.reaction === 'white_check_mark' && DEV_TEAM_IDS.has(event.user)) {
+  if (event.reaction === 'white_check_mark' && (await getDevTeamIds()).has(event.user)) {
     const supabase = await getSupabaseServiceClient()
     const { data: issueData } = await supabase
       .from('slack_issues').select('*').eq('thread_ts', event.item.ts).single()
@@ -607,6 +626,80 @@ async function handleViewSubmission(submission: SlackViewSubmission): Promise<vo
 
 async function handleBlockAction(action: SlackBlockAction): Promise<void> {
   const actionId = action.actions[0]?.action_id
+
+  // Ticket controls: dev self-assign + status change. Runs in after(), so the
+  // ClickUp/Supabase writes happen after the 200 ack — no 3s-timeout risk.
+  if (actionId === ASSIGN_ACTION_ID || actionId === STATUS_ACTION_ID) {
+    const clickerId = action.user.id
+    const threadTs = action.message?.thread_ts ?? action.message?.ts
+    if (!threadTs) return
+    const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
+    const supabase = await getSupabaseServiceClient()
+    const { data: issueRow } = await supabase
+      .from('slack_issues').select('channel_id, clickup_task_id').eq('thread_ts', threadTs).single()
+    const issue = issueRow as unknown as { channel_id: string; clickup_task_id: string | null } | null
+    const channel = issue?.channel_id ?? action.channel?.id ?? ''
+    const originalBlocks = (action.message?.blocks ?? []) as Array<{ type: string; [k: string]: unknown }>
+    const cu = buildClickUpClient(process.env.CLICKUP_BOT_TOKEN ?? '')
+
+    if (actionId === ASSIGN_ACTION_ID) {
+      const email = await clickupEmailForSlackId(clickerId)
+      if (!email) {
+        await slack.postEphemeral(channel, clickerId, "You're not in the Dev Team registry, so I can't assign this to you. Ask an admin to add you in the PM app → Dev Team.").catch(() => undefined)
+        return
+      }
+      let assignedInClickUp = false
+      if (issue?.clickup_task_id) {
+        try {
+          const userId = resolveClickUpUserId(await cu.getMembers(), email)
+          if (!userId) {
+            await slack.postEphemeral(channel, clickerId, `Couldn't find a ClickUp account for ${email}. Check the ClickUp email on your Dev Team entry.`).catch(() => undefined)
+            return
+          }
+          await cu.updateTask(issue.clickup_task_id, { assignees: { add: [userId] } })
+          assignedInClickUp = true
+        } catch (err) {
+          console.warn('[slack-webhook] ClickUp assign failed:', err)
+          await slack.postEphemeral(channel, clickerId, 'ClickUp assignment failed — try again, or assign in ClickUp directly.').catch(() => undefined)
+          return
+        }
+      }
+      await supabase.from('slack_issues')
+        .update({ handoff_status: 'taken', updated_at: new Date().toISOString() })
+        .eq('thread_ts', threadTs)
+      if (action.response_url) {
+        await slack.updateViaResponseUrl(
+          action.response_url,
+          rebuildTicketBlocks(originalBlocks, { keepAssign: false, note: `👤 Assigned to <@${clickerId}>${assignedInClickUp ? '' : ' (Slack-only)'} — bot standing down.` }),
+          'Ticket assigned',
+        ).catch(() => undefined)
+      }
+      await slack.postMessage(channel, `👤 <@${clickerId}> took this ticket — bot standing down.`, threadTs).catch(() => undefined)
+      return
+    }
+
+    // STATUS_ACTION_ID
+    const status = action.actions[0]?.selected_option?.value
+    if (!status) return
+    if (issue?.clickup_task_id) {
+      try {
+        await cu.updateTask(issue.clickup_task_id, { status })
+      } catch (err) {
+        console.warn('[slack-webhook] ClickUp status update failed:', err)
+        await slack.postEphemeral(channel, clickerId, `ClickUp rejected status "${status}" — it may not exist on this list.`).catch(() => undefined)
+        return
+      }
+    }
+    if (action.response_url) {
+      await slack.updateViaResponseUrl(
+        action.response_url,
+        rebuildTicketBlocks(originalBlocks, { keepAssign: hasAssignButton(originalBlocks), status }),
+        'Ticket status updated',
+      ).catch(() => undefined)
+    }
+    await slack.postMessage(channel, `Status → *${status}* by <@${clickerId}>.`, threadTs).catch(() => undefined)
+    return
+  }
 
   // Feedback modal trigger
   if (actionId === 'feedback_open') {

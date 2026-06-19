@@ -13,7 +13,7 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildSlackClient } from '@/lib/slack/client'
 import { getActiveSop } from '@/lib/issue-triage/sop'
 import { recordObservation } from '@/lib/issue-triage/observations'
-import { DEV_TEAM_IDS, devMention } from '@/lib/issue-triage/dev-team'
+import { getDevTeamIds, devMention } from '@/lib/issue-triage/dev-team'
 import {
   decideStaleActions,
   resolveStaleRules,
@@ -86,6 +86,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
   if (!openIssues?.length) return NextResponse.json({ ticketsNudged: 0, inBusinessHours })
 
+  const devIds = await getDevTeamIds()
   let ticketsNudged = 0
   let totalActions = 0
 
@@ -95,10 +96,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const messages = await slack.getThreadReplies(issue.channel_id, issue.thread_ts).catch(() => [])
       const replies = messages.slice(1).filter((m) => !m.bot_id)
       const repliers = new Set(replies.map((m) => m.user).filter(Boolean) as string[])
-      const hasDevReply = [...repliers].some((u) => DEV_TEAM_IDS.has(u))
+      const hasDevReply = [...repliers].some((u) => devIds.has(u))
 
       const fixReply = [...replies].reverse().find(
-        (m) => m.user && DEV_TEAM_IDS.has(m.user) && FIX_PHRASE.test(m.text ?? ''),
+        (m) => m.user && devIds.has(m.user) && FIX_PHRASE.test(m.text ?? ''),
       )
       const fixMessage = fixReply?.user
         ? { devId: fixReply.user, tsMs: Math.floor(parseFloat(fixReply.ts) * 1000) }
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
       const reactions = await slack.getReactions(issue.channel_id, issue.thread_ts)
       const reactors = new Set(reactions.flatMap((r) => r.users))
-      const devReactorsWithoutReply = [...reactors].filter((u) => DEV_TEAM_IDS.has(u) && !repliers.has(u))
+      const devReactorsWithoutReply = [...reactors].filter((u) => devIds.has(u) && !repliers.has(u))
 
       const openedAtMs = Math.floor(parseFloat(issue.thread_ts) * 1000)
       const replyTimes = replies
