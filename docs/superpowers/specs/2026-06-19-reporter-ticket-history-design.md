@@ -79,8 +79,14 @@ export async function fetchReporterHistory(
 
 // Slack mrkdwn for the thread reply. null if there is nothing to show.
 // Reserves slots (THREAD_OPEN_SLOTS open + THREAD_CLOSED_SLOTS closed) so recent
-// resolutions are never buried under a wall of open tickets. Escapes summaries
-// for mrkdwn. Trailer reports per-group hidden counts.
+// resolutions are never buried under a wall of open tickets. Trailer reports
+// per-group hidden counts.
+//
+// Per-summary ordering is fixed: TRUNCATE the raw summary first, THEN escape for
+// mrkdwn. Escaping expands one char into a multi-char entity (& -> &amp;), so
+// truncating an already-escaped string can slice an entity in half (&am) and
+// render as broken text. Truncate-then-escape keeps the length budget on visible
+// characters and never splits an entity.
 export function formatHistoryForThread(tickets: ReporterTicket[]): string | null
 
 // Compact prompt text of the reporter's CLOSED tickets only (the gap the
@@ -202,7 +208,9 @@ reporter-profile / media work, so run it concurrently with those:
 - `FETCH_LIMIT` cap is requested on the `slack_issues` query.
 - `formatHistoryForThread`: empty → null; slot reservation (≥6 open + ≥4 closed →
   5 open + 3 closed shown with `+N open, +M closed not shown` trailer); mrkdwn
-  escaping (`<`/`>`/`&` in a summary).
+  escaping (`<`/`>`/`&` in a summary); truncate-before-escape order — a summary
+  with an `&`/`<` positioned at the truncation boundary must not yield a split
+  entity.
 - `formatHistoryForTriage`: closed-only, empty closed → ''.
 
 ## Out of scope (YAGNI)
