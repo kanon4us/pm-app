@@ -12,6 +12,7 @@ import { fetchSlackFile, uploadToClickUp, generateVisualSummary } from '@/lib/is
 import { EMPTY_TICKET_DATA } from '@/lib/issue-triage/types'
 import type { SlackIssue } from '@/lib/issue-triage/types'
 import { getDevTeamIds, clickupEmailForSlackId } from '@/lib/issue-triage/dev-team'
+import { fetchReporterHistory, formatHistoryForThread, formatHistoryForTriage } from '@/lib/issue-triage/reporter-history'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import {
   ASSIGN_ACTION_ID,
@@ -256,8 +257,17 @@ async function handleNewIssue(
     }
   }
 
-  // Look up reporter profile from Slack
-  const reporterProfile = await slack.getUserProfile(event.user ?? '').catch(() => ({ email: null, displayName: null }))
+  // Look up reporter profile + prior ticket history in parallel. History runs
+  // before triage (which consumes its closed subset); not parallel with triage.
+  const [reporterProfile, reporterHistory] = await Promise.all([
+    slack.getUserProfile(event.user ?? '').catch(() => ({ email: null, displayName: null })),
+    fetchReporterHistory(supabase, event.user ?? '', event.ts).catch((err) => {
+      console.warn('[slack-webhook] reporter history fetch failed:', err)
+      return []
+    }),
+  ])
+  const historyTaskIds = new Set(reporterHistory.map((t) => t.clickupTaskId))
+  const historyBlock = formatHistoryForThread(reporterHistory)
   const reporterFirstName = reporterProfile.displayName?.split(' ')[0] ?? null
 
   // Strip Slack mention syntax and seed ticket with clean initial message
@@ -311,7 +321,7 @@ async function handleNewIssue(
   let dupStatus = '*No related tickets found at this time.*'
   let triageResult
   try {
-    triageResult = await detectDuplicate(fullIssue.ticket_data, task.id)
+    triageResult = await detectDuplicate(fullIssue.ticket_data, task.id, formatHistoryForTriage(reporterHistory))
     if (triageResult.duplicate_task_id) {
       dupStatus = `⚠️ Possible duplicate of <https://app.clickup.com/t/${triageResult.duplicate_task_id}|existing ticket> — monitoring as we learn more.`
     }
@@ -319,17 +329,26 @@ async function handleNewIssue(
     console.warn('[slack-webhook] initial triage failed:', err)
   }
 
+  // Repeat detection: the matched duplicate is one of THIS reporter's own tickets.
+  const isRepeatForReporter = !!(triageResult?.duplicate_task_id && historyTaskIds.has(triageResult.duplicate_task_id))
+
   // Check if a dev team member has already replied before asking a question
   const threadHistory = await slack.getThreadReplies(event.channel, event.ts).catch(() => [])
   const devIds = await getDevTeamIds()
   const devAlreadyReplied = threadHistory.some((m) => m.user && devIds.has(m.user))
 
   if (devAlreadyReplied) {
+    if (isRepeatForReporter) {
+      await supabase.from('slack_issues')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ ticket_data: { ...fullIssue.ticket_data, is_repeat_issue: true } as any, updated_at: new Date().toISOString() })
+        .eq('thread_ts', event.ts)
+    }
     await slack.postBlocks(
       event.channel,
       `I've opened a ticket: ${task.url}`,
       [
-        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}` } },
+        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}${historyBlock ? `\n\n${historyBlock}` : ''}` } },
         ticketControlsBlock({ includeAssign: true }),
       ],
       event.ts,
@@ -339,9 +358,13 @@ async function handleNewIssue(
     try {
       const intakeResult = await runIntakeTurn(fullIssue, event.text, [])
       firstQuestion = intakeResult.bot_response
+      const persistedSchema = {
+        ...intakeResult.updated_schema,
+        is_repeat_issue: isRepeatForReporter || intakeResult.updated_schema.is_repeat_issue,
+      }
       await supabase.from('slack_issues')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ ticket_data: intakeResult.updated_schema as any, updated_at: new Date().toISOString() })
+        .update({ ticket_data: persistedSchema as any, updated_at: new Date().toISOString() })
         .eq('thread_ts', event.ts)
 
       // Update ClickUp task with the clean AI-generated summary and reporter name prefix
@@ -364,7 +387,7 @@ async function handleNewIssue(
       event.channel,
       `I've opened a ticket for you: ${task.url}`,
       [
-        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket for you: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}\n\n${firstQuestion}` } },
+        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket for you: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}${historyBlock ? `\n\n${historyBlock}` : ''}\n\n${firstQuestion}` } },
         ticketControlsBlock({ includeAssign: true }),
       ],
       event.ts,

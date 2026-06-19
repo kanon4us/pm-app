@@ -38,7 +38,11 @@ function parseTriageJson(text: string): TriageClaudeResponse {
   }
 }
 
-export async function detectDuplicate(ticketData: TicketData, excludeTaskId?: string): Promise<TriageClaudeResponse> {
+export async function detectDuplicate(
+  ticketData: TicketData,
+  excludeTaskId?: string,
+  reporterClosedHistory?: string,
+): Promise<TriageClaudeResponse> {
   const token = process.env.CLICKUP_BOT_TOKEN
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!token) throw new Error('CLICKUP_BOT_TOKEN is not set')
@@ -75,7 +79,8 @@ export async function detectDuplicate(ticketData: TicketData, excludeTaskId?: st
     `Possible threshold: ${possible}, Confirmed threshold: ${confirmed}`,
     `Completed ticket:\n${JSON.stringify(ticketData)}`,
     `Active ClickUp tasks (all lists):\n${formatTaskList(allTasks)}`,
-  ].join('\n\n')
+    reporterClosedHistory ? reporterClosedHistory : '',
+  ].filter(Boolean).join('\n\n')
 
   const response = await anthropic.messages.create({
     model: 'claude-opus-4-6',
