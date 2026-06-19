@@ -12,6 +12,7 @@ import { fetchSlackFile, uploadToClickUp, generateVisualSummary } from '@/lib/is
 import { EMPTY_TICKET_DATA } from '@/lib/issue-triage/types'
 import type { SlackIssue } from '@/lib/issue-triage/types'
 import { DEV_TEAM_IDS } from '@/lib/issue-triage/dev-team'
+import { validateIntakePromptChange } from '@/lib/issue-triage/sop-proposal-guard'
 
 interface SlackFile {
   id: string
@@ -589,11 +590,13 @@ async function handleViewSubmission(submission: SlackViewSubmission): Promise<vo
     const result = await resolveSopProposal(meta.proposalId, meta.decision, submission.user.id, field('reason', 'reason_input'))
     const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
     const channel = process.env.SLACK_BOT_IMPROVEMENTS_CHANNEL_ID ?? ''
-    if (channel) await slack.postMessage(channel, result).catch(() => undefined)
-    // Replace the original proposal message so the buttons can't be clicked again.
-    if (meta.responseUrl) {
+    if (channel) await slack.postMessage(channel, result.message).catch(() => undefined)
+    // Only replace the original message (removing the buttons) when the proposal
+    // was actually resolved — if it was blocked, leave the buttons so it can be
+    // re-actioned after the proposal is fixed.
+    if (result.resolved && meta.responseUrl) {
       await slack
-        .updateViaResponseUrl(meta.responseUrl, [{ type: 'section', text: { type: 'mrkdwn', text: result } }], result)
+        .updateViaResponseUrl(meta.responseUrl, [{ type: 'section', text: { type: 'mrkdwn', text: result.message } }], result.message)
         .catch(() => undefined)
     }
     return
@@ -680,12 +683,12 @@ async function resolveSopProposal(
   decision: 'approve' | 'reject',
   userId: string,
   pmResponse: string,
-): Promise<string> {
+): Promise<{ resolved: boolean; message: string }> {
   const supabase = await getSupabaseServiceClient()
   const { data: proposal } = await supabase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from('sop_proposals' as any).select('*').eq('id', proposalId).single()
-  if (!proposal) return 'SOP proposal not found.'
+  if (!proposal) return { resolved: false, message: 'SOP proposal not found.' }
 
   const p = proposal as unknown as {
     status: string
@@ -694,7 +697,7 @@ async function resolveSopProposal(
     supporting_data?: { requires_code?: boolean }
   }
   if (p.status !== 'pending_review') {
-    return `This proposal was already *${p.status}* — no change made.`
+    return { resolved: false, message: `This proposal was already *${p.status}* — no change made.` }
   }
 
   const resolved = { resolved_by: userId, resolved_at: new Date().toISOString(), pm_response: pmResponse || null }
@@ -704,7 +707,7 @@ async function resolveSopProposal(
     await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from('sop_proposals' as any).update({ status: 'rejected', ...resolved }).eq('id', proposalId)
-    return `🚫 Proposal rejected by <@${userId}>. The current SOP stays active.${reasonLine}`
+    return { resolved: true, message: `🚫 Proposal rejected by <@${userId}>. The current SOP stays active.${reasonLine}` }
   }
 
   // Approve. Feature requests have no config to apply — just log them.
@@ -712,11 +715,24 @@ async function resolveSopProposal(
     await supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from('sop_proposals' as any).update({ status: 'approved', ...resolved }).eq('id', proposalId)
-    return `✅ Logged as an engineering task by <@${userId}> — no SOP config change applied.${reasonLine}`
+    return { resolved: true, message: `✅ Logged as an engineering task by <@${userId}> — no SOP config change applied.${reasonLine}` }
   }
 
-  // Config change: archive the active SOP and publish the next version.
+  // Config change. Guard against a lossy intake_prompt rewrite breaking the live
+  // bot (see SOP v2: it dropped the JSON output contract). Block, don't apply.
   const sop = await getActiveSop()
+  const changes = p.proposed_changes ?? {}
+  if ('intake_prompt' in changes) {
+    const check = validateIntakePromptChange(sop.intake_prompt, String(changes.intake_prompt?.new ?? ''))
+    if (!check.ok) {
+      return {
+        resolved: false,
+        message: `⚠️ *Not applied* — the proposed \`intake_prompt\` would break the bot: ${check.issues.join('; ')}. The SOP is unchanged (still v${sop.version}). Fix the proposal or reject it.`,
+      }
+    }
+  }
+
+  // Safe to apply: archive the active SOP and publish the next version.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('bot_sops') as any).update({ status: 'archived' }).eq('status', 'active')
   const newSopData: Record<string, unknown> = {
@@ -730,7 +746,7 @@ async function resolveSopProposal(
     approved_by: userId,
     approved_at: new Date().toISOString(),
   }
-  for (const [key, change] of Object.entries(p.proposed_changes ?? {})) {
+  for (const [key, change] of Object.entries(changes)) {
     newSopData[key] = change.new
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -738,5 +754,5 @@ async function resolveSopProposal(
   await supabase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from('sop_proposals' as any).update({ status: 'approved', ...resolved }).eq('id', proposalId)
-  return `✅ Approved by <@${userId}> — SOP v${sop.version + 1} is now active.${reasonLine}`
+  return { resolved: true, message: `✅ Approved by <@${userId}> — SOP v${sop.version + 1} is now active.${reasonLine}` }
 }

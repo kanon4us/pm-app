@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { getActiveSop } from '@/lib/issue-triage/sop'
 import { buildSlackClient } from '@/lib/slack/client'
+import { validateIntakePromptChange } from '@/lib/issue-triage/sop-proposal-guard'
 
 const ANALYSIS_WINDOW_DAYS = 7
 const MIN_OBSERVATIONS = 10
@@ -222,6 +223,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       ? `\n\n${conflictWarnings.join('\n')}\n_Review these directives before approving — the analysis layer cannot modify manual_directives._`
       : ''
 
+    // Surface a lossy intake_prompt rewrite so it's caught before approval.
+    let promptWarning = ''
+    const ipChange = (analysis.proposed_changes as Record<string, { new?: unknown }> | undefined)?.intake_prompt
+    if (!requiresCode && ipChange && typeof ipChange.new === 'string') {
+      const check = validateIntakePromptChange(sop.intake_prompt, ipChange.new)
+      if (!check.ok) {
+        promptWarning = `\n\n⚠️ *This intake_prompt change looks lossy:* ${check.issues.join('; ')}. Review the full new prompt before approving — approval is blocked if it drops the JSON contract.`
+      }
+    }
+
     const bodyLines = requiresCode
       ? [
           `🛠️ *Feature Request — needs engineering (not a config change)*`,
@@ -245,6 +256,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           `*Expected outcome:* ${analysis.expected_outcome}`,
           `*Confidence:* ${((analysis.confidence ?? 0) * 100).toFixed(0)}%`,
           conflictBlock,
+          promptWarning,
         ]
 
     const proposalId = (proposal as { id: string }).id
