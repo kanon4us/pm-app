@@ -64,7 +64,9 @@ export interface ReporterTicket {
 
 const CLOSED_STATUSES = new Set(['DONE', 'DEPLOYED', 'ARCHIVE'])
 const CLOSED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
-const THREAD_DISPLAY_CAP = 8
+const FETCH_LIMIT = 100         // safety valve against noisy service accounts
+const THREAD_OPEN_SLOTS = 5     // display budget split (5 open + 3 closed = 8)
+const THREAD_CLOSED_SLOTS = 3
 
 // Pulls all OPEN + CLOSED-within-30-days tickets for this reporter.
 export async function fetchReporterHistory(
@@ -74,7 +76,9 @@ export async function fetchReporterHistory(
 ): Promise<ReporterTicket[]>
 
 // Slack mrkdwn for the thread reply. null if there is nothing to show.
-// Applies THREAD_DISPLAY_CAP with a "+N more" trailer.
+// Reserves slots (THREAD_OPEN_SLOTS open + THREAD_CLOSED_SLOTS closed) so recent
+// resolutions are never buried under a wall of open tickets. Escapes summaries
+// for mrkdwn. Trailer reports per-group hidden counts.
 export function formatHistoryForThread(tickets: ReporterTicket[]): string | null
 
 // Compact prompt text of the reporter's CLOSED tickets only (the gap the
@@ -84,9 +88,12 @@ export function formatHistoryForTriage(tickets: ReporterTicket[]): string
 
 ### Open/closed classification (`fetchReporterHistory`)
 
+Two queries with an in-memory join (deliberately not a single PostgREST embedded
+join — see "Query approach" below):
+
 1. Query `slack_issues` for `reporter_id = X`, `thread_ts != excludeThreadTs`,
    `clickup_task_id not null`. Select `thread_ts, clickup_task_id, ticket_data,
-   updated_at`.
+   updated_at`. `.order('updated_at', { ascending: false }).limit(FETCH_LIMIT)`.
 2. Query `tasks` for `clickup_task_id in (...)` → `status, is_archived, synced_at`.
 3. Join in memory. A ticket is **closed** when
    `is_archived === true` OR `status.toUpperCase()` ∈ `CLOSED_STATUSES`.
@@ -97,10 +104,44 @@ export function formatHistoryForTriage(tickets: ReporterTicket[]): string
 5. Order: open first (by `slack_issues.updated_at` desc), then recent closed
    (by `synced_at` desc).
 
+#### Query approach: why two queries, not an embedded join
+
+A single PostgREST `tasks!inner(...)` embedded join would drop reporter tickets
+that have **no** `tasks` row — but those must be classified *open* (a freshly
+bot-created ticket has no `tasks` row until it first moves or changes status; see
+the ClickUp webhook). A left embed avoids the drop but makes the
+"open (non-closed status *or* no task row) OR closed-within-30-days" predicate
+fragile to express as one declarative filter. Two queries are correct and
+readable; realistic per-reporter volume is tens of rows, and `FETCH_LIMIT` caps
+the pathological tail.
+
+#### Indexing
+
+- Add `CREATE INDEX idx_slack_issues_reporter_id ON slack_issues(reporter_id);`
+  (new migration). The primary lookup is `WHERE reporter_id = X`; `slack_issues`
+  currently indexes only `status` and `updated_at`.
+- `tasks.clickup_task_id` is already `UNIQUE NOT NULL` (migration 001), so the
+  `IN (...)` lookup is already index-backed — no migration needed.
+- Per repo convention, the new index migration is applied to prod **manually**,
+  separate from the code deploy. It is non-breaking (the feature works without it,
+  just with a seq scan), so deploy ordering is low-risk.
+
 ### Wiring into `handleNewIssue` (`app/api/webhooks/slack/route.ts`)
 
 Fetch history once, by `event.user`, after the new `slack_issues` row is inserted
 (so the current thread already exists and is excluded by `thread_ts`).
+
+**Execution order.** `fetchReporterHistory` must complete *before* triage, because
+triage consumes the closed subset. It does **not** need to block on the
+reporter-profile / media work, so run it concurrently with those:
+
+| Step | Action | Notes |
+| --- | --- | --- |
+| 1 | Insert new `slack_issues` row | Establishes current `thread_ts` (excluded from history). |
+| 2 | `Promise.all`: `fetchReporterHistory` ‖ reporter-profile ‖ media processing | History fetch is a fast DB read; parallel with the other enrichment, **not** with triage. |
+| 3 | Run `detectDuplicate(ticketData, excludeTaskId, closedHistory)` | Inject the closed subset (step 2 output) into the triage prompt. |
+| 4 | Run intake turn; persist `updated_schema` with `is_repeat_issue` override | Override applied last so the intake model cannot clobber it. |
+| 5 | Post Slack reply with `formatHistoryForThread` block appended | Both `devAlreadyReplied` and normal branches. |
 
 - **Show in thread** — if `formatHistoryForThread(history)` is non-null, append a
   section block to the bot's reply in *both* the `devAlreadyReplied` and normal
@@ -109,16 +150,27 @@ Fetch history once, by `event.user`, after the new `slack_issues` row is inserte
   > 📋 *Earlier from <@reporter>:*
   > • Active — _summary_ (link)
   > • ✅ DONE 3d ago — _summary_ (link)
-  > _+2 more_
+  > _+2 open, +1 closed not shown_
 
 - **Feed dedup/triage** — extend `detectDuplicate(ticketData, excludeTaskId,
-  reporterClosedHistory?)`. When closed history is present, append a
-  "This reporter's recently resolved tickets" block to the triage prompt so a
-  re-report of a closed ticket can be matched. Open tickets are intentionally not
-  fed — they are already in the searched lists.
+  reporterClosedHistory?)`. When closed history is present, append the block below
+  to the triage user-turn so a re-report of a closed ticket can be matched. Open
+  tickets are intentionally not fed — they are already in the searched lists.
+
+  ```
+  This reporter has these RECENTLY RESOLVED tickets (already closed; NOT in the
+  active list above). If the new ticket is the same underlying issue as one of
+  these, treat it as a duplicate and return that ClickUp id — a resolved bug
+  resurfacing is a high-signal duplicate.
+  [<clickupTaskId>] (DONE 3d ago) <summary>
+  [<clickupTaskId>] (DEPLOYED 12d ago) <summary>
+  ```
+
+  The existing duplicate-confidence thresholds still gate the decision; this block
+  only widens the candidate set, it does not lower the bar.
 
 - **Set `is_repeat_issue`** — after triage, if `triageResult.duplicate_task_id`
-  equals one of the reporter's own history `clickupTaskId`s, set
+  equals one of the reporter's own history `clickupTaskId`s (open *or* closed), set
   `ticket_data.is_repeat_issue = true`. Apply as a final override when persisting
   the intake's `updated_schema`, so the intake model cannot clobber it.
 
@@ -129,7 +181,11 @@ Fetch history once, by `event.user`, after the new `slack_issues` row is inserte
 - `fetchReporterHistory` / `tasks` query failure → `console.warn` and continue.
   History is enrichment, never fatal to ticket creation (matches existing
   media/triage/intake error handling in `handleNewIssue`).
-- Missing `tasks` rows are treated as open, not as errors.
+- Missing `tasks` rows are treated as open, **silently** — no warning/metric. A
+  missing row is the *normal* state for a recently created ticket that has not yet
+  moved or changed status (the `tasks` mirror is written only by the ClickUp
+  webhook on `taskMoved`/`taskStatusUpdated`, or by list (re)subscribe). Warning on
+  it would fire on most recent tickets and bury real signal.
 
 ## Testing
 
@@ -141,8 +197,11 @@ Fetch history once, by `event.user`, after the new `slack_issues` row is inserte
 - Task id absent from `tasks` → classified open.
 - Current thread excluded.
 - Ordering: open-before-closed, recency within each group.
-- `formatHistoryForThread`: empty → null; over-cap → 8 shown + "+N more";
-  `formatHistoryForTriage`: closed-only, empty closed → ''.
+- `FETCH_LIMIT` cap is requested on the `slack_issues` query.
+- `formatHistoryForThread`: empty → null; slot reservation (≥6 open + ≥4 closed →
+  5 open + 3 closed shown with `+N open, +M closed not shown` trailer); mrkdwn
+  escaping (`<`/`>`/`&` in a summary).
+- `formatHistoryForTriage`: closed-only, empty closed → ''.
 
 ## Out of scope (YAGNI)
 
