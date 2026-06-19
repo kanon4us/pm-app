@@ -76,6 +76,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const pmFallback = process.env.PM_SLACK_ID ?? ''
   const route = resolveAuthor(doc, slackMap, pmFallback)
 
+  // Validation override: when VAULT_TEST_SLACK_ID is set, route ALL DMs to that
+  // single tester instead of the real author. Lets the first live run be scoped
+  // to one person without messaging the whole team. Unset in normal operation.
+  const testSlackId = process.env.VAULT_TEST_SLACK_ID?.trim()
+  const dmTarget = testSlackId || route.slackId
+
   // 7. Count existing sessions for this author this run
   const { count, error: countError } = await supabase
     .from('vault_review_sessions')
@@ -99,7 +105,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         run_id: runId,
         doc_path: docPath,
         author_email: route.key,
-        slack_user_id: route.slackId,
+        author_slack_id: dmTarget,
         status: 'digest',
         base_blob_sha: doc.blobSha,
         branch: `vault-consolidation/${runId}`,
@@ -130,7 +136,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
   const dmResult = await slack.dm(
-    route.slackId,
+    dmTarget,
     blocks as Record<string, unknown>[],
     bodyText,
   )
@@ -142,7 +148,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       run_id: runId,
       doc_path: docPath,
       author_email: route.key,
-      slack_user_id: route.slackId,
+      author_slack_id: dmTarget,
       status: 'open',
       base_blob_sha: doc.blobSha,
       branch: `vault-consolidation/${runId}`,

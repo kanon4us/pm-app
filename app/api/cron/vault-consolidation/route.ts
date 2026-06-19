@@ -8,6 +8,9 @@ import type { VaultCommit } from '@/lib/vault/changes'
 import { enqueue } from '@/lib/queue/client'
 import { buildSlackClient } from '@/lib/slack/client'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
+import { auditDoc, SUPPORT_CRITICAL_PATHS_DEFAULT } from '@/lib/vault/audit'
+import { buildQuestions } from '@/lib/vault/questions'
+import { resolveAuthor } from '@/lib/vault/author-routing'
 
 export const maxDuration = 300
 
@@ -155,9 +158,55 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const runId = isoWeek(new Date())
   const token = process.env.GITHUB_TOKEN ?? ''
 
+  // Validation controls (query params):
+  //   ?dryRun=1  → read-only: build the report (snapshot + audit + questions +
+  //                routing) and RETURN it. No snapshot store, no Slack, no
+  //                enqueue, no DB writes. Needs only GITHUB_TOKEN.
+  //   ?limit=N   → cap how many stable docs are processed/enqueued (scopes the
+  //                first live run so it can't fan out to the whole team).
+  const { searchParams } = new URL(req.url)
+  const dryRun = searchParams.get('dryRun') === '1' || searchParams.get('dryRun') === 'true'
+  const limitParam = Number(searchParams.get('limit'))
+  const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : Infinity
+
+  const now = new Date()
+
   // 1. Build snapshot via injected (real) GitHub deps
   const deps = buildGithubDeps(token)
   const snap = await buildSnapshot(runId, deps)
+
+  // Stable docs (the consolidation candidates), capped by `limit`.
+  const stableDocs = snap.docs.filter((d) => isStable(d.lastCommitISO, now)).slice(0, limit)
+
+  // ── DRY RUN: report what WOULD happen, with zero side effects ──────────────
+  if (dryRun) {
+    const backlinks = new Map(snap.backlinks.map(([k, v]) => [k, new Set(v)]))
+    const slackMap: Record<string, string> = JSON.parse(process.env.VAULT_AUTHOR_SLACK_MAP ?? '{}')
+    const pmFallback = process.env.PM_SLACK_ID ?? ''
+
+    const docs = stableDocs.map((doc) => {
+      const audit = auditDoc(doc, backlinks, SUPPORT_CRITICAL_PATHS_DEFAULT)
+      const questions = buildQuestions(audit)
+      const route = resolveAuthor(doc, slackMap, pmFallback)
+      return {
+        path: doc.path,
+        lastCommitISO: doc.lastCommitISO,
+        supportCritical: audit.supportCritical,
+        signals: audit.signals,
+        questions: questions.map((q) => ({ id: q.id, text: q.text })),
+        author: { key: route.key, slackId: route.slackId || '(unmapped → PM fallback)' },
+      }
+    })
+
+    return NextResponse.json({
+      dryRun: true,
+      runId,
+      totalDocs: snap.docs.length,
+      stableDocs: stableDocs.length,
+      withQuestions: docs.filter((d) => d.questions.length > 0).length,
+      docs,
+    })
+  }
 
   // 2. Persist snapshot
   const supabase = await getSupabaseServiceClient()
@@ -196,17 +245,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     await slack.postMessage(channel, lines.join('\n'))
   }
 
-  // 6. Fan-out stable docs to the process endpoint
+  // 6. Fan-out stable docs (already filtered + capped by `limit`) to /process
   const baseUrl = process.env.VAULT_APP_BASE_URL ?? ''
   const processUrl = `${baseUrl}/api/vault/consolidation/process`
-  const now = new Date()
 
   let enqueued = 0
-  for (const doc of snap.docs) {
-    if (isStable(doc.lastCommitISO, now)) {
-      await enqueue(processUrl, { runId, docPath: doc.path })
-      enqueued++
-    }
+  for (const doc of stableDocs) {
+    await enqueue(processUrl, { runId, docPath: doc.path })
+    enqueued++
   }
 
   return NextResponse.json({ result: 'ok', runId, enqueued })

@@ -203,4 +203,37 @@ describe('GET /api/cron/vault-consolidation', () => {
       enqueued: 2,
     })
   })
+
+  // ── dry-run + limit (validation controls) ─────────────────────────────────
+
+  function makeRequestWithQuery(query: string, token = 'test-cron-secret') {
+    return new NextRequest(
+      `https://app.example.com/api/cron/vault-consolidation?${query}`,
+      { headers: { authorization: `Bearer ${token}` } },
+    )
+  }
+
+  it('dryRun=1 returns a report with ZERO side effects', async () => {
+    const res = await GET(makeRequestWithQuery('dryRun=1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ dryRun: true, totalDocs: 3, stableDocs: 2 })
+    expect(body.docs).toHaveLength(2)
+    expect(body.docs[0]).toHaveProperty('signals')
+    expect(body.docs[0]).toHaveProperty('questions')
+    expect(body.docs[0].author).toHaveProperty('slackId')
+    // No writes, no Slack, no enqueue
+    expect(mockStoreSnapshot).not.toHaveBeenCalled()
+    expect(mockEnqueue).not.toHaveBeenCalled()
+    expect(mockPostMessage).not.toHaveBeenCalled()
+    expect(mockSupabaseFrom).not.toHaveBeenCalled()
+  })
+
+  it('limit=1 caps the live fan-out to a single stable doc', async () => {
+    const res = await GET(makeRequestWithQuery('limit=1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ result: 'ok', enqueued: 1 })
+    expect(mockEnqueue).toHaveBeenCalledTimes(1)
+  })
 })
