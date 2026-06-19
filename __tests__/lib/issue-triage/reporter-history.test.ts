@@ -1,6 +1,8 @@
-import { fetchReporterHistory } from '@/lib/issue-triage/reporter-history'
-import { formatHistoryForThread } from '@/lib/issue-triage/reporter-history'
-import { formatHistoryForTriage } from '@/lib/issue-triage/reporter-history'
+import {
+  fetchReporterHistory,
+  formatHistoryForThread,
+  formatHistoryForTriage,
+} from '@/lib/issue-triage/reporter-history'
 import type { ReporterTicket } from '@/lib/issue-triage/reporter-history'
 
 // Minimal chainable fake of the Supabase query builder. Each `.from(table)`
@@ -119,6 +121,22 @@ describe('fetchReporterHistory', () => {
   it('returns [] when the reporter has no prior tickets', async () => {
     const supabase = makeSupabase({ slack_issues: [], tasks: [] })
     expect(await fetchReporterHistory(supabase, 'U1', 'current')).toEqual([])
+  })
+
+  it('drops a closed ticket that has no synced_at (cannot be recency-checked)', async () => {
+    const supabase = makeSupabase({
+      slack_issues: [
+        issue({ thread_ts: '1', clickup_task_id: 'NO_TS' }),
+        issue({ thread_ts: '2', clickup_task_id: 'OK' }),
+      ],
+      tasks: [
+        { clickup_task_id: 'NO_TS', status: 'DONE', is_archived: false, synced_at: null },
+        { clickup_task_id: 'OK', status: 'IN PROGRESS', is_archived: false, synced_at: recent },
+      ],
+    })
+    const out = await fetchReporterHistory(supabase, 'U1', 'current')
+    // NO_TS is closed but undateable → dropped; OK stays as the only (open) result.
+    expect(out.map((t) => t.clickupTaskId)).toEqual(['OK'])
   })
 })
 
