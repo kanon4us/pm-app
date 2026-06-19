@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/cron/sop-analysis",
-      "schedule": "0 9 * * 1"
+      "schedule": "15 2 * * 5"
     },
     {
       "path": "/api/cron/vault-consolidation",
