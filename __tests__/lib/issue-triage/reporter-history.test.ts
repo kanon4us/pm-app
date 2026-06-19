@@ -141,10 +141,15 @@ describe('formatHistoryForThread', () => {
   })
 
   it('escapes mrkdwn AFTER truncation so a boundary entity is never split', () => {
-    const summary = ' '.repeat(79) + '&&&'
+    // 'a'.repeat(78) + '&&&' = 81 chars; slice(0,79) captures 78 a's + first '&'
+    // trimEnd leaves it intact; escape turns '&' → '&amp;' (full entity, not split)
+    // If we had escaped-then-truncated, the 5-char '&amp;' would land mid-entity.
+    const summary = 'a'.repeat(78) + '&&&'
     const out = formatHistoryForThread([ticket({ summary })])!
-    expect(out).not.toContain('&am')
+    // Verify the & was properly escaped to the full entity
     expect(out).toContain('&amp;')
+    // Verify no raw & leaked through (would happen if escape was skipped)
+    expect(out).not.toMatch(/[^&]&[^a]|^&[^a]/)
   })
 })
 
