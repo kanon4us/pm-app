@@ -8,11 +8,14 @@
  */
 
 const mockPublishJSON = jest.fn()
+const mockEnqueueJSON = jest.fn()
+const mockQueue = jest.fn(() => ({ enqueueJSON: mockEnqueueJSON }))
 const mockVerify = jest.fn()
 
 jest.mock('@upstash/qstash', () => ({
   Client: jest.fn().mockImplementation(() => ({
     publishJSON: mockPublishJSON,
+    queue: mockQueue,
   })),
   Receiver: jest.fn().mockImplementation(() => ({
     verify: mockVerify,
@@ -20,7 +23,7 @@ jest.mock('@upstash/qstash', () => ({
 }))
 
 // Import after mocking
-import { enqueue, verifyQstashSignature } from '@/lib/queue/client'
+import { enqueue, enqueueToQueue, verifyQstashSignature } from '@/lib/queue/client'
 
 describe('enqueue', () => {
   beforeEach(() => {
@@ -59,6 +62,34 @@ describe('enqueue', () => {
   test('returns void (does not expose messageId)', async () => {
     const result = await enqueue('https://x/api', { c: 3 })
     expect(result).toBeUndefined()
+  })
+})
+
+describe('enqueueToQueue', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockEnqueueJSON.mockResolvedValue({ messageId: 'msg_q' })
+  })
+
+  test('routes through the named queue via enqueueJSON (serialized path)', async () => {
+    await enqueueToQueue('vault-writes', 'https://x/write', { sessionId: 's1' }, { retries: 2 })
+
+    expect(mockQueue).toHaveBeenCalledWith({ queueName: 'vault-writes' })
+    expect(mockPublishJSON).not.toHaveBeenCalled() // must NOT use the parallel direct publish
+    expect(mockEnqueueJSON).toHaveBeenCalledTimes(1)
+    expect(mockEnqueueJSON).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://x/write',
+        body: { sessionId: 's1' },
+        retries: 2,
+      })
+    )
+  })
+
+  test('omits retries when opts not passed', async () => {
+    await enqueueToQueue('vault-writes', 'https://x/write', { sessionId: 's2' })
+    const callArg = mockEnqueueJSON.mock.calls[0][0]
+    expect(callArg.retries).toBeUndefined()
   })
 })
 

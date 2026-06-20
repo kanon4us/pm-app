@@ -44,21 +44,21 @@ The answer flow breaks silently without these:
   Read-only or expired = the answer→commit step fails. The dry-run confirms *read*;
   write must be verified on the first scoped run.
 
-### ⚠️ Known code gap (fix before multi-author use; harmless at `limit=1`)
-- `lib/queue/client.ts` `enqueue()` uses `client.publishJSON({ url })` — a **direct
-  publish**, not the named queue. So writes **bypass the `vault-writes` queue** and the
-  `parallelism=1` serialization is **not active**. With `?limit=1` there is exactly one
-  write, so no race. Before opening to the whole team, change the write enqueue to
-  `client.queue({ queueName: 'vault-writes' }).enqueueJSON({ url, body })` so concurrent
-  answers serialize (otherwise two simultaneous clicks can collide on the weekly branch
-  with a non-fast-forward 422).
+### ✅ Queue serialization (fixed 2026-06)
+- `lib/queue/client.ts` now exposes `enqueueToQueue(queueName, url, body)` which routes
+  through the named QStash queue via `client.queue({ queueName }).enqueueJSON(...)`. The
+  interactions webhook uses `enqueueToQueue('vault-writes', …)` for the write path, so
+  concurrent answers serialize through the `parallelism=1` queue (no non-fast-forward 422
+  race on the shared weekly branch). The parallel `enqueue()` (direct publish) is still
+  used for the process fan-out, which doesn't need ordering.
 
 ## Will it work?
 - **Dry-run (`?dryRun=1`)** — ✅ works now (needs only `GITHUB_TOKEN`). Do this first.
 - **Scoped first live run (`?limit=1`)** — ✅ will work once the env vars + redeploy +
   Slack Interactivity URL + bot scopes + GitHub write access are in place. The queue gap
   does not bite here.
-- **Full multi-author production** — ❗ needs the queue-serialization fix above.
+- **Full multi-author production** — ✅ queue serialization now wired (see above);
+  remaining requirement is just the same env/Slack/GitHub setup as the scoped run.
 
 ## Runbook (in order)
 
@@ -79,8 +79,8 @@ The answer flow breaks silently without these:
    ```
    Verify, end-to-end: you receive one Block Kit DM → click an action → a commit lands on
    branch `vault-consolidation/<isoweek>` in the documentation repo → frontmatter updated.
-5. **Fix the queue-serialization gap**, then remove `?limit` / the test override and let
-   the Monday cron run for real.
+5. Remove `?limit` / the `VAULT_TEST_SLACK_ID` override and let the Monday cron run for
+   real. (Queue serialization is already wired — see the "Queue serialization" note.)
 
 ## Cleanup
 - `rm .env.prod.pulled` (created during setup — holds prod secrets in plaintext).
