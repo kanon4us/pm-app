@@ -49,7 +49,13 @@ export async function enqueue(
   body: unknown,
   opts?: { retries?: number }
 ): Promise<void> {
-  const client = new Client({ token: process.env.QSTASH_TOKEN })
+  // QSTASH_URL is region-specific (e.g. https://qstash-us-east-1.upstash.io for
+  // the US region). Pass it explicitly when set so publishes hit the correct
+  // region's endpoint instead of the SDK's default (EU).
+  const client = new Client({
+    token: process.env.QSTASH_TOKEN,
+    ...(process.env.QSTASH_URL ? { baseUrl: process.env.QSTASH_URL } : {}),
+  })
 
   await client.publishJSON({
     url: destinationUrl,
