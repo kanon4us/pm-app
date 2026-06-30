@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
+    "typecheck": "tsc --noEmit",
     "validate-design-index": "ts-node scripts/validate-design-index.ts"
   },
   "dependencies": {

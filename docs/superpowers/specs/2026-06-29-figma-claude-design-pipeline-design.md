@@ -225,6 +225,32 @@ in the repo; (3) the JSON conforms to the schema. Runs on every PR.
 - **Figma Make bindings** → back up / sync early AI visual prototyping to GitHub
   when used for exploration.
 
+### 6.4 Long-Lived Branch Resync Protocol
+
+Feature branches that stay open across multiple sprints drift behind `main`.
+Because Claude reads the live codebase as design context (§6.1) and edits
+`design/figma-index.json`, a stale branch makes Claude design against outdated
+components, write broken `codePaths`, and trip the anti-rot CI guard. To prevent
+this, the following is **mandated before any active iteration phase** on an open
+branch. Claude's *first* action when resuming work on a branch is to check
+freshness against `main`.
+
+1. **Upstream alignment (rebase, not merge).** `git fetch origin` then
+   `git rebase origin/main`. Rebase keeps history linear so Claude's
+   code-reading context isn't polluted by `Merge branch 'main'...` commits.
+2. **Conflict resolution rule.** On conflicts in `design/figma-index.json`,
+   prioritize the **schema/structural updates from `main`**, then re-append the
+   branch's local active user-story objects on top.
+3. **Local gate validation (must pass before pushing):**
+   - `npm run typecheck` — zero TypeScript regressions (`tsc --noEmit`).
+   - `npm run validate-design-index` — paths + ClickUp IDs match the rebased repo.
+4. **Force-safe push.** Only after both gates pass:
+   `git push origin <branch> --force-with-lease` (never bare `--force`).
+
+This mirrors the CI guard (§6.2) locally so drift is caught before the push, not
+after. The same two gates are what the `design-index-validate` workflow enforces
+on the resulting PR.
+
 ## 7. End-to-End Workflow Loop
 
 For each user story (driven by a ClickUp ticket):
