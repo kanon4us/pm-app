@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-30T04:17:22.151Z",
+  "fetchedAt": "2026-06-30T18:43:33.649Z",
   "files": [
     {
       "projectName": "ActorHub",
@@ -54,27 +54,6 @@
         }
       ],
       "frameCount": 1
-    },
-    {
-      "projectName": "Archive",
-      "fileKey": "Y3jPjEIPEUK2hkQxCTt5jE",
-      "fileName": "(Archive)  Ideation Live Proto",
-      "fileUrl": "https://figma.com/design/Y3jPjEIPEUK2hkQxCTt5jE/Archive-Ideation-Live-Proto",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Prototype"
-        },
-        {
-          "nodeId": "1:2",
-          "name": "Cover"
-        },
-        {
-          "nodeId": "136:120629",
-          "name": "Archive"
-        }
-      ],
-      "frameCount": 111
     },
     {
       "projectName": "Creatives",
@@ -203,786 +182,6 @@
         }
       ],
       "frameCount": 84
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "TIuWFkO5GYcZkUCiAUpWYJ",
-      "fileName": "Casting users available actions",
-      "fileUrl": "https://figma.com/design/TIuWFkO5GYcZkUCiAUpWYJ/Casting-users-available-actions",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "Y55AcyeMvTLTGcXNQ6qO9D",
-      "fileName": "Creatives / Elements / Clips",
-      "fileUrl": "https://figma.com/design/Y55AcyeMvTLTGcXNQ6qO9D/Creatives-Elements-Clips",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "zZieOW3nW5F2qFnxST2Xwu",
-      "fileName": "Creatives-schema update",
-      "fileUrl": "https://figma.com/design/zZieOW3nW5F2qFnxST2Xwu/Creatives-schema-update",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "8waj3oCbbTJGPvBhfxcb7D",
-      "fileName": "Database Schema (APP) v1",
-      "fileUrl": "https://figma.com/design/8waj3oCbbTJGPvBhfxcb7D/Database-Schema-APP-v1",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "Y0JTU0uDqNdTYRzJ1c6H6q",
-      "fileName": "Database Schema (APP) v2",
-      "fileUrl": "https://figma.com/design/Y0JTU0uDqNdTYRzJ1c6H6q/Database-Schema-APP-v2",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "KKrh3Ps7TPa1GaT3B6HFuR",
-      "fileName": "Database Schema (BETA)",
-      "fileUrl": "https://figma.com/design/KKrh3Ps7TPa1GaT3B6HFuR/Database-Schema-BETA",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "DtYT27dMCQ6cPZiCxIan1G",
-      "fileName": "Permissions for Ideation",
-      "fileUrl": "https://figma.com/design/DtYT27dMCQ6cPZiCxIan1G/Permissions-for-Ideation",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "loS7X2utlsIVdLSgwgu2Jh",
-      "fileName": "Permissions in DB",
-      "fileUrl": "https://figma.com/design/loS7X2utlsIVdLSgwgu2Jh/Permissions-in-DB",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "JCVibjkGp6B3nEPn0kgZst",
-      "fileName": "Project & Team Management Report Schema Changes",
-      "fileUrl": "https://figma.com/design/JCVibjkGp6B3nEPn0kgZst/Project-Team-Management-Report-Schema-Changes",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "HvM4xP9GNKRoGLu9BJLDUg",
-      "fileName": "Shooting Session",
-      "fileUrl": "https://figma.com/design/HvM4xP9GNKRoGLu9BJLDUg/Shooting-Session",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "QujBaF6VgLehdnQtmBNhIB",
-      "fileName": "Shotlist Data Schema",
-      "fileUrl": "https://figma.com/design/QujBaF6VgLehdnQtmBNhIB/Shotlist-Data-Schema",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "t4kByfh01DPBQ16oZNiJGg",
-      "fileName": "Typesense Tags",
-      "fileUrl": "https://figma.com/design/t4kByfh01DPBQ16oZNiJGg/Typesense-Tags",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "RwgNDVqoVUkyFgxZpjQtj3",
-      "fileName": "Untitled",
-      "fileUrl": "https://figma.com/design/RwgNDVqoVUkyFgxZpjQtj3/Untitled",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Data Planning",
-      "fileKey": "As3PscrMmstwWPvMUuaXG1",
-      "fileName": "Untitled",
-      "fileUrl": "https://figma.com/design/As3PscrMmstwWPvMUuaXG1/Untitled",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "dpU5wmMkxQvVkYUXVcy8b4",
-      "fileName": "AI Researcher",
-      "fileUrl": "https://figma.com/design/dpU5wmMkxQvVkYUXVcy8b4/AI-Researcher",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "8BxDTPEpSnKjSkTRq37ZDS",
-      "fileName": "Access & Teams",
-      "fileUrl": "https://figma.com/design/8BxDTPEpSnKjSkTRq37ZDS/Access-Teams",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "oR8Qop5o3A0ocp3Wrf3NU7",
-      "fileName": "Accounting Tech Stack",
-      "fileUrl": "https://figma.com/design/oR8Qop5o3A0ocp3Wrf3NU7/Accounting-Tech-Stack",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "o8PYjDWyUIKXF5m9rg0uLG",
-      "fileName": "Backend Restful API",
-      "fileUrl": "https://figma.com/design/o8PYjDWyUIKXF5m9rg0uLG/Backend-Restful-API",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "BujF2jw58GwiF5XlHZj3rb",
-      "fileName": "Billing",
-      "fileUrl": "https://figma.com/design/BujF2jw58GwiF5XlHZj3rb/Billing",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "yNpYXLs4UW7Q9Bdp1zLBOg",
-      "fileName": "Casting User Flow",
-      "fileUrl": "https://figma.com/design/yNpYXLs4UW7Q9Bdp1zLBOg/Casting-User-Flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "W18kIFUZYZCV6vkjyw6ME1",
-      "fileName": "Clip number to shooting session filename",
-      "fileUrl": "https://figma.com/design/W18kIFUZYZCV6vkjyw6ME1/Clip-number-to-shooting-session-filename",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "hfiVZoi77Bf34Ph2fvd6OP",
-      "fileName": "Creative Flow",
-      "fileUrl": "https://figma.com/design/hfiVZoi77Bf34Ph2fvd6OP/Creative-Flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "fF2X1TTCcKMXkOnujhDQUv",
-      "fileName": "DeliverLifeCycle",
-      "fileUrl": "https://figma.com/design/fF2X1TTCcKMXkOnujhDQUv/DeliverLifeCycle",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "LJJiWwvja4lMoEeov4u1l5",
-      "fileName": "Elements & Variations",
-      "fileUrl": "https://figma.com/design/LJJiWwvja4lMoEeov4u1l5/Elements-Variations",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "GVotb8reyRMLcqEUexjQEA",
-      "fileName": "Facebook API Flow",
-      "fileUrl": "https://figma.com/design/GVotb8reyRMLcqEUexjQEA/Facebook-API-Flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "LORZN2TLACH2EoBiU8q6mr",
-      "fileName": "Firebase Structure",
-      "fileUrl": "https://figma.com/design/LORZN2TLACH2EoBiU8q6mr/Firebase-Structure",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 8
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "RBA8yX7BzPiKZ36PZUaDjU",
-      "fileName": "Firebase: Media Library Entities",
-      "fileUrl": "https://figma.com/design/RBA8yX7BzPiKZ36PZUaDjU/Firebase-Media-Library-Entities",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "2vN0mDwdAYzNqFq1e7YtN7",
-      "fileName": "How to use sessions to hide static front end using proxy",
-      "fileUrl": "https://figma.com/design/2vN0mDwdAYzNqFq1e7YtN7/How-to-use-sessions-to-hide-static-front-end-using-proxy",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "x3jYwtc2fzcY2hOoFcZtcR",
-      "fileName": "Idea Lifecycles",
-      "fileUrl": "https://figma.com/design/x3jYwtc2fzcY2hOoFcZtcR/Idea-Lifecycles",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "perhfEramW9QzPXmLdGRqg",
-      "fileName": "Ideation Entities",
-      "fileUrl": "https://figma.com/design/perhfEramW9QzPXmLdGRqg/Ideation-Entities",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "I5YHWZFomQKejtNsIQQ9AN",
-      "fileName": "Ideation data flow",
-      "fileUrl": "https://figma.com/design/I5YHWZFomQKejtNsIQQ9AN/Ideation-data-flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "FqobWgaSRrCKW04WjUPRhu",
-      "fileName": "Image Proxy",
-      "fileUrl": "https://figma.com/design/FqobWgaSRrCKW04WjUPRhu/Image-Proxy",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "jfHNOt0ho4czMSF2zdplOp",
-      "fileName": "Media Library Media Processing Solutions",
-      "fileUrl": "https://figma.com/design/jfHNOt0ho4czMSF2zdplOp/Media-Library-Media-Processing-Solutions",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "PAoaxYuv6bE9JW5QaQShFh",
-      "fileName": "Media Life Cycle",
-      "fileUrl": "https://figma.com/design/PAoaxYuv6bE9JW5QaQShFh/Media-Life-Cycle",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "tpjSxzXIPXerkrOf47NzQy",
-      "fileName": "Media Storage Structure",
-      "fileUrl": "https://figma.com/design/tpjSxzXIPXerkrOf47NzQy/Media-Storage-Structure",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "GSJXvPjanbBaPXR9FGsAFa",
-      "fileName": "Media Upload Options (P&C)",
-      "fileUrl": "https://figma.com/design/GSJXvPjanbBaPXR9FGsAFa/Media-Upload-Options-P-C",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "CqNSyOyeoSkglKehy8X4HY",
-      "fileName": "Multistage Form Usage",
-      "fileUrl": "https://figma.com/design/CqNSyOyeoSkglKehy8X4HY/Multistage-Form-Usage",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "SDrEBJetKrrneHRA6UMlRH",
-      "fileName": "New Media Sync Flow",
-      "fileUrl": "https://figma.com/design/SDrEBJetKrrneHRA6UMlRH/New-Media-Sync-Flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "ODnXBdX9gcjTf758gw8RFp",
-      "fileName": "Next.js api layer",
-      "fileUrl": "https://figma.com/design/ODnXBdX9gcjTf758gw8RFp/Next-js-api-layer",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "XvzDkXYiT7vJcL0msMA9Mv",
-      "fileName": "Onboarding Flowchart v1.0",
-      "fileUrl": "https://figma.com/design/XvzDkXYiT7vJcL0msMA9Mv/Onboarding-Flowchart-v1-0",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "2j833lOYTuaasV2OSoONCl",
-      "fileName": "Onboarding Flowchart v1.1",
-      "fileUrl": "https://figma.com/design/2j833lOYTuaasV2OSoONCl/Onboarding-Flowchart-v1-1",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "tgo5zk0IjgJhmmboCeh7L4",
-      "fileName": "Onboarding Flowchart v1.2",
-      "fileUrl": "https://figma.com/design/tgo5zk0IjgJhmmboCeh7L4/Onboarding-Flowchart-v1-2",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "Pu3Gwc8xpvSmtkHGYWSCtX",
-      "fileName": "RUDDR-Int",
-      "fileUrl": "https://figma.com/design/Pu3Gwc8xpvSmtkHGYWSCtX/RUDDR-Int",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "HJhoCwosghgMBgIqcjoKxb",
-      "fileName": "Release Rollout Process",
-      "fileUrl": "https://figma.com/design/HJhoCwosghgMBgIqcjoKxb/Release-Rollout-Process",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "QYuOqQln271nYuVI9qkqlV",
-      "fileName": "SOP Suggestion",
-      "fileUrl": "https://figma.com/design/QYuOqQln271nYuVI9qkqlV/SOP-Suggestion",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "hA6NPtgwWdNnCMDXV6hPPh",
-      "fileName": "Storyboard File Structure",
-      "fileUrl": "https://figma.com/design/hA6NPtgwWdNnCMDXV6hPPh/Storyboard-File-Structure",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "QzS30JBPK0BGJ56in8odF6",
-      "fileName": "SyncThing setup flow",
-      "fileUrl": "https://figma.com/design/QzS30JBPK0BGJ56in8odF6/SyncThing-setup-flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "WUmKcyVIxVbmkrOMvMeljo",
-      "fileName": "Talent Application",
-      "fileUrl": "https://figma.com/design/WUmKcyVIxVbmkrOMvMeljo/Talent-Application",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "VDUFpGDmsJBpsSIeX1IbIm",
-      "fileName": "Talent Data Flow",
-      "fileUrl": "https://figma.com/design/VDUFpGDmsJBpsSIeX1IbIm/Talent-Data-Flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "nBA75y8TcuDG4rYFmFtMEF",
-      "fileName": "Transfer Brand Ownership",
-      "fileUrl": "https://figma.com/design/nBA75y8TcuDG4rYFmFtMEF/Transfer-Brand-Ownership",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "wXgbjlRIdsW0i7Qd49B5Co",
-      "fileName": "Typesense Flow",
-      "fileUrl": "https://figma.com/design/wXgbjlRIdsW0i7Qd49B5Co/Typesense-Flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "yxTRQPfaxb2LxZEXjxeqgv",
-      "fileName": "Typesense for Elements | Backend Design",
-      "fileUrl": "https://figma.com/design/yxTRQPfaxb2LxZEXjxeqgv/Typesense-for-Elements-Backend-Design",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "5FpvloQUpYGEBApVmQHzeO",
-      "fileName": "Typesense workflow updates",
-      "fileUrl": "https://figma.com/design/5FpvloQUpYGEBApVmQHzeO/Typesense-workflow-updates",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "L5s2SeYTfSHiOH6RX5MCQF",
-      "fileName": "URL → Permission Resolution (Mobile Deeplink)",
-      "fileUrl": "https://figma.com/design/L5s2SeYTfSHiOH6RX5MCQF/URL-Permission-Resolution-Mobile-Deeplink",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "z35r869Jv0PQp1WTFiIonI",
-      "fileName": "Untitled",
-      "fileUrl": "https://figma.com/design/z35r869Jv0PQp1WTFiIonI/Untitled",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "YX9sJlyOIZOZAX3QRunl3g",
-      "fileName": "Variation Element Upload Workflow",
-      "fileUrl": "https://figma.com/design/YX9sJlyOIZOZAX3QRunl3g/Variation-Element-Upload-Workflow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "grIw5MjWAiAjRzOgAOj24e",
-      "fileName": "Video Processing Pipeline",
-      "fileUrl": "https://figma.com/design/grIw5MjWAiAjRzOgAOj24e/Video-Processing-Pipeline",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "eauRJxrMFNPaMiN8NMwUq3",
-      "fileName": "WebflowOnboarding",
-      "fileUrl": "https://figma.com/design/eauRJxrMFNPaMiN8NMwUq3/WebflowOnboarding",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Flowcharts",
-      "fileKey": "vX3G2SqQLJPsMdvh61m2gc",
-      "fileName": "XML Comparison & Desktop App",
-      "fileUrl": "https://figma.com/design/vX3G2SqQLJPsMdvh61m2gc/XML-Comparison-Desktop-App",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Gen AI Token Usage",
-      "fileKey": "EUGR15VW5M1JTR8FFnLux5",
-      "fileName": "DEV-13199 — Generative-AI Token Billing · Architecture & Plan",
-      "fileUrl": "https://figma.com/design/EUGR15VW5M1JTR8FFnLux5/DEV-13199-Generative-AI-Token-Billing-Architecture-Plan",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 8
     },
     {
       "projectName": "Ideation",
@@ -1201,36 +400,6 @@
       "frameCount": 20
     },
     {
-      "projectName": "Sales Process",
-      "fileKey": "fe2cphpx8mkoseIJ7RBFnz",
-      "fileName": "Product Positioning Brainstorming",
-      "fileUrl": "https://figma.com/design/fe2cphpx8mkoseIJ7RBFnz/Product-Positioning-Brainstorming",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Sales Process",
-      "fileKey": "Onvt3MBkEA4HzCxzC84LY2",
-      "fileName": "Sales Process",
-      "fileUrl": "https://figma.com/design/Onvt3MBkEA4HzCxzC84LY2/Sales-Process",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        },
-        {
-          "nodeId": "5391:2743",
-          "name": "2026"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
       "projectName": "Settings",
       "fileKey": "VXv9714EBsJ7Uq29NsT2rq",
       "fileName": "Account Settings",
@@ -1323,35 +492,6 @@
     },
     {
       "projectName": "Settings",
-      "fileKey": "6fTLynNmsW0aGEhUT6HtjB",
-      "fileName": "Media Sync Desktop App",
-      "fileUrl": "https://figma.com/design/6fTLynNmsW0aGEhUT6HtjB/Media-Sync-Desktop-App",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Content"
-        },
-        {
-          "nodeId": "159:3337",
-          "name": "Materials"
-        },
-        {
-          "nodeId": "1:3",
-          "name": "---"
-        },
-        {
-          "nodeId": "19:25621",
-          "name": "Archive"
-        },
-        {
-          "nodeId": "1:2",
-          "name": "Cover"
-        }
-      ],
-      "frameCount": 46
-    },
-    {
-      "projectName": "Settings",
       "fileKey": "D95d1FJJILzccjLx1W357j",
       "fileName": "People\\Settings",
       "fileUrl": "https://figma.com/design/D95d1FJJILzccjLx1W357j/People-Settings",
@@ -1438,124 +578,108 @@
       "frameCount": 24
     },
     {
-      "projectName": "User Story and Planning",
-      "fileKey": "Z9qWKraUnx2GtS6NhPdC8D",
-      "fileName": "App Objectives & Key Results",
-      "fileUrl": "https://figma.com/design/Z9qWKraUnx2GtS6NhPdC8D/App-Objectives-Key-Results",
+      "projectName": "▢ ARCHIVE",
+      "fileKey": "Y3jPjEIPEUK2hkQxCTt5jE",
+      "fileName": "(Archive)  Ideation Live Proto",
+      "fileUrl": "https://figma.com/design/Y3jPjEIPEUK2hkQxCTt5jE/Archive-Ideation-Live-Proto",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Prototype"
+        },
+        {
+          "nodeId": "1:2",
+          "name": "Cover"
+        },
+        {
+          "nodeId": "136:120629",
+          "name": "Archive"
+        }
+      ],
+      "frameCount": 111
+    },
+    {
+      "projectName": "▢ ARCHIVE",
+      "fileKey": "tk8WOATXZ5nMsiLBtJp8kF",
+      "fileName": "Feather Icons & Unicons Library (Community)",
+      "fileUrl": "https://figma.com/design/tk8WOATXZ5nMsiLBtJp8kF/Feather-Icons-Unicons-Library-Community",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Icons"
+        },
+        {
+          "nodeId": "2:2318",
+          "name": "Cover"
+        }
+      ],
+      "frameCount": 3
+    },
+    {
+      "projectName": "▢ ARCHIVE",
+      "fileKey": "6fTLynNmsW0aGEhUT6HtjB",
+      "fileName": "Media Sync Desktop App",
+      "fileUrl": "https://figma.com/design/6fTLynNmsW0aGEhUT6HtjB/Media-Sync-Desktop-App",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Content"
+        },
+        {
+          "nodeId": "159:3337",
+          "name": "Materials"
+        },
+        {
+          "nodeId": "1:3",
+          "name": "---"
+        },
+        {
+          "nodeId": "19:25621",
+          "name": "Archive"
+        },
+        {
+          "nodeId": "1:2",
+          "name": "Cover"
+        }
+      ],
+      "frameCount": 46
+    },
+    {
+      "projectName": "▢ ARCHIVE",
+      "fileKey": "pbP7zLlG2hciusDcTZ2Yrw",
+      "fileName": "Solar Icons Set (Community)",
+      "fileUrl": "https://figma.com/design/pbP7zLlG2hciusDcTZ2Yrw/Solar-Icons-Set-Community",
+      "pages": [
+        {
+          "nodeId": "870:2",
+          "name": "✨ Hello! "
+        },
+        {
+          "nodeId": "0:1",
+          "name": "🔥 Icon Library"
+        },
+        {
+          "nodeId": "869:1502",
+          "name": "🗂️  Index"
+        }
+      ],
+      "frameCount": 237
+    },
+    {
+      "projectName": "▢ Gen AI Token Usage",
+      "fileKey": "EUGR15VW5M1JTR8FFnLux5",
+      "fileName": "DEV-13199 — Generative-AI Token Billing · Architecture & Plan",
+      "fileUrl": "https://figma.com/design/EUGR15VW5M1JTR8FFnLux5/DEV-13199-Generative-AI-Token-Billing-Architecture-Plan",
       "pages": [
         {
           "nodeId": "0:1",
           "name": "Page 1"
         }
       ],
-      "frameCount": 0
+      "frameCount": 8
     },
     {
-      "projectName": "User Story and Planning",
-      "fileKey": "aQGIUTRuwIhj9Xq5pWMgtd",
-      "fileName": "ClickUp Task Basic Flow",
-      "fileUrl": "https://figma.com/design/aQGIUTRuwIhj9Xq5pWMgtd/ClickUp-Task-Basic-Flow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "User Story and Planning",
-      "fileKey": "WSdSHAsgTjHGlhnjO1uxCI",
-      "fileName": "Clickup Dev Workflow",
-      "fileUrl": "https://figma.com/design/WSdSHAsgTjHGlhnjO1uxCI/Clickup-Dev-Workflow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "User Story and Planning",
-      "fileKey": "3Q2XQFI6v8HZHtq6M2Viho",
-      "fileName": "Clickup Dev Workflow (Copy)",
-      "fileUrl": "https://figma.com/design/3Q2XQFI6v8HZHtq6M2Viho/Clickup-Dev-Workflow-Copy",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "User Story and Planning",
-      "fileKey": "yepjBquBQ1QZDyaFAU2L0B",
-      "fileName": "DESIGN-VS-DEVELOPMENT",
-      "fileUrl": "https://figma.com/design/yepjBquBQ1QZDyaFAU2L0B/DESIGN-VS-DEVELOPMENT",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "User Story and Planning",
-      "fileKey": "bTe9e1XMdMsBqvKWUzT0ao",
-      "fileName": "Development Workflow",
-      "fileUrl": "https://figma.com/design/bTe9e1XMdMsBqvKWUzT0ao/Development-Workflow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "User Story and Planning",
-      "fileKey": "nc1glmTm08devm6eaOKGxK",
-      "fileName": "Git Branching",
-      "fileUrl": "https://figma.com/design/nc1glmTm08devm6eaOKGxK/Git-Branching",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "User Story and Planning",
-      "fileKey": "jdh6EAIeBBLEfIwuFS1XWu",
-      "fileName": "GitHub branching flow for large features",
-      "fileUrl": "https://figma.com/design/jdh6EAIeBBLEfIwuFS1XWu/GitHub-branching-flow-for-large-features",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "User Story and Planning",
-      "fileKey": "SxzHbNM3beQ46PDQK2XM2u",
-      "fileName": "MegaVariation",
-      "fileUrl": "https://figma.com/design/SxzHbNM3beQ46PDQK2XM2u/MegaVariation",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "PToUWwYjGkiRaddU7awCs1",
       "fileName": "Ant Design System for Figma 5.11",
       "fileUrl": "https://figma.com/design/PToUWwYjGkiRaddU7awCs1/Ant-Design-System-for-Figma-5-11",
@@ -1948,7 +1072,7 @@
       "frameCount": 142
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "zUyEegE75uQy5uTWxYJZkp",
       "fileName": "Audition Form\\Settings",
       "fileUrl": "https://figma.com/design/zUyEegE75uQy5uTWxYJZkp/Audition-Form-Settings",
@@ -1973,7 +1097,7 @@
       "frameCount": 1
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "Y00HTqhSSCEKbofZGU6GeH",
       "fileName": "Brand Intranet",
       "fileUrl": "https://figma.com/design/Y00HTqhSSCEKbofZGU6GeH/Brand-Intranet",
@@ -2002,20 +1126,7 @@
       "frameCount": 61
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "ZJuvuzEXalsB9JjNOCVxrD",
-      "fileName": "Chad Terry's team library",
-      "fileUrl": "https://figma.com/design/ZJuvuzEXalsB9JjNOCVxrD/Chad-Terry-s-team-library",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Template"
-        }
-      ],
-      "frameCount": 13
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "L2WtMQ5D7np7KDJ2vm3Ly0",
       "fileName": "Components",
       "fileUrl": "https://figma.com/design/L2WtMQ5D7np7KDJ2vm3Ly0/Components",
@@ -2048,7 +1159,7 @@
       "frameCount": 17
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "f0fuEGiCEOn7OKNPGBFzfs",
       "fileName": "Conversations",
       "fileUrl": "https://figma.com/design/f0fuEGiCEOn7OKNPGBFzfs/Conversations",
@@ -2073,7 +1184,7 @@
       "frameCount": 28
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "axPt6e2dntwNgIPJErVCKm",
       "fileName": "Creative Details",
       "fileUrl": "https://figma.com/design/axPt6e2dntwNgIPJErVCKm/Creative-Details",
@@ -2094,7 +1205,7 @@
       "frameCount": 5
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "8CqIKC6GtVcjoxzrEvqc6u",
       "fileName": "Custom Naming Convention Field",
       "fileUrl": "https://figma.com/design/8CqIKC6GtVcjoxzrEvqc6u/Custom-Naming-Convention-Field",
@@ -2107,7 +1218,7 @@
       "frameCount": 0
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "MrpRtJfdVq5X6KihHNFBz3",
       "fileName": "Draft",
       "fileUrl": "https://figma.com/design/MrpRtJfdVq5X6KihHNFBz3/Draft",
@@ -2120,7 +1231,7 @@
       "frameCount": 0
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "1RdGliDZXi5vZm9wuttPDl",
       "fileName": "Education",
       "fileUrl": "https://figma.com/design/1RdGliDZXi5vZm9wuttPDl/Education",
@@ -2145,36 +1256,7 @@
       "frameCount": 13
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "6JLq2RQuWUVFXATauNw58w",
-      "fileName": "Education CMS",
-      "fileUrl": "https://figma.com/design/6JLq2RQuWUVFXATauNw58w/Education-CMS",
-      "pages": [
-        {
-          "nodeId": "21:472",
-          "name": "Design"
-        },
-        {
-          "nodeId": "2004:7202",
-          "name": "---"
-        },
-        {
-          "nodeId": "2015:23587",
-          "name": "Playground"
-        },
-        {
-          "nodeId": "19:7355",
-          "name": "Archive"
-        },
-        {
-          "nodeId": "2004:7201",
-          "name": "Cover"
-        }
-      ],
-      "frameCount": 12
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "2lPfoxcVDl4WtZ0Cl9THrO",
       "fileName": "Element Library UI",
       "fileUrl": "https://figma.com/design/2lPfoxcVDl4WtZ0Cl9THrO/Element-Library-UI",
@@ -2207,7 +1289,7 @@
       "frameCount": 10
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "ud2GJRfy73qUIVTAm6rMlj",
       "fileName": "Errors",
       "fileUrl": "https://figma.com/design/ud2GJRfy73qUIVTAm6rMlj/Errors",
@@ -2228,37 +1310,7 @@
       "frameCount": 7
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "tk8WOATXZ5nMsiLBtJp8kF",
-      "fileName": "Feather Icons & Unicons Library (Community)",
-      "fileUrl": "https://figma.com/design/tk8WOATXZ5nMsiLBtJp8kF/Feather-Icons-Unicons-Library-Community",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Icons"
-        },
-        {
-          "nodeId": "2:2318",
-          "name": "Cover"
-        }
-      ],
-      "frameCount": 3
-    },
-    {
-      "projectName": "Viscap UI",
-      "fileKey": "WIkuhUXGxPNTUK9aQSS17K",
-      "fileName": "File Scanning Workflow",
-      "fileUrl": "https://figma.com/design/WIkuhUXGxPNTUK9aQSS17K/File-Scanning-Workflow",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "6Zorsq5OOXFEPWIxjnP1f8",
       "fileName": "Frameworks",
       "fileUrl": "https://figma.com/design/6Zorsq5OOXFEPWIxjnP1f8/Frameworks",
@@ -2291,20 +1343,7 @@
       "frameCount": 18
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "E6pWXrh2jfwZSu8tZQW3sI",
-      "fileName": "Handle app crashes while keeping track of all files",
-      "fileUrl": "https://figma.com/design/E6pWXrh2jfwZSu8tZQW3sI/Handle-app-crashes-while-keeping-track-of-all-files",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "dhLhbWxn0blghb9oF3VM5u",
       "fileName": "Help & Resources",
       "fileUrl": "https://figma.com/design/dhLhbWxn0blghb9oF3VM5u/Help-Resources",
@@ -2333,7 +1372,7 @@
       "frameCount": 22
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "eEYq7ZBSr6rIaUfef8aybW",
       "fileName": "Idea Bank",
       "fileUrl": "https://figma.com/design/eEYq7ZBSr6rIaUfef8aybW/Idea-Bank",
@@ -2362,7 +1401,7 @@
       "frameCount": 28
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "jEjgUm9Bd9FKKMXD2uNtTx",
       "fileName": "Log In / Sign Up",
       "fileUrl": "https://figma.com/design/jEjgUm9Bd9FKKMXD2uNtTx/Log-In-Sign-Up",
@@ -2407,40 +1446,7 @@
       "frameCount": 31
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "iUZ6wVOdMCjjHLVpWurzls",
-      "fileName": "MVP Mobile App",
-      "fileUrl": "https://figma.com/design/iUZ6wVOdMCjjHLVpWurzls/MVP-Mobile-App",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "First Version [Creatives + SS]"
-        },
-        {
-          "nodeId": "459:55864",
-          "name": "Drafts "
-        },
-        {
-          "nodeId": "453:55855",
-          "name": "UI-KIT"
-        },
-        {
-          "nodeId": "30:49448",
-          "name": "---"
-        },
-        {
-          "nodeId": "30:49446",
-          "name": "Cover"
-        },
-        {
-          "nodeId": "30:49447",
-          "name": "Archive"
-        }
-      ],
-      "frameCount": 60
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "hH6HUh8tqNpiWCfHvnq5I0",
       "fileName": "Media Library",
       "fileUrl": "https://figma.com/design/hH6HUh8tqNpiWCfHvnq5I0/Media-Library",
@@ -2469,7 +1475,7 @@
       "frameCount": 28
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "6qnlg8DQW2IavR0NlwvVQV",
       "fileName": "Mission Control",
       "fileUrl": "https://figma.com/design/6qnlg8DQW2IavR0NlwvVQV/Mission-Control",
@@ -2506,53 +1512,7 @@
       "frameCount": 114
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "mRCQYEPCLMkv5TxXWhG94k",
-      "fileName": "Mobile App V2",
-      "fileUrl": "https://figma.com/design/mRCQYEPCLMkv5TxXWhG94k/Mobile-App-V2",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "First Version [Creatives + SS]"
-        },
-        {
-          "nodeId": "459:55864",
-          "name": "Drafts "
-        },
-        {
-          "nodeId": "453:55855",
-          "name": "UI-KIT"
-        },
-        {
-          "nodeId": "30:49448",
-          "name": "---"
-        },
-        {
-          "nodeId": "30:49446",
-          "name": "Cover"
-        },
-        {
-          "nodeId": "30:49447",
-          "name": "Archive"
-        }
-      ],
-      "frameCount": 109
-    },
-    {
-      "projectName": "Viscap UI",
-      "fileKey": "dxVWYRPJYh4YlJt8YrZFVs",
-      "fileName": "Moving talents between sprints",
-      "fileUrl": "https://figma.com/design/dxVWYRPJYh4YlJt8YrZFVs/Moving-talents-between-sprints",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "D1bBniTVyvY2syYChkB13L",
       "fileName": "New Creative Page",
       "fileUrl": "https://figma.com/design/D1bBniTVyvY2syYChkB13L/New-Creative-Page",
@@ -2577,7 +1537,7 @@
       "frameCount": 36
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "JhXGOE6RzTWC4JoDh7SWEP",
       "fileName": "Permissions UI",
       "fileUrl": "https://figma.com/design/JhXGOE6RzTWC4JoDh7SWEP/Permissions-UI",
@@ -2622,20 +1582,7 @@
       "frameCount": 8
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "xCgbJPrjXEd03wyTFWbmnQ",
-      "fileName": "Permissions update suggestion",
-      "fileUrl": "https://figma.com/design/xCgbJPrjXEd03wyTFWbmnQ/Permissions-update-suggestion",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "qDAk29LAbbsczBjlKVVwKD",
       "fileName": "Phase&Sprints",
       "fileUrl": "https://figma.com/design/qDAk29LAbbsczBjlKVVwKD/Phase-Sprints",
@@ -2664,7 +1611,7 @@
       "frameCount": 1
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "vVVnnKC5EGVYYt5RKYTOje",
       "fileName": "Reports",
       "fileUrl": "https://figma.com/design/vVVnnKC5EGVYYt5RKYTOje/Reports",
@@ -2685,53 +1632,7 @@
       "frameCount": 30
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "hchYb8XVKyyFvsOGF9ifuW",
-      "fileName": "Shooting Sessions Mobile App",
-      "fileUrl": "https://figma.com/design/hchYb8XVKyyFvsOGF9ifuW/Shooting-Sessions-Mobile-App",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Quick Proto"
-        },
-        {
-          "nodeId": "1:4",
-          "name": " "
-        },
-        {
-          "nodeId": "1:3",
-          "name": "Archive"
-        },
-        {
-          "nodeId": "1:2",
-          "name": "Cover"
-        }
-      ],
-      "frameCount": 33
-    },
-    {
-      "projectName": "Viscap UI",
-      "fileKey": "pbP7zLlG2hciusDcTZ2Yrw",
-      "fileName": "Solar Icons Set (Community)",
-      "fileUrl": "https://figma.com/design/pbP7zLlG2hciusDcTZ2Yrw/Solar-Icons-Set-Community",
-      "pages": [
-        {
-          "nodeId": "870:2",
-          "name": "✨ Hello! "
-        },
-        {
-          "nodeId": "0:1",
-          "name": "🔥 Icon Library"
-        },
-        {
-          "nodeId": "869:1502",
-          "name": "🗂️  Index"
-        }
-      ],
-      "frameCount": 237
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "tufWvWL4VeiZslwmhHW9Pa",
       "fileName": "Talent Management",
       "fileUrl": "https://figma.com/design/tufWvWL4VeiZslwmhHW9Pa/Talent-Management",
@@ -2768,7 +1669,7 @@
       "frameCount": 69
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "94pt6Tyzqr36vUN7dBtyiy",
       "fileName": "Talent Profile",
       "fileUrl": "https://figma.com/design/94pt6Tyzqr36vUN7dBtyiy/Talent-Profile",
@@ -2789,20 +1690,7 @@
       "frameCount": 2
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "SLI3n4DzovtLAkxgiQJI3i",
-      "fileName": "Talent media uploading",
-      "fileUrl": "https://figma.com/design/SLI3n4DzovtLAkxgiQJI3i/Talent-media-uploading",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "Page 1"
-        }
-      ],
-      "frameCount": 0
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "fd3W9HeMxXxbQvS4opxMvc",
       "fileName": "Variables",
       "fileUrl": "https://figma.com/design/fd3W9HeMxXxbQvS4opxMvc/Variables",
@@ -2831,7 +1719,7 @@
       "frameCount": 1
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "Hof2q3eWYTjOJbmesNjm1a",
       "fileName": "Views",
       "fileUrl": "https://figma.com/design/Hof2q3eWYTjOJbmesNjm1a/Views",
@@ -2844,7 +1732,7 @@
       "frameCount": 4
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "LLedChrrsvS2orH0WeBkgw",
       "fileName": "VisCap 2.0",
       "fileUrl": "https://figma.com/design/LLedChrrsvS2orH0WeBkgw/VisCap-2-0",
@@ -2949,36 +1837,7 @@
       "frameCount": 422
     },
     {
-      "projectName": "Viscap UI",
-      "fileKey": "cfUlJrRYaYgY5lxR160FX4",
-      "fileName": "VisCap Mobile",
-      "fileUrl": "https://figma.com/design/cfUlJrRYaYgY5lxR160FX4/VisCap-Mobile",
-      "pages": [
-        {
-          "nodeId": "0:1",
-          "name": "🖍️ Proccess"
-        },
-        {
-          "nodeId": "1:15",
-          "name": "References "
-        },
-        {
-          "nodeId": "1:3",
-          "name": " "
-        },
-        {
-          "nodeId": "1:4",
-          "name": "Archive"
-        },
-        {
-          "nodeId": "1:2",
-          "name": "Cover"
-        }
-      ],
-      "frameCount": 46
-    },
-    {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "QM86NsviiqoaklEnkYmKIh",
       "fileName": "VisCap.ai 2.0 - Header",
       "fileUrl": "https://figma.com/design/QM86NsviiqoaklEnkYmKIh/VisCap-ai-2-0-Header",
@@ -2991,7 +1850,7 @@
       "frameCount": 3
     },
     {
-      "projectName": "Viscap UI",
+      "projectName": "▢ Viscap UI [FROZEN — DO NOT EDIT]",
       "fileKey": "fp2f9OHAme6lMUNh0tJwqV",
       "fileName": "Webflow viscap.ai",
       "fileUrl": "https://figma.com/design/fp2f9OHAme6lMUNh0tJwqV/Webflow-viscap-ai",
@@ -3038,6 +1897,1134 @@
         }
       ],
       "frameCount": 132
+    },
+    {
+      "projectName": "▣ CMS APP",
+      "fileKey": "6JLq2RQuWUVFXATauNw58w",
+      "fileName": "Education CMS",
+      "fileUrl": "https://figma.com/design/6JLq2RQuWUVFXATauNw58w/Education-CMS",
+      "pages": [
+        {
+          "nodeId": "21:472",
+          "name": "Design"
+        },
+        {
+          "nodeId": "2004:7202",
+          "name": "---"
+        },
+        {
+          "nodeId": "2015:23587",
+          "name": "Playground"
+        },
+        {
+          "nodeId": "19:7355",
+          "name": "Archive"
+        },
+        {
+          "nodeId": "2004:7201",
+          "name": "Cover"
+        }
+      ],
+      "frameCount": 12
+    },
+    {
+      "projectName": "▣ MOBILE APP",
+      "fileKey": "E6pWXrh2jfwZSu8tZQW3sI",
+      "fileName": "Handle app crashes while keeping track of all files",
+      "fileUrl": "https://figma.com/design/E6pWXrh2jfwZSu8tZQW3sI/Handle-app-crashes-while-keeping-track-of-all-files",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "▣ MOBILE APP",
+      "fileKey": "iUZ6wVOdMCjjHLVpWurzls",
+      "fileName": "MVP Mobile App",
+      "fileUrl": "https://figma.com/design/iUZ6wVOdMCjjHLVpWurzls/MVP-Mobile-App",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "First Version [Creatives + SS]"
+        },
+        {
+          "nodeId": "459:55864",
+          "name": "Drafts "
+        },
+        {
+          "nodeId": "453:55855",
+          "name": "UI-KIT"
+        },
+        {
+          "nodeId": "30:49448",
+          "name": "---"
+        },
+        {
+          "nodeId": "30:49446",
+          "name": "Cover"
+        },
+        {
+          "nodeId": "30:49447",
+          "name": "Archive"
+        }
+      ],
+      "frameCount": 60
+    },
+    {
+      "projectName": "▣ MOBILE APP",
+      "fileKey": "mRCQYEPCLMkv5TxXWhG94k",
+      "fileName": "Mobile App V2",
+      "fileUrl": "https://figma.com/design/mRCQYEPCLMkv5TxXWhG94k/Mobile-App-V2",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "First Version [Creatives + SS]"
+        },
+        {
+          "nodeId": "459:55864",
+          "name": "Drafts "
+        },
+        {
+          "nodeId": "453:55855",
+          "name": "UI-KIT"
+        },
+        {
+          "nodeId": "30:49448",
+          "name": "---"
+        },
+        {
+          "nodeId": "30:49446",
+          "name": "Cover"
+        },
+        {
+          "nodeId": "30:49447",
+          "name": "Archive"
+        }
+      ],
+      "frameCount": 109
+    },
+    {
+      "projectName": "▣ MOBILE APP",
+      "fileKey": "hchYb8XVKyyFvsOGF9ifuW",
+      "fileName": "Shooting Sessions Mobile App",
+      "fileUrl": "https://figma.com/design/hchYb8XVKyyFvsOGF9ifuW/Shooting-Sessions-Mobile-App",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Quick Proto"
+        },
+        {
+          "nodeId": "1:4",
+          "name": " "
+        },
+        {
+          "nodeId": "1:3",
+          "name": "Archive"
+        },
+        {
+          "nodeId": "1:2",
+          "name": "Cover"
+        }
+      ],
+      "frameCount": 33
+    },
+    {
+      "projectName": "▣ MOBILE APP",
+      "fileKey": "cfUlJrRYaYgY5lxR160FX4",
+      "fileName": "VisCap Mobile",
+      "fileUrl": "https://figma.com/design/cfUlJrRYaYgY5lxR160FX4/VisCap-Mobile",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "🖍️ Proccess"
+        },
+        {
+          "nodeId": "1:15",
+          "name": "References "
+        },
+        {
+          "nodeId": "1:3",
+          "name": " "
+        },
+        {
+          "nodeId": "1:4",
+          "name": "Archive"
+        },
+        {
+          "nodeId": "1:2",
+          "name": "Cover"
+        }
+      ],
+      "frameCount": 46
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "TIuWFkO5GYcZkUCiAUpWYJ",
+      "fileName": "Casting users available actions",
+      "fileUrl": "https://figma.com/design/TIuWFkO5GYcZkUCiAUpWYJ/Casting-users-available-actions",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "Y55AcyeMvTLTGcXNQ6qO9D",
+      "fileName": "Creatives / Elements / Clips",
+      "fileUrl": "https://figma.com/design/Y55AcyeMvTLTGcXNQ6qO9D/Creatives-Elements-Clips",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "zZieOW3nW5F2qFnxST2Xwu",
+      "fileName": "Creatives-schema update",
+      "fileUrl": "https://figma.com/design/zZieOW3nW5F2qFnxST2Xwu/Creatives-schema-update",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "8waj3oCbbTJGPvBhfxcb7D",
+      "fileName": "Database Schema (APP) v1",
+      "fileUrl": "https://figma.com/design/8waj3oCbbTJGPvBhfxcb7D/Database-Schema-APP-v1",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "Y0JTU0uDqNdTYRzJ1c6H6q",
+      "fileName": "Database Schema (APP) v2",
+      "fileUrl": "https://figma.com/design/Y0JTU0uDqNdTYRzJ1c6H6q/Database-Schema-APP-v2",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "KKrh3Ps7TPa1GaT3B6HFuR",
+      "fileName": "Database Schema (BETA)",
+      "fileUrl": "https://figma.com/design/KKrh3Ps7TPa1GaT3B6HFuR/Database-Schema-BETA",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "DtYT27dMCQ6cPZiCxIan1G",
+      "fileName": "Permissions for Ideation",
+      "fileUrl": "https://figma.com/design/DtYT27dMCQ6cPZiCxIan1G/Permissions-for-Ideation",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "loS7X2utlsIVdLSgwgu2Jh",
+      "fileName": "Permissions in DB",
+      "fileUrl": "https://figma.com/design/loS7X2utlsIVdLSgwgu2Jh/Permissions-in-DB",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "JCVibjkGp6B3nEPn0kgZst",
+      "fileName": "Project & Team Management Report Schema Changes",
+      "fileUrl": "https://figma.com/design/JCVibjkGp6B3nEPn0kgZst/Project-Team-Management-Report-Schema-Changes",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "HvM4xP9GNKRoGLu9BJLDUg",
+      "fileName": "Shooting Session",
+      "fileUrl": "https://figma.com/design/HvM4xP9GNKRoGLu9BJLDUg/Shooting-Session",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "QujBaF6VgLehdnQtmBNhIB",
+      "fileName": "Shotlist Data Schema",
+      "fileUrl": "https://figma.com/design/QujBaF6VgLehdnQtmBNhIB/Shotlist-Data-Schema",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "t4kByfh01DPBQ16oZNiJGg",
+      "fileName": "Typesense Tags",
+      "fileUrl": "https://figma.com/design/t4kByfh01DPBQ16oZNiJGg/Typesense-Tags",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "RwgNDVqoVUkyFgxZpjQtj3",
+      "fileName": "Untitled",
+      "fileUrl": "https://figma.com/design/RwgNDVqoVUkyFgxZpjQtj3/Untitled",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Data Planning",
+      "fileKey": "As3PscrMmstwWPvMUuaXG1",
+      "fileName": "Untitled",
+      "fileUrl": "https://figma.com/design/As3PscrMmstwWPvMUuaXG1/Untitled",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "dpU5wmMkxQvVkYUXVcy8b4",
+      "fileName": "AI Researcher",
+      "fileUrl": "https://figma.com/design/dpU5wmMkxQvVkYUXVcy8b4/AI-Researcher",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "8BxDTPEpSnKjSkTRq37ZDS",
+      "fileName": "Access & Teams",
+      "fileUrl": "https://figma.com/design/8BxDTPEpSnKjSkTRq37ZDS/Access-Teams",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "oR8Qop5o3A0ocp3Wrf3NU7",
+      "fileName": "Accounting Tech Stack",
+      "fileUrl": "https://figma.com/design/oR8Qop5o3A0ocp3Wrf3NU7/Accounting-Tech-Stack",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "o8PYjDWyUIKXF5m9rg0uLG",
+      "fileName": "Backend Restful API",
+      "fileUrl": "https://figma.com/design/o8PYjDWyUIKXF5m9rg0uLG/Backend-Restful-API",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "BujF2jw58GwiF5XlHZj3rb",
+      "fileName": "Billing",
+      "fileUrl": "https://figma.com/design/BujF2jw58GwiF5XlHZj3rb/Billing",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "yNpYXLs4UW7Q9Bdp1zLBOg",
+      "fileName": "Casting User Flow",
+      "fileUrl": "https://figma.com/design/yNpYXLs4UW7Q9Bdp1zLBOg/Casting-User-Flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "W18kIFUZYZCV6vkjyw6ME1",
+      "fileName": "Clip number to shooting session filename",
+      "fileUrl": "https://figma.com/design/W18kIFUZYZCV6vkjyw6ME1/Clip-number-to-shooting-session-filename",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "hfiVZoi77Bf34Ph2fvd6OP",
+      "fileName": "Creative Flow",
+      "fileUrl": "https://figma.com/design/hfiVZoi77Bf34Ph2fvd6OP/Creative-Flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "fF2X1TTCcKMXkOnujhDQUv",
+      "fileName": "DeliverLifeCycle",
+      "fileUrl": "https://figma.com/design/fF2X1TTCcKMXkOnujhDQUv/DeliverLifeCycle",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "LJJiWwvja4lMoEeov4u1l5",
+      "fileName": "Elements & Variations",
+      "fileUrl": "https://figma.com/design/LJJiWwvja4lMoEeov4u1l5/Elements-Variations",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "GVotb8reyRMLcqEUexjQEA",
+      "fileName": "Facebook API Flow",
+      "fileUrl": "https://figma.com/design/GVotb8reyRMLcqEUexjQEA/Facebook-API-Flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "WIkuhUXGxPNTUK9aQSS17K",
+      "fileName": "File Scanning Workflow",
+      "fileUrl": "https://figma.com/design/WIkuhUXGxPNTUK9aQSS17K/File-Scanning-Workflow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "LORZN2TLACH2EoBiU8q6mr",
+      "fileName": "Firebase Structure",
+      "fileUrl": "https://figma.com/design/LORZN2TLACH2EoBiU8q6mr/Firebase-Structure",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 8
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "RBA8yX7BzPiKZ36PZUaDjU",
+      "fileName": "Firebase: Media Library Entities",
+      "fileUrl": "https://figma.com/design/RBA8yX7BzPiKZ36PZUaDjU/Firebase-Media-Library-Entities",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "2vN0mDwdAYzNqFq1e7YtN7",
+      "fileName": "How to use sessions to hide static front end using proxy",
+      "fileUrl": "https://figma.com/design/2vN0mDwdAYzNqFq1e7YtN7/How-to-use-sessions-to-hide-static-front-end-using-proxy",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "x3jYwtc2fzcY2hOoFcZtcR",
+      "fileName": "Idea Lifecycles",
+      "fileUrl": "https://figma.com/design/x3jYwtc2fzcY2hOoFcZtcR/Idea-Lifecycles",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "perhfEramW9QzPXmLdGRqg",
+      "fileName": "Ideation Entities",
+      "fileUrl": "https://figma.com/design/perhfEramW9QzPXmLdGRqg/Ideation-Entities",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "I5YHWZFomQKejtNsIQQ9AN",
+      "fileName": "Ideation data flow",
+      "fileUrl": "https://figma.com/design/I5YHWZFomQKejtNsIQQ9AN/Ideation-data-flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "FqobWgaSRrCKW04WjUPRhu",
+      "fileName": "Image Proxy",
+      "fileUrl": "https://figma.com/design/FqobWgaSRrCKW04WjUPRhu/Image-Proxy",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "jfHNOt0ho4czMSF2zdplOp",
+      "fileName": "Media Library Media Processing Solutions",
+      "fileUrl": "https://figma.com/design/jfHNOt0ho4czMSF2zdplOp/Media-Library-Media-Processing-Solutions",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "PAoaxYuv6bE9JW5QaQShFh",
+      "fileName": "Media Life Cycle",
+      "fileUrl": "https://figma.com/design/PAoaxYuv6bE9JW5QaQShFh/Media-Life-Cycle",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "tpjSxzXIPXerkrOf47NzQy",
+      "fileName": "Media Storage Structure",
+      "fileUrl": "https://figma.com/design/tpjSxzXIPXerkrOf47NzQy/Media-Storage-Structure",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "GSJXvPjanbBaPXR9FGsAFa",
+      "fileName": "Media Upload Options (P&C)",
+      "fileUrl": "https://figma.com/design/GSJXvPjanbBaPXR9FGsAFa/Media-Upload-Options-P-C",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "dxVWYRPJYh4YlJt8YrZFVs",
+      "fileName": "Moving talents between sprints",
+      "fileUrl": "https://figma.com/design/dxVWYRPJYh4YlJt8YrZFVs/Moving-talents-between-sprints",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "CqNSyOyeoSkglKehy8X4HY",
+      "fileName": "Multistage Form Usage",
+      "fileUrl": "https://figma.com/design/CqNSyOyeoSkglKehy8X4HY/Multistage-Form-Usage",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "SDrEBJetKrrneHRA6UMlRH",
+      "fileName": "New Media Sync Flow",
+      "fileUrl": "https://figma.com/design/SDrEBJetKrrneHRA6UMlRH/New-Media-Sync-Flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "ODnXBdX9gcjTf758gw8RFp",
+      "fileName": "Next.js api layer",
+      "fileUrl": "https://figma.com/design/ODnXBdX9gcjTf758gw8RFp/Next-js-api-layer",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "XvzDkXYiT7vJcL0msMA9Mv",
+      "fileName": "Onboarding Flowchart v1.0",
+      "fileUrl": "https://figma.com/design/XvzDkXYiT7vJcL0msMA9Mv/Onboarding-Flowchart-v1-0",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "2j833lOYTuaasV2OSoONCl",
+      "fileName": "Onboarding Flowchart v1.1",
+      "fileUrl": "https://figma.com/design/2j833lOYTuaasV2OSoONCl/Onboarding-Flowchart-v1-1",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "tgo5zk0IjgJhmmboCeh7L4",
+      "fileName": "Onboarding Flowchart v1.2",
+      "fileUrl": "https://figma.com/design/tgo5zk0IjgJhmmboCeh7L4/Onboarding-Flowchart-v1-2",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "xCgbJPrjXEd03wyTFWbmnQ",
+      "fileName": "Permissions update suggestion",
+      "fileUrl": "https://figma.com/design/xCgbJPrjXEd03wyTFWbmnQ/Permissions-update-suggestion",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "Pu3Gwc8xpvSmtkHGYWSCtX",
+      "fileName": "RUDDR-Int",
+      "fileUrl": "https://figma.com/design/Pu3Gwc8xpvSmtkHGYWSCtX/RUDDR-Int",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "HJhoCwosghgMBgIqcjoKxb",
+      "fileName": "Release Rollout Process",
+      "fileUrl": "https://figma.com/design/HJhoCwosghgMBgIqcjoKxb/Release-Rollout-Process",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "QYuOqQln271nYuVI9qkqlV",
+      "fileName": "SOP Suggestion",
+      "fileUrl": "https://figma.com/design/QYuOqQln271nYuVI9qkqlV/SOP-Suggestion",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "hA6NPtgwWdNnCMDXV6hPPh",
+      "fileName": "Storyboard File Structure",
+      "fileUrl": "https://figma.com/design/hA6NPtgwWdNnCMDXV6hPPh/Storyboard-File-Structure",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "QzS30JBPK0BGJ56in8odF6",
+      "fileName": "SyncThing setup flow",
+      "fileUrl": "https://figma.com/design/QzS30JBPK0BGJ56in8odF6/SyncThing-setup-flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "WUmKcyVIxVbmkrOMvMeljo",
+      "fileName": "Talent Application",
+      "fileUrl": "https://figma.com/design/WUmKcyVIxVbmkrOMvMeljo/Talent-Application",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "VDUFpGDmsJBpsSIeX1IbIm",
+      "fileName": "Talent Data Flow",
+      "fileUrl": "https://figma.com/design/VDUFpGDmsJBpsSIeX1IbIm/Talent-Data-Flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "SLI3n4DzovtLAkxgiQJI3i",
+      "fileName": "Talent media uploading",
+      "fileUrl": "https://figma.com/design/SLI3n4DzovtLAkxgiQJI3i/Talent-media-uploading",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "nBA75y8TcuDG4rYFmFtMEF",
+      "fileName": "Transfer Brand Ownership",
+      "fileUrl": "https://figma.com/design/nBA75y8TcuDG4rYFmFtMEF/Transfer-Brand-Ownership",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "wXgbjlRIdsW0i7Qd49B5Co",
+      "fileName": "Typesense Flow",
+      "fileUrl": "https://figma.com/design/wXgbjlRIdsW0i7Qd49B5Co/Typesense-Flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "yxTRQPfaxb2LxZEXjxeqgv",
+      "fileName": "Typesense for Elements | Backend Design",
+      "fileUrl": "https://figma.com/design/yxTRQPfaxb2LxZEXjxeqgv/Typesense-for-Elements-Backend-Design",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "5FpvloQUpYGEBApVmQHzeO",
+      "fileName": "Typesense workflow updates",
+      "fileUrl": "https://figma.com/design/5FpvloQUpYGEBApVmQHzeO/Typesense-workflow-updates",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "L5s2SeYTfSHiOH6RX5MCQF",
+      "fileName": "URL → Permission Resolution (Mobile Deeplink)",
+      "fileUrl": "https://figma.com/design/L5s2SeYTfSHiOH6RX5MCQF/URL-Permission-Resolution-Mobile-Deeplink",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "z35r869Jv0PQp1WTFiIonI",
+      "fileName": "Untitled",
+      "fileUrl": "https://figma.com/design/z35r869Jv0PQp1WTFiIonI/Untitled",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "YX9sJlyOIZOZAX3QRunl3g",
+      "fileName": "Variation Element Upload Workflow",
+      "fileUrl": "https://figma.com/design/YX9sJlyOIZOZAX3QRunl3g/Variation-Element-Upload-Workflow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "grIw5MjWAiAjRzOgAOj24e",
+      "fileName": "Video Processing Pipeline",
+      "fileUrl": "https://figma.com/design/grIw5MjWAiAjRzOgAOj24e/Video-Processing-Pipeline",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "eauRJxrMFNPaMiN8NMwUq3",
+      "fileName": "WebflowOnboarding",
+      "fileUrl": "https://figma.com/design/eauRJxrMFNPaMiN8NMwUq3/WebflowOnboarding",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Flowcharts",
+      "fileKey": "vX3G2SqQLJPsMdvh61m2gc",
+      "fileName": "XML Comparison & Desktop App",
+      "fileUrl": "https://figma.com/design/vX3G2SqQLJPsMdvh61m2gc/XML-Comparison-Desktop-App",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Sales Process",
+      "fileKey": "fe2cphpx8mkoseIJ7RBFnz",
+      "fileName": "Product Positioning Brainstorming",
+      "fileUrl": "https://figma.com/design/fe2cphpx8mkoseIJ7RBFnz/Product-Positioning-Brainstorming",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ Sales Process",
+      "fileKey": "Onvt3MBkEA4HzCxzC84LY2",
+      "fileName": "Sales Process",
+      "fileUrl": "https://figma.com/design/Onvt3MBkEA4HzCxzC84LY2/Sales-Process",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        },
+        {
+          "nodeId": "5391:2743",
+          "name": "2026"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "Z9qWKraUnx2GtS6NhPdC8D",
+      "fileName": "App Objectives & Key Results",
+      "fileUrl": "https://figma.com/design/Z9qWKraUnx2GtS6NhPdC8D/App-Objectives-Key-Results",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "aQGIUTRuwIhj9Xq5pWMgtd",
+      "fileName": "ClickUp Task Basic Flow",
+      "fileUrl": "https://figma.com/design/aQGIUTRuwIhj9Xq5pWMgtd/ClickUp-Task-Basic-Flow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "WSdSHAsgTjHGlhnjO1uxCI",
+      "fileName": "Clickup Dev Workflow",
+      "fileUrl": "https://figma.com/design/WSdSHAsgTjHGlhnjO1uxCI/Clickup-Dev-Workflow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "3Q2XQFI6v8HZHtq6M2Viho",
+      "fileName": "Clickup Dev Workflow (Copy)",
+      "fileUrl": "https://figma.com/design/3Q2XQFI6v8HZHtq6M2Viho/Clickup-Dev-Workflow-Copy",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "yepjBquBQ1QZDyaFAU2L0B",
+      "fileName": "DESIGN-VS-DEVELOPMENT",
+      "fileUrl": "https://figma.com/design/yepjBquBQ1QZDyaFAU2L0B/DESIGN-VS-DEVELOPMENT",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "bTe9e1XMdMsBqvKWUzT0ao",
+      "fileName": "Development Workflow",
+      "fileUrl": "https://figma.com/design/bTe9e1XMdMsBqvKWUzT0ao/Development-Workflow",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "nc1glmTm08devm6eaOKGxK",
+      "fileName": "Git Branching",
+      "fileUrl": "https://figma.com/design/nc1glmTm08devm6eaOKGxK/Git-Branching",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "jdh6EAIeBBLEfIwuFS1XWu",
+      "fileName": "GitHub branching flow for large features",
+      "fileUrl": "https://figma.com/design/jdh6EAIeBBLEfIwuFS1XWu/GitHub-branching-flow-for-large-features",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
+    },
+    {
+      "projectName": "◇ User Story and Planning",
+      "fileKey": "SxzHbNM3beQ46PDQK2XM2u",
+      "fileName": "MegaVariation",
+      "fileUrl": "https://figma.com/design/SxzHbNM3beQ46PDQK2XM2u/MegaVariation",
+      "pages": [
+        {
+          "nodeId": "0:1",
+          "name": "Page 1"
+        }
+      ],
+      "frameCount": 0
     }
   ]
 }
