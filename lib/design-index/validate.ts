@@ -1,12 +1,14 @@
 // lib/design-index/validate.ts
-import { parseFigmaUrl } from '@/lib/figma/client'
+// Relative imports (not the `@/` alias) so this pure lib + its CLI run under any
+// runner — Jest (via moduleNameMapper) and ts-node alike — without path mapping.
+import { parseFigmaUrl } from '../figma/client'
 import {
   ACTIVE_STATUSES,
   MAX_ACTIVE_STORIES,
   type DesignIndex,
   type UserStoryStatus,
   type ValidationContext,
-} from '@/lib/design-index/types'
+} from './types'
 
 const VALID_STATUSES: ReadonlySet<UserStoryStatus> = new Set([
   'in-design',
