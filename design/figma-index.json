@@ -1,48 +1,15 @@
 {
   "version": 1,
   "apps": {
-    "web": { "figmaProject": "▣ WEB APP" },
-    "cms": { "figmaProject": "▣ CMS APP" },
-    "mobile": { "figmaProject": "▣ MOBILE APP" }
-  },
-  "features": [
-    {
-      "id": "web-settings",
-      "app": "web",
-      "section": "Settings",
-      "feature": "Account & Billing",
-      "figmaFileKey": "EXMPLsettings01",
-      "figmaFileUrl": "https://figma.com/design/EXMPLsettings01/Settings",
-      "codePaths": ["app/setup/**", "lib/field-config.ts"],
-      "userStories": [
-        {
-          "clickupId": "US-SETTINGS-001",
-          "title": "Account settings landing",
-          "status": "in-design",
-          "figmaPageNodeId": "1:100",
-          "sourceOfTruthNodeId": "1:101",
-          "sandboxNodeId": "1:102"
-        }
-      ]
+    "web": {
+      "figmaProject": "▣ WEB APP"
     },
-    {
-      "id": "web-performance-hub",
-      "app": "web",
-      "section": "Performance Hub",
-      "feature": "Performance Hub",
-      "figmaFileKey": "EXMPLperfhub001",
-      "figmaFileUrl": "https://figma.com/design/EXMPLperfhub001/Performance-Hub",
-      "codePaths": ["app/sprint/**"],
-      "userStories": [
-        {
-          "clickupId": "US-PERF-001",
-          "title": "Performance hub overview",
-          "status": "in-design",
-          "figmaPageNodeId": "2:200",
-          "sourceOfTruthNodeId": "2:201",
-          "sandboxNodeId": "2:202"
-        }
-      ]
+    "cms": {
+      "figmaProject": "▣ CMS APP"
+    },
+    "mobile": {
+      "figmaProject": "▣ MOBILE APP"
     }
-  ]
+  },
+  "features": []
 }

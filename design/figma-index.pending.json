@@ -1,0 +1,349 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "featureId": "web-actor-hub-actor-hub",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "GlUPlN2ys2OdbyyceRozR3",
+        "figmaFileUrl": "https://figma.com/design/GlUPlN2ys2OdbyyceRozR3/Actor-Hub",
+        "codePaths": [
+          "app/actor-hub/**",
+          "components/actors/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-casting-casting",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "KgPTzFdTEEIAgdadtaIome",
+        "figmaFileUrl": "https://figma.com/design/KgPTzFdTEEIAgdadtaIome/Casting",
+        "codePaths": [
+          "app/actor-hub/**",
+          "components/actors/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-creatives-creatives",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "iOCT6fZQXISI3m57JeHj93",
+        "figmaFileUrl": "https://figma.com/design/iOCT6fZQXISI3m57JeHj93/Creatives",
+        "codePaths": [
+          "app/creatives/**",
+          "components/creatives/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-script-script",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "JRNf7BeijOk4yISCUM5eUq",
+        "figmaFileUrl": "https://figma.com/design/JRNf7BeijOk4yISCUM5eUq/Script",
+        "codePaths": [
+          "app/creatives/**",
+          "components/creatives/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-storyboard-storyboard",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "RsA8vOCL7GjDbRWsICuQjX",
+        "figmaFileUrl": "https://figma.com/design/RsA8vOCL7GjDbRWsICuQjX/Storyboard",
+        "codePaths": [
+          "app/creatives/**",
+          "components/creatives/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-storyboard-sidepanel-storyboard-sidepanel",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "4Bj0mqtcLfn0rzXwilUky2",
+        "figmaFileUrl": "https://figma.com/design/4Bj0mqtcLfn0rzXwilUky2/Storyboard-Sidepanel",
+        "codePaths": [
+          "app/creatives/**",
+          "components/creatives/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-brainstorm-doc-ideation",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "OuBJ948wVDtB69eBzF69Sy",
+        "figmaFileUrl": "https://figma.com/design/OuBJ948wVDtB69eBzF69Sy/Brainstorm-Doc-Ideation",
+        "codePaths": [
+          "app/features/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-concept-ideation",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "IzA6qjM9PPSwGfE4lWS8H0",
+        "figmaFileUrl": "https://figma.com/design/IzA6qjM9PPSwGfE4lWS8H0/Concept-Ideation",
+        "codePaths": [
+          "app/features/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-idea-bdoc-sidepanel-ideation",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "A58EeRY4sC02V650koNuEu",
+        "figmaFileUrl": "https://figma.com/design/A58EeRY4sC02V650koNuEu/Idea-BDoc-Sidepanel-Ideation",
+        "codePaths": [
+          "app/features/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-ideation-ideation",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "UbX2L5JUbTnKMb0I1j8Pi7",
+        "figmaFileUrl": "https://figma.com/design/UbX2L5JUbTnKMb0I1j8Pi7/Ideation",
+        "codePaths": [
+          "app/features/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-inspiration-bank-inspiration-bank",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "FZxUJmUPDed9wNw37baKhS",
+        "figmaFileUrl": "https://figma.com/design/FZxUJmUPDed9wNw37baKhS/Inspiration-Bank",
+        "codePaths": [
+          "app/features/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-kanban-view-for-bd-ideation",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "HXvL2Idk22rOyGv1agVEEL",
+        "figmaFileUrl": "https://figma.com/design/HXvL2Idk22rOyGv1agVEEL/Kanban-View-for-BD-Ideation",
+        "codePaths": [
+          "app/features/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-filter-setting-perfomance-hub",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "Nt4lRqD3DTpTIbgVgo8VP3",
+        "figmaFileUrl": "https://figma.com/design/Nt4lRqD3DTpTIbgVgo8VP3/Filter-Setting-Perfomance-Hub",
+        "codePaths": [
+          "app/sprint/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-performance-hub-performance-hub",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "iXn3GpkCbwSR084YkkER9M",
+        "figmaFileUrl": "https://figma.com/design/iXn3GpkCbwSR084YkkER9M/Performance-Hub",
+        "codePaths": [
+          "app/sprint/**"
+        ]
+      }
+    },
+    {
+      "featureId": "cms-education-cms-education-cms",
+      "reason": [
+        "unassigned-codepaths",
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "6JLq2RQuWUVFXATauNw58w",
+        "figmaFileUrl": "https://figma.com/design/6JLq2RQuWUVFXATauNw58w/Education-CMS",
+        "codePaths": []
+      }
+    },
+    {
+      "featureId": "mobile-handle-app-crashes-while-keeping-track-of-all-files-handle-app-crashes-while-keeping-track-of-all-files",
+      "reason": [
+        "unassigned-codepaths",
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "E6pWXrh2jfwZSu8tZQW3sI",
+        "figmaFileUrl": "https://figma.com/design/E6pWXrh2jfwZSu8tZQW3sI/Handle-app-crashes-while-keeping-track-of-all-files",
+        "codePaths": []
+      }
+    },
+    {
+      "featureId": "mobile-mvp-mobile-app-mvp-mobile-app",
+      "reason": [
+        "unassigned-codepaths",
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "iUZ6wVOdMCjjHLVpWurzls",
+        "figmaFileUrl": "https://figma.com/design/iUZ6wVOdMCjjHLVpWurzls/MVP-Mobile-App",
+        "codePaths": []
+      }
+    },
+    {
+      "featureId": "mobile-mobile-app-v2-mobile-app-v2",
+      "reason": [
+        "unassigned-codepaths",
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "mRCQYEPCLMkv5TxXWhG94k",
+        "figmaFileUrl": "https://figma.com/design/mRCQYEPCLMkv5TxXWhG94k/Mobile-App-V2",
+        "codePaths": []
+      }
+    },
+    {
+      "featureId": "mobile-shooting-sessions-mobile-app-shooting-sessions-mobile-app",
+      "reason": [
+        "unassigned-codepaths",
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "hchYb8XVKyyFvsOGF9ifuW",
+        "figmaFileUrl": "https://figma.com/design/hchYb8XVKyyFvsOGF9ifuW/Shooting-Sessions-Mobile-App",
+        "codePaths": []
+      }
+    },
+    {
+      "featureId": "mobile-viscap-mobile-viscap-mobile",
+      "reason": [
+        "unassigned-codepaths",
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "cfUlJrRYaYgY5lxR160FX4",
+        "figmaFileUrl": "https://figma.com/design/cfUlJrRYaYgY5lxR160FX4/VisCap-Mobile",
+        "codePaths": []
+      }
+    },
+    {
+      "featureId": "web-settings-account",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "VXv9714EBsJ7Uq29NsT2rq",
+        "figmaFileUrl": "https://figma.com/design/VXv9714EBsJ7Uq29NsT2rq/Settings-Account",
+        "codePaths": [
+          "app/settings/**",
+          "components/settings/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-settings-billing-usage",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "PTsTAZuHZJ1u5ORhGF0cUB",
+        "figmaFileUrl": "https://figma.com/design/PTsTAZuHZJ1u5ORhGF0cUB/Settings-Billing-Usage",
+        "codePaths": [
+          "app/settings/**",
+          "components/settings/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-settings-brand",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "vAoinJcv1Y1UFD7OjAzDm4",
+        "figmaFileUrl": "https://figma.com/design/vAoinJcv1Y1UFD7OjAzDm4/Settings-Brand",
+        "codePaths": [
+          "app/settings/**",
+          "components/settings/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-settings-people",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "D95d1FJJILzccjLx1W357j",
+        "figmaFileUrl": "https://figma.com/design/D95d1FJJILzccjLx1W357j/Settings-People",
+        "codePaths": [
+          "app/settings/**",
+          "components/settings/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-settings-position",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "CBipmHbaJ79HUnBkMyLcqg",
+        "figmaFileUrl": "https://figma.com/design/CBipmHbaJ79HUnBkMyLcqg/Settings-Position",
+        "codePaths": [
+          "app/settings/**",
+          "components/settings/**"
+        ]
+      }
+    },
+    {
+      "featureId": "web-settings-workflow",
+      "reason": [
+        "placeholder-clickup"
+      ],
+      "partial": {
+        "figmaFileKey": "6gLHOkbArITK1NSutIGXCE",
+        "figmaFileUrl": "https://figma.com/design/6gLHOkbArITK1NSutIGXCE/Settings-Workflow",
+        "codePaths": [
+          "app/settings/**",
+          "components/settings/**"
+        ]
+      }
+    }
+  ]
+}
