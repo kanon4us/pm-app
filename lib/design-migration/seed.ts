@@ -59,6 +59,13 @@ export function manifestToIndexEntries(manifest: MigrationManifest): IndexSplit 
             : `unassigned-${f.sourceFileKey}`,
         reason: reasons.length > 0 ? reasons : ['unassigned-feature'],
         partial: {
+          id:
+            f.app && f.targetSection && f.targetFeature
+              ? featureIdFor(f.app, f.targetSection, f.targetFeature)
+              : undefined,
+          app: f.app ?? undefined,
+          section: f.targetSection ?? undefined,
+          feature: f.targetFeature ?? undefined,
           figmaFileKey: f.sourceFileKey,
           figmaFileUrl: f.sourceFileUrl,
           codePaths: f.codePaths,

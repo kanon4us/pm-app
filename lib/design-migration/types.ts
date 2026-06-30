@@ -48,11 +48,18 @@ export type PendingReason =
   | 'placeholder-clickup'
   | 'unassigned-codepaths'
   | 'unassigned-feature'
+  | 'unassigned-figma'
 
 export interface PendingEntry {
   featureId: string
   reason: PendingReason[]
   partial: Partial<Feature>
+  /** Real ClickUp id once a ticket has been assigned (G1). */
+  assignedClickupId?: string
+  /** Ticket title, becomes the user-story title on promotion. */
+  title?: string
+  /** Deep Figma node id, anchors the user story on promotion. */
+  figmaNodeId?: string
 }
 
 export interface IndexSplit {
