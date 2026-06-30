@@ -37,14 +37,36 @@ describe('inferSectionFeature', () => {
   it('uses the whole name as both when no separator', () => {
     expect(inferSectionFeature('Casting')).toEqual({ section: 'Casting', feature: 'Casting' })
   })
+  it('splits on a backslash delimiter', () => {
+    expect(inferSectionFeature('Billing & Usage\\Settings')).toEqual({
+      section: 'Billing & Usage',
+      feature: 'Settings',
+    })
+  })
+  it('splits on a slash with no leading space', () => {
+    expect(inferSectionFeature('Concept/ Ideation')).toEqual({
+      section: 'Concept',
+      feature: 'Ideation',
+    })
+  })
 })
 
 describe('inferCodePaths', () => {
-  it('maps a known section to real repo dirs', () => {
-    expect(inferCodePaths('Performance Hub', 'Performance Hub')).toEqual(['app/sprint/**'])
+  it('anchors on the project name for single-area spaces', () => {
+    expect(inferCodePaths('Perfomance Hub', 'Filter&Setting', 'x')).toEqual(['app/sprint/**'])
+    expect(inferCodePaths('ActorHub', 'Casting', 'x')).toEqual([
+      'app/actor-hub/**',
+      'components/actors/**',
+    ])
   })
-  it('returns [] for an unknown section', () => {
-    expect(inferCodePaths('Mystery', 'Thing')).toEqual([])
+  it('falls back to the section lookup for the Viscap UI monolith', () => {
+    expect(inferCodePaths('Viscap UI', 'Media Library', 'Upload')).toEqual([
+      'app/media/**',
+      'components/media/**',
+    ])
+  })
+  it('returns [] when neither project nor section is known', () => {
+    expect(inferCodePaths('Mystery', 'Thing', 'x')).toEqual([])
   })
 })
 

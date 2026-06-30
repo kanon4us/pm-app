@@ -26,7 +26,7 @@ describe('inventoryToManifest', () => {
     expect(f.app).toBe('web')
     expect(f.targetSection).toBe('Settings')
     expect(f.targetFeature).toBe('Billing')
-    expect(f.codePaths).toEqual(['app/setup/**', 'lib/field-config.ts'])
+    expect(f.codePaths).toEqual(['app/settings/**', 'components/settings/**'])
     expect(f.unassigned).toBe(false)
   })
 

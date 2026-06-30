@@ -21,8 +21,17 @@ export function featureIdFor(app: string, section: string, feature: string): str
     .replace(/^-+|-+$/g, '')
 }
 
+/** Planning/diagram projects → the ◇ FLOWS & PLANNING zone (not archive). */
+const FLOWS_PROJECTS = new Set([
+  'Flowcharts',
+  'Data Planning',
+  'User Story and Planning',
+  'Sales Process',
+])
+
 function zoneFor(projectName: string, app: string | null): Zone {
   if (projectName === 'Desktop' || projectName === 'Media Sync Desktop App') return 'archive'
+  if (FLOWS_PROJECTS.has(projectName)) return 'flows'
   if (app) return 'product'
   return 'archive'
 }
@@ -32,7 +41,7 @@ export function inventoryToManifest(inventory: FigmaInventory): MigrationManifes
     const app = inferApp(file.projectName, file.fileName)
     const zone = zoneFor(file.projectName, app)
     const { section, feature } = inferSectionFeature(file.fileName)
-    const codePaths = app ? inferCodePaths(section, feature) : []
+    const codePaths = app ? inferCodePaths(file.projectName, section, feature) : []
     const featureId = app ? featureIdFor(app, section, feature) : `unassigned-${file.fileKey}`
     const unassigned = !app || codePaths.length === 0
 
