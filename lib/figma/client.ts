@@ -154,3 +154,68 @@ export async function fetchFigmaFrames(
 
   return { frames, warnings: cappedWarnings }
 }
+
+// ── Workspace enumeration (PAT-based, for the migration inventory) ──────────────
+// These use the X-Figma-Token header (personal access token), distinct from the
+// OAuth Bearer flow above. Used read-only by scripts/figma-inventory.ts.
+
+export interface FigmaProject {
+  id: string
+  name: string
+}
+
+export interface FigmaFileSummary {
+  key: string
+  name: string
+}
+
+function figmaPatHeaders(token: string) {
+  return { 'X-Figma-Token': token }
+}
+
+/**
+ * GET a Figma API URL as JSON with exponential back-off on HTTP 429.
+ * Throws on non-OK, non-429 responses (caller decides fatal vs. skip).
+ */
+export async function figmaGetJson(
+  token: string,
+  url: string,
+  attempt = 0
+): Promise<unknown> {
+  const res = await fetch(url, { headers: figmaPatHeaders(token) })
+  if (res.status === 429 && attempt < 5) {
+    const wait = 2 ** attempt * 1000
+    await new Promise((r) => setTimeout(r, wait))
+    return figmaGetJson(token, url, attempt + 1)
+  }
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`)
+  return res.json()
+}
+
+/** Lists projects in a team. */
+export async function fetchTeamProjects(token: string, teamId: string): Promise<FigmaProject[]> {
+  const data = (await figmaGetJson(token, `${FIGMA_API}/v1/teams/${teamId}/projects`)) as {
+    projects?: FigmaProject[]
+  }
+  return data.projects ?? []
+}
+
+/** Lists files in a project. */
+export async function fetchProjectFiles(
+  token: string,
+  projectId: string
+): Promise<FigmaFileSummary[]> {
+  const data = (await figmaGetJson(token, `${FIGMA_API}/v1/projects/${projectId}/files`)) as {
+    files?: FigmaFileSummary[]
+  }
+  return data.files ?? []
+}
+
+/** Fetches a file's node tree (raw) for inventory mapping. `depth=2` → pages + frames. */
+export async function fetchFileDocument(
+  token: string,
+  fileKey: string,
+  depth = 2
+): Promise<unknown> {
+  return figmaGetJson(token, `${FIGMA_API}/v1/files/${fileKey}?depth=${depth}`)
+}
