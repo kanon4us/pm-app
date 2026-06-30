@@ -1,7 +1,12 @@
 // scripts/figma-inventory.ts
 // Phase 0: read-only enumeration of the Figma workspace → design/figma-inventory.json.
+import * as dotenv from 'dotenv'
 import * as fs from 'fs'
 import * as path from 'path'
+
+// Load .env.local (Next.js convention) so FIGMA_MIGRATION_TOKEN / FIGMA_TEAM_ID
+// are available without exporting them in the shell.
+dotenv.config({ path: '.env.local' })
 import {
   fetchTeamProjects,
   fetchProjectFiles,
