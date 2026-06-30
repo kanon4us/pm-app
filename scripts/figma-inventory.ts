@@ -18,8 +18,10 @@ import type { FigmaInventory, FigmaInventoryFile } from '../lib/design-migration
 const REPO_ROOT = path.join(__dirname, '..')
 const OUT_PATH = path.join(REPO_ROOT, 'design', 'figma-inventory.json')
 
-const TOKEN = process.env.FIGMA_MIGRATION_TOKEN
-const TEAM_ID = process.env.FIGMA_TEAM_ID
+// Prefer the dedicated migration PAT; fall back to the app's existing Figma token.
+const TOKEN = process.env.FIGMA_MIGRATION_TOKEN ?? process.env.FIGMA_ACCESS_TOKEN
+// Team ID is not secret (it's in the workspace URL); default to Viscap's, allow override.
+const TEAM_ID = process.env.FIGMA_TEAM_ID ?? '1155279883633947706'
 
 async function main() {
   if (!TOKEN || !TEAM_ID) {
