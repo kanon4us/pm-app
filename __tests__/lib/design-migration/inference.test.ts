@@ -13,6 +13,11 @@ describe('inferApp', () => {
   it('maps the mobile project to mobile', () => {
     expect(inferApp('MVP Mobile App', 'Home')).toBe('mobile')
   })
+  it('maps the post-migration destination projects', () => {
+    expect(inferApp('▣ WEB APP', 'Settings — Account')).toBe('web')
+    expect(inferApp('▣ CMS APP', 'x')).toBe('cms')
+    expect(inferApp('▣ MOBILE APP', 'x')).toBe('mobile')
+  })
   it('maps desktop to archive-bound null', () => {
     expect(inferApp('Media Sync Desktop App', 'Sync')).toBeNull()
   })

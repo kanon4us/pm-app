@@ -3,12 +3,13 @@ import type { AppKeyOrNull } from './types'
 
 /** Source Figma project/file name → app. Refined during Phase 1 review. */
 const WEB_PROJECTS = new Set([
+  '▣ WEB APP', // post-migration destination
   'Viscap UI', 'ActorHub', 'Actor Hub', 'Performance Hub', 'Perfomance Hub',
   'Creatives', 'Settings', 'Ideation', 'B-Doc', 'Brand Intranet',
   'Phase&Sprints', 'Phase & Sprints', 'Media Library', 'Login / Sign Up',
 ])
-const CMS_PROJECTS = new Set(['CMS', 'CMS Web Application'])
-const MOBILE_PROJECTS = new Set(['MVP Mobile App'])
+const CMS_PROJECTS = new Set(['▣ CMS APP', 'CMS', 'CMS Web Application'])
+const MOBILE_PROJECTS = new Set(['▣ MOBILE APP', 'MVP Mobile App'])
 const ARCHIVE_PROJECTS = new Set(['Media Sync Desktop App', 'Desktop'])
 
 export function inferApp(projectName: string, _fileName: string): AppKeyOrNull {
