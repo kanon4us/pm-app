@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     await forceUpdateBranch(token, REPO, BRANCH, [
       { path: 'design/figma-index.json', content: JSON.stringify(out.index, null, 2) + '\n' },
       { path: 'design/figma-index.pending.json', content: JSON.stringify(out.pending, null, 2) + '\n' },
-    ], `chore(design-index): scaffold ${rows.length} ticket(s) [skip ci]`)
+    ], `chore(design-index): scaffold ${rows.length} ticket(s)`)
     const pr = await ensurePrWithAutoMerge(token, REPO, BRANCH, 'Design-index: scaffold from ClickUp')
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
