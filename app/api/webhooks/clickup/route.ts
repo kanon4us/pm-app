@@ -4,7 +4,7 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import type { Json } from '@/lib/supabase/types'
 import { maybeQueueDesignIndex } from './design-index-hook'
-import { parseDesignIndexStatuses } from '@/lib/design-index/inbox-trigger'
+import { parseDesignIndexStatuses, isDesignIndexStatus } from '@/lib/design-index/inbox-trigger'
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
@@ -84,6 +84,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
+  // ── Design-index scaffold — independent of support-bot task/list resolution ──
+  // Runs for ANY taskStatusUpdated whose status is a configured design status,
+  // fetching task details straight from ClickUp. The tasks/lists tables may be
+  // missing the task or hold duplicate list rows (which break the .single()
+  // auto-import below), and neither must block the design-index queue.
+  const designStatuses = parseDesignIndexStatuses(process.env.CLICKUP_DESIGN_INDEX_STATUSES)
+  if (isDesignIndexStatus(event.toStatus, designStatuses)) {
+    const { data: diToken } = await supabase
+      .from('oauth_tokens').select('access_token').eq('provider', 'clickup').limit(1).single()
+    if (diToken) {
+      try {
+        const cuTask = await buildClickUpClient(diToken.access_token).getTask(event.taskId)
+        await maybeQueueDesignIndex(
+          supabase,
+          {
+            clickupTaskId: event.taskId,
+            taskName: cuTask.name,
+            toStatus: event.toStatus,
+            customFields: cuTask.custom_fields as { name?: string; value?: unknown }[] | undefined,
+          },
+          designStatuses
+        )
+      } catch (err) {
+        console.warn('[design-index] scaffold fetch failed for task', event.taskId, err)
+      }
+    }
+  }
+
   // taskStatusUpdated — existing behavior unchanged
   let { data: task } = await supabase
     .from('tasks')
@@ -135,17 +163,6 @@ export async function POST(req: NextRequest) {
       await supabase.from('trigger_queue').insert(triggers)
     }
   }
-
-  await maybeQueueDesignIndex(
-    supabase,
-    {
-      clickupTaskId: event.taskId,
-      taskName: task ? (task as { name?: string }).name ?? '' : '',
-      toStatus: event.toStatus,
-      customFields: (task as { custom_fields?: { name?: string; value?: unknown }[] })?.custom_fields,
-    },
-    parseDesignIndexStatuses(process.env.CLICKUP_DESIGN_INDEX_STATUSES)
-  )
 
   await handleSlackHandoff(event.taskId, event.type, event.listId, supabase)
   return NextResponse.json({ ok: true })
