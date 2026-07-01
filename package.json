@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "jest"
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "validate-design-index": "ts-node scripts/validate-design-index.ts",
+    "figma:inventory": "ts-node scripts/figma-inventory.ts",
+    "figma:manifest": "ts-node scripts/build-migration-manifest.ts",
+    "figma:verify": "ts-node scripts/verify-figma-migration.ts",
+    "figma:seed": "ts-node scripts/seed-index-from-manifest.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.1",

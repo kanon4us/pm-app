@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "apps": {
+    "web": {
+      "figmaProject": "▣ WEB APP"
+    },
+    "cms": {
+      "figmaProject": "▣ CMS APP"
+    },
+    "mobile": {
+      "figmaProject": "▣ MOBILE APP"
+    }
+  },
+  "features": []
+}

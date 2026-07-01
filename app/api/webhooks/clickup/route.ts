@@ -3,6 +3,8 @@ import { verifyClickUpSignature, parseWebhookEvent } from '@/lib/clickup/webhook
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import type { Json } from '@/lib/supabase/types'
+import { maybeQueueDesignIndex } from './design-index-hook'
+import { parseDesignIndexStatuses } from '@/lib/design-index/inbox-trigger'
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
   // taskStatusUpdated — existing behavior unchanged
   let { data: task } = await supabase
     .from('tasks')
-    .select('id, list_id, status')
+    .select('id, list_id, status, name, custom_fields')
     .eq('clickup_task_id', event.taskId)
     .single()
 
@@ -105,7 +107,7 @@ export async function POST(req: NextRequest) {
             status: event.toStatus,
             custom_fields: (cuTask.custom_fields ?? []) as unknown as Json,
             synced_at: new Date().toISOString(),
-          }).select('id, list_id, status').single()
+          }).select('id, list_id, status, name, custom_fields').single()
           task = inserted
         }
       } catch (err) {
@@ -133,6 +135,17 @@ export async function POST(req: NextRequest) {
       await supabase.from('trigger_queue').insert(triggers)
     }
   }
+
+  await maybeQueueDesignIndex(
+    supabase,
+    {
+      clickupTaskId: event.taskId,
+      taskName: task ? (task as { name?: string }).name ?? '' : '',
+      toStatus: event.toStatus,
+      customFields: (task as { custom_fields?: { name?: string; value?: unknown }[] })?.custom_fields,
+    },
+    parseDesignIndexStatuses(process.env.CLICKUP_DESIGN_INDEX_STATUSES)
+  )
 
   await handleSlackHandoff(event.taskId, event.type, event.listId, supabase)
   return NextResponse.json({ ok: true })

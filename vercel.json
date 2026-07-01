@@ -16,6 +16,7 @@
     {
       "path": "/api/cron/vault-consolidation-closeout",
       "schedule": "0 9 * * 3"
-    }
+    },
+    { "path": "/api/cron/design-index-sync", "schedule": "*/15 * * * *" }
   ]
 }
