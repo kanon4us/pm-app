@@ -10,8 +10,11 @@ const PUBLIC_PATHS = [
   '/api/github/callback',
   '/api/webhooks/clickup',
   '/api/webhooks/slack',
-  '/api/cron/slack-stale-check',
-  '/api/cron/sop-analysis',
+  // All /api/cron/* routes self-authenticate via CRON_SECRET / x-vercel-cron
+  // (see each route). The proxy must not gate them on a session cookie — Vercel's
+  // scheduled calls carry no session and would otherwise be 401'd here before
+  // ever reaching the route's own auth guard.
+  '/api/cron',
   // /api/bot/* is authenticated by BOT_JWT_SECRET (lib/bot/auth.ts), not by session —
   // requests come from viscap-ai-cloud-functions with a signed HS256 JWT.
   '/api/bot',
