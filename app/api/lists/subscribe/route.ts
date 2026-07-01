@@ -22,7 +22,11 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ error: 'ClickUp not connected' }, { status: 400 })
 
   const client = buildClickUpClient(token.access_token)
-  const webhookEndpoint = `${process.env.NEXTAUTH_URL}/api/webhooks/clickup`
+  // Always register the STABLE prod domain, never a per-deploy alias. On preview
+  // deployments NEXTAUTH_URL is the branch alias (pm-app-git-…vercel.app), which
+  // ClickUp can't reliably reach — so the webhook must point at the real domain.
+  const baseUrl = process.env.CLICKUP_WEBHOOK_BASE_URL ?? 'https://viscap.edgefixautomation.com'
+  const webhookEndpoint = `${baseUrl}/api/webhooks/clickup`
   const results: Array<{ listId: string; taskCount: number }> = []
 
   for (const listId of listIds) {
