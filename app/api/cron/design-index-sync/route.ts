@@ -16,11 +16,12 @@ function staticPrefix(glob: string): string {
 }
 export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
-  // Match the repo convention: only enforce the secret when it's configured, so
-  // the scheduled Vercel cron runs whether or not CRON_SECRET is set (Vercel adds
-  // the Bearer header automatically when it is).
+  // Vercel's scheduler marks cron invocations with an `x-vercel-cron` header,
+  // which Vercel strips from any external request — so it's a trustworthy signal.
+  // Accept those; otherwise require the Bearer secret (for manual triggers).
+  const isVercelCron = req.headers.get('x-vercel-cron') != null
   const auth = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isVercelCron && process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const token = process.env.GITHUB_TOKEN
