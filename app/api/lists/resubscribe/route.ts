@@ -28,12 +28,16 @@ export async function POST(req: NextRequest) {
   if (!lists?.length) return NextResponse.json({ error: 'No subscribed lists found' }, { status: 404 })
 
   const client = buildClickUpClient(token.access_token)
-  const webhookEndpoint = `${process.env.NEXTAUTH_URL}/api/webhooks/clickup`
+  // Register the STABLE prod domain, never a per-deploy alias (NEXTAUTH_URL is the
+  // branch alias on preview deployments, which ClickUp can't reliably reach).
+  const baseUrl = process.env.CLICKUP_WEBHOOK_BASE_URL ?? 'https://viscap.edgefixautomation.com'
+  const webhookEndpoint = `${baseUrl}/api/webhooks/clickup`
 
-  // Delete all webhooks in ClickUp pointing at our endpoint (handles orphans not tracked in Supabase)
+  // Delete ANY of our webhooks (matched by path) so stale branch-alias / localhost
+  // registrations get cleaned up too — not just ones matching the current base URL.
   try {
     const existing = await client.listWebhooks(teamId)
-    const ours = existing.filter((w) => w.endpoint === webhookEndpoint)
+    const ours = existing.filter((w) => w.endpoint.endsWith('/api/webhooks/clickup'))
     for (const w of ours) {
       try { await client.deleteWebhook(w.id) } catch { /* ignore */ }
     }
