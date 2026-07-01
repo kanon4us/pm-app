@@ -14,7 +14,7 @@ function staticPrefix(glob: string): string {
   const i = glob.indexOf('*')
   return (i === -1 ? glob : glob.slice(0, i)).replace(/\/+$/, '')
 }
-
+export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
