@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifySlackSignature } from '@/lib/slack/verify'
 import { buildSlackClient } from '@/lib/slack/client'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
-import { enqueue } from '@/lib/queue/client'
+import { enqueueToQueue } from '@/lib/queue/client'
 
 // Action IDs that trigger the "Resolve overlap" modal instead of a write.
 const MERGE_DECISION_ACTIONS = new Set(['merge-canonical', 'distinct'])
@@ -144,7 +144,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const writesUrl =
     (process.env.VAULT_APP_BASE_URL ?? '') + '/api/vault/consolidation/write'
 
-  await enqueue(writesUrl, {
+  // Route through the serialized `vault-writes` queue (parallelism=1) so
+  // concurrent answers commit to the shared weekly branch one-at-a-time and
+  // can't collide on a non-fast-forward 422.
+  await enqueueToQueue('vault-writes', writesUrl, {
     sessionId: (session as { id: string }).id,
     actionId,
     responseUrl,

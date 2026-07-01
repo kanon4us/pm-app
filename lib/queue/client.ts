@@ -44,24 +44,51 @@ import { Client, Receiver } from '@upstash/qstash'
  * not crash the module (they'll throw at call time instead, where the error
  * is more actionable).
  */
+function qstashClient(): Client {
+  // QSTASH_URL is region-specific (e.g. https://qstash-us-east-1.upstash.io for
+  // the US region). Pass it explicitly when set so publishes hit the correct
+  // region's endpoint instead of the SDK's default (EU).
+  return new Client({
+    token: process.env.QSTASH_TOKEN,
+    ...(process.env.QSTASH_URL ? { baseUrl: process.env.QSTASH_URL } : {}),
+  })
+}
+
 export async function enqueue(
   destinationUrl: string,
   body: unknown,
   opts?: { retries?: number }
 ): Promise<void> {
-  // QSTASH_URL is region-specific (e.g. https://qstash-us-east-1.upstash.io for
-  // the US region). Pass it explicitly when set so publishes hit the correct
-  // region's endpoint instead of the SDK's default (EU).
-  const client = new Client({
-    token: process.env.QSTASH_TOKEN,
-    ...(process.env.QSTASH_URL ? { baseUrl: process.env.QSTASH_URL } : {}),
-  })
-
-  await client.publishJSON({
+  await qstashClient().publishJSON({
     url: destinationUrl,
     body,
     ...(opts?.retries !== undefined ? { retries: opts.retries } : {}),
   })
+}
+
+/**
+ * Enqueue a JSON message through a NAMED QStash queue.
+ *
+ * Unlike `enqueue` (a parallel direct publish), this routes the message through
+ * a QStash queue, which delivers in FIFO order with the queue's configured
+ * parallelism. The `vault-writes` queue is created with `parallelism=1`, so
+ * messages enqueued here are processed strictly one-at-a-time — preventing
+ * concurrent commits to the shared weekly branch from racing into a
+ * non-fast-forward 422.
+ */
+export async function enqueueToQueue(
+  queueName: string,
+  destinationUrl: string,
+  body: unknown,
+  opts?: { retries?: number }
+): Promise<void> {
+  await qstashClient()
+    .queue({ queueName })
+    .enqueueJSON({
+      url: destinationUrl,
+      body,
+      ...(opts?.retries !== undefined ? { retries: opts.retries } : {}),
+    })
 }
 
 /**
