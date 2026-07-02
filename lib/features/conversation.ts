@@ -7,6 +7,7 @@ import { PLANNING_SYSTEM } from '@/lib/claude/prompts/planning'
 import { PROTOTYPING_SYSTEM } from '@/lib/claude/prompts/prototyping'
 import { PLANNING_TOOLS, executePlanningTool, emptyApplied, type AppliedChanges } from '@/lib/claude/tools/planning'
 import { PROTOTYPING_TOOLS, PROTOTYPING_TOOL_NAMES, executePrototypingTool } from '@/lib/claude/tools/prototyping'
+import { FIGMA_TOOLS, FIGMA_TOOL_NAME, executeViewFigma } from '@/lib/claude/tools/figma'
 import type { Tables } from '@/lib/supabase/types'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -59,14 +60,15 @@ export async function getMessages(conversationId: string): Promise<FeatureMessag
   return data ?? []
 }
 
-// Tool-round budget per PM message: planning turns stay conversational (a plan
-// mutation + a narration round); prototyping turns explore the product repo.
-const PLANNING_MAX_TOOL_ROUNDS = 3
+// Tool-round budget per PM message: planning turns stay conversational (Figma
+// views + a plan mutation + narration); prototyping turns explore the product repo.
+const PLANNING_MAX_TOOL_ROUNDS = 5
 const PROTOTYPING_MAX_TOOL_ROUNDS = 25
 
 export async function sendFeatureMessage(
   featureId: string,
-  userContent: string
+  userContent: string,
+  userId?: string
 ): Promise<{ content: string; applied: AppliedChanges | null }> {
   const feature = await getFeature(featureId)
   if (!feature) throw new Error('Feature not found')
@@ -77,7 +79,9 @@ export async function sendFeatureMessage(
   await addMessage(conversation.id, 'user', userContent)
 
   const prototypingActive = feature.planning_phase !== 'planning'
-  const tools = prototypingActive ? [...PLANNING_TOOLS, ...PROTOTYPING_TOOLS] : PLANNING_TOOLS
+  const tools = prototypingActive
+    ? [...PLANNING_TOOLS, ...FIGMA_TOOLS, ...PROTOTYPING_TOOLS]
+    : [...PLANNING_TOOLS, ...FIGMA_TOOLS]
   const maxToolRounds = prototypingActive ? PROTOTYPING_MAX_TOOL_ROUNDS : PLANNING_MAX_TOOL_ROUNDS
   const system = buildSystem(feature, featureContext, prototypingActive)
 
@@ -99,7 +103,7 @@ export async function sendFeatureMessage(
 
     // Always execute what the model requested, even on the last round —
     // a dangling tool_use with no execution would silently drop work.
-    const toolResults = await runTools(featureId, response, applied)
+    const toolResults = await runTools(featureId, userId, response, applied)
     if (round + 1 >= maxToolRounds) {
       budgetReached = true
       break
@@ -140,19 +144,31 @@ function collectText(response: Anthropic.Message): string[] {
 
 async function runTools(
   featureId: string,
+  userId: string | undefined,
   response: Anthropic.Message,
   applied: AppliedChanges
 ): Promise<Anthropic.ToolResultBlockParam[]> {
   const results: Anthropic.ToolResultBlockParam[] = []
   for (const block of response.content) {
     if (block.type !== 'tool_use') continue
-    const isPrototyping = (PROTOTYPING_TOOL_NAMES as readonly string[]).includes(block.name)
-    const { result, isError } = isPrototyping
-      ? await executePrototypingTool(featureId, block.name, block.input, applied)
-      : await executePlanningTool(featureId, block.name, block.input, applied)
+    const { result, isError } = await executeTool(featureId, userId, block.name, block.input, applied)
     results.push({ type: 'tool_result', tool_use_id: block.id, content: result, is_error: isError })
   }
   return results
+}
+
+function executeTool(
+  featureId: string,
+  userId: string | undefined,
+  name: string,
+  input: unknown,
+  applied: AppliedChanges
+): Promise<{ result: string | Anthropic.ToolResultBlockParam['content']; isError: boolean }> {
+  if (name === FIGMA_TOOL_NAME) return executeViewFigma(userId, input as { url: string }, applied)
+  if ((PROTOTYPING_TOOL_NAMES as readonly string[]).includes(name)) {
+    return executePrototypingTool(featureId, name, input, applied)
+  }
+  return executePlanningTool(featureId, name, input, applied)
 }
 
 // Persisted history is text-only; these markers keep tool activity visible to
@@ -169,6 +185,7 @@ function buildMarkers(applied: AppliedChanges): string[] {
   }
   if (applied.specUpdated) markers.push('[Spec draft updated]')
   if (applied.filesInspected > 0) markers.push(`[Inspected ${applied.filesInspected} file(s) in the product repo]`)
+  if (applied.framesViewed > 0) markers.push(`[Viewed ${applied.framesViewed} Figma frame(s)]`)
   if (applied.prototypePrUrl) markers.push(`[Prototype PR: ${applied.prototypePrUrl}]`)
   return markers
 }
