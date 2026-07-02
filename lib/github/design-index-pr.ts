@@ -20,17 +20,33 @@ export async function readRepoFile(
   return Buffer.from(data.content, 'base64').toString('utf8')
 }
 
+/** Lists a directory on a ref. Returns null if the path doesn't exist. */
+export async function listRepoDir(
+  token: string, repo: string, path: string, ref = 'main'
+): Promise<{ name: string; path: string; type: 'file' | 'dir' }[] | null> {
+  const res = await fetch(`${API}/repos/${repo}/contents/${path}?ref=${ref}`, { headers: gh(token) })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`listRepoDir ${path}: ${res.status}`)
+  const data = await res.json()
+  if (!Array.isArray(data)) throw new Error(`listRepoDir ${path}: not a directory`)
+  return (data as { name: string; path: string; type: string }[]).map((e) => ({
+    name: e.name,
+    path: e.path,
+    type: e.type === 'dir' ? 'dir' : 'file',
+  }))
+}
+
 /**
- * Force-updates `branch` to a single commit off main that writes `files`.
+ * Force-updates `branch` to a single commit off `base` that writes `files`.
  * Deterministic: re-running with the same content yields the same tree.
  */
 export async function forceUpdateBranch(
-  token: string, repo: string, branch: string, files: { path: string; content: string }[], message: string
+  token: string, repo: string, branch: string, files: { path: string; content: string }[], message: string, base = 'main'
 ): Promise<void> {
   const headers = gh(token)
-  const mainRef = await fetch(`${API}/repos/${repo}/git/ref/heads/main`, { headers })
-  if (!mainRef.ok) throw new Error(`get main ref: ${mainRef.status}`)
-  const baseSha = ((await mainRef.json()) as { object: { sha: string } }).object.sha
+  const baseRef = await fetch(`${API}/repos/${repo}/git/ref/heads/${base}`, { headers })
+  if (!baseRef.ok) throw new Error(`get ${base} ref: ${baseRef.status}`)
+  const baseSha = ((await baseRef.json()) as { object: { sha: string } }).object.sha
 
   const blobs = await Promise.all(files.map(async (f) => {
     const r = await fetch(`${API}/repos/${repo}/git/blobs`, {
@@ -60,32 +76,54 @@ export async function forceUpdateBranch(
   if (!refRes.ok) throw new Error(`update ref: ${refRes.status}`)
 }
 
-/** Ensures one open PR for branch→main exists and enables auto-merge. Returns PR number. */
-export async function ensurePrWithAutoMerge(
-  token: string, repo: string, branch: string, title: string
-): Promise<number> {
+export interface EnsurePrOptions {
+  base: string
+  title: string
+  body: string
+  autoMerge: boolean
+}
+
+/** Ensures one open PR for branch→base exists. Returns PR number and URL. */
+export async function ensurePr(
+  token: string, repo: string, branch: string, opts: EnsurePrOptions
+): Promise<{ number: number; url: string }> {
   const headers = gh(token)
   const owner = repo.split('/')[0]
   const list = await fetch(`${API}/repos/${repo}/pulls?head=${owner}:${branch}&state=open`, { headers })
   if (!list.ok) throw new Error(`list pulls: ${list.status}`)
-  let pr = ((await list.json()) as { number: number; node_id: string }[])[0]
+  let pr = ((await list.json()) as { number: number; node_id: string; html_url: string }[])[0]
 
   if (!pr) {
     const create = await fetch(`${API}/repos/${repo}/pulls`, {
-      method: 'POST', headers, body: JSON.stringify({ title, head: branch, base: 'main', body: 'Automated design-index scaffold. Auto-merges on green CI.' }),
+      method: 'POST', headers, body: JSON.stringify({ title: opts.title, head: branch, base: opts.base, body: opts.body }),
     })
     if (!create.ok) throw new Error(`create pull: ${create.status}`)
-    pr = (await create.json()) as { number: number; node_id: string }
+    pr = (await create.json()) as { number: number; node_id: string; html_url: string }
   }
 
-  // Enable auto-merge (GraphQL); ignore failure if already enabled / not allowed.
-  await fetch(`${API}/graphql`, {
-    method: 'POST', headers,
-    body: JSON.stringify({
-      query: `mutation($id:ID!){ enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:SQUASH}){ clientMutationId } }`,
-      variables: { id: pr.node_id },
-    }),
-  }).catch(() => {})
+  if (opts.autoMerge) {
+    // Enable auto-merge (GraphQL); ignore failure if already enabled / not allowed.
+    await fetch(`${API}/graphql`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        query: `mutation($id:ID!){ enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:SQUASH}){ clientMutationId } }`,
+        variables: { id: pr.node_id },
+      }),
+    }).catch(() => {})
+  }
 
-  return pr.number
+  return { number: pr.number, url: pr.html_url }
+}
+
+/** Design-index behavior: PR branch→main with auto-merge enabled. Returns PR number. */
+export async function ensurePrWithAutoMerge(
+  token: string, repo: string, branch: string, title: string
+): Promise<number> {
+  const { number } = await ensurePr(token, repo, branch, {
+    base: 'main',
+    title,
+    body: 'Automated design-index scaffold. Auto-merges on green CI.',
+    autoMerge: true,
+  })
+  return number
 }

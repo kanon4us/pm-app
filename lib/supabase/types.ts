@@ -235,9 +235,14 @@ export interface Database {
         Relationships: []
       }
       features: {
-        Row: { id: string; name: string; description: string | null; status: 'draft' | 'active' | 'archived'; planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; name: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null }
-        Update: { name?: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null }
+        Row: {
+          id: string; name: string; description: string | null; status: 'draft' | 'active' | 'archived'
+          planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
+          code_paths: string[]; prototype_branch: string | null; prototype_pr_url: string | null
+          created_at: string; updated_at: string
+        }
+        Insert: { id?: string; name: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null; code_paths?: string[]; prototype_branch?: string | null; prototype_pr_url?: string | null }
+        Update: { name?: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null; code_paths?: string[]; prototype_branch?: string | null; prototype_pr_url?: string | null }
         Relationships: []
       }
       feature_tasks: {
