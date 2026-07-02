@@ -1,28 +1,45 @@
 // app/features/[id]/components/ClaudePanel.tsx
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Input, Spin, Typography, Space, message } from 'antd'
-import { SendOutlined, PlusCircleOutlined } from '@ant-design/icons'
+import { Alert, Button, Drawer, Input, Popconfirm, Spin, Tag, Typography, Space, message } from 'antd'
+import { SendOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import type { FeatureMessage } from '@/lib/features/conversation'
+
+type PlanningPhase = 'planning' | 'approved' | 'prototyping'
+
+interface AppliedChanges {
+  stories: number
+  scenarios: number
+  steps: number
+  specUpdated: boolean
+}
 
 interface Props {
   featureId: string
-  onSyncStep: (title: string, description: string) => void
+  planningPhase: PlanningPhase
+  specContent: string | null
+  onApplied: () => void
 }
 
-export function ClaudePanel({ featureId, onSyncStep }: Props) {
+const PHASE_COLORS: Record<PlanningPhase, string> = {
+  planning: 'blue',
+  approved: 'green',
+  prototyping: 'purple',
+}
+
+export function ClaudePanel({ featureId, planningPhase, specContent, onApplied }: Props) {
   const [messages, setMessages] = useState<FeatureMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [specOpen, setSpecOpen] = useState(false)
+  const [approving, setApproving] = useState(false)
   const [reviewing, setReviewing] = useState(false)
   const [reviewFindings, setReviewFindings] = useState<{ type: string; title: string; description: string }[] | null>(null)
-  const [reviewError, setReviewError] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   async function runReview() {
     setReviewing(true)
-    setReviewError(false)
     try {
       const res = await fetch('/api/features/review', {
         method: 'POST',
@@ -33,7 +50,6 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
       const findings = await res.json()
       setReviewFindings(Array.isArray(findings) ? findings : [])
     } catch {
-      setReviewError(true)
       message.error('Review failed')
     } finally {
       setReviewing(false)
@@ -79,7 +95,7 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
         headers: { 'Content-Type': 'application/json' },
       })
       if (!res.ok) throw new Error('Request failed')
-      const data: { content: string; suggestedStep: { title: string; description: string } | null } = await res.json()
+      const data: { content: string; applied: AppliedChanges | null } = await res.json()
 
       const assistantMsg: FeatureMessage = {
         id: `temp-assistant-${Date.now()}`,
@@ -90,27 +106,10 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
       }
       setMessages((prev) => [...prev.filter((m) => m.id !== tempUserMsg.id), tempUserMsg, assistantMsg])
 
-      if (data.suggestedStep) {
-        // Show a quick action to sync the suggested step
-        message.info({
-          content: (
-            <Space>
-              <span>Claude suggested a step: <strong>{data.suggestedStep.title}</strong></span>
-              <Button
-                size="small"
-                type="primary"
-                icon={<PlusCircleOutlined />}
-                onClick={() => {
-                  onSyncStep(data.suggestedStep!.title, data.suggestedStep!.description)
-                  message.destroy()
-                }}
-              >
-                Add to first scenario
-              </Button>
-            </Space>
-          ),
-          duration: 8,
-        })
+      if (data.applied) {
+        // Claude wrote to the panel/spec via tools — refresh the editor state
+        onApplied()
+        if (data.applied.specUpdated) message.success('Spec draft updated')
       }
     } catch {
       message.error('Failed to send message')
@@ -120,11 +119,36 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
     }
   }
 
+  async function approveSpec() {
+    setApproving(true)
+    try {
+      const res = await fetch(`/api/features/${featureId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ planning_phase: 'approved' }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error('Approve failed')
+      message.success('Spec approved — ready for prototyping')
+      setSpecOpen(false)
+      onApplied()
+    } catch {
+      message.error('Failed to approve spec')
+    } finally {
+      setApproving(false)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography.Text strong>Claude</Typography.Text>
-        <Button size="small" loading={reviewing} onClick={runReview}>App-wide Review</Button>
+        <Space size={6}>
+          <Typography.Text strong>Claude</Typography.Text>
+          <Tag color={PHASE_COLORS[planningPhase]} style={{ marginInlineEnd: 0 }}>{planningPhase}</Tag>
+        </Space>
+        <Space size={6}>
+          <Button size="small" icon={<FileTextOutlined />} disabled={!specContent} onClick={() => setSpecOpen(true)}>Spec</Button>
+          <Button size="small" loading={reviewing} onClick={runReview}>App-wide Review</Button>
+        </Space>
       </div>
       {reviewFindings && (
         <div style={{ padding: 8, borderBottom: '1px solid #333' }}>
@@ -141,11 +165,11 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
           <div style={{ textAlign: 'center', paddingTop: 24 }}><Spin /></div>
         ) : messages.length === 0 ? (
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Ask Claude to suggest steps, critique scenarios, or generate a prototype.
+            Brainstorm this feature with Claude. It will ask questions, populate the scenarios panel, and draft a spec for you to approve.
           </Typography.Text>
         ) : (
           messages.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} onSyncStep={onSyncStep} />
+            <MessageBubble key={msg.id} msg={msg} />
           ))
         )}
         <div ref={bottomRef} />
@@ -171,22 +195,37 @@ export function ClaudePanel({ featureId, onSyncStep }: Props) {
           />
         </Space.Compact>
       </div>
+
+      <Drawer
+        title="Feature Spec"
+        open={specOpen}
+        onClose={() => setSpecOpen(false)}
+        width={520}
+        extra={planningPhase === 'planning' && specContent ? (
+          <Popconfirm
+            title="Approve this spec?"
+            description="Approving unlocks the prototyping phase."
+            onConfirm={approveSpec}
+            okText="Approve"
+          >
+            <Button type="primary" size="small" icon={<CheckCircleOutlined />} loading={approving}>
+              Approve spec
+            </Button>
+          </Popconfirm>
+        ) : planningPhase !== 'planning' ? (
+          <Tag color={PHASE_COLORS[planningPhase]}>{planningPhase}</Tag>
+        ) : null}
+      >
+        <Typography.Paragraph style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
+          {specContent ?? 'No spec yet.'}
+        </Typography.Paragraph>
+      </Drawer>
     </div>
   )
 }
 
-interface MessageBubbleProps {
-  msg: FeatureMessage
-  onSyncStep: (title: string, description: string) => void
-}
-
-function MessageBubble({ msg, onSyncStep }: MessageBubbleProps) {
+function MessageBubble({ msg }: { msg: FeatureMessage }) {
   const isUser = msg.role === 'user'
-
-  // Parse suggested step from assistant message
-  const suggestedStepMatch = msg.role === 'assistant'
-    ? msg.content.match(/\*\*\[SUGGESTED STEP\]\*\*\s+Title:\s*"([^"]+)"\s*\|\s*Description:\s*"([^"]+)"/)
-    : null
 
   return (
     <div
@@ -209,20 +248,6 @@ function MessageBubble({ msg, onSyncStep }: MessageBubbleProps) {
         }}
       >
         <Typography.Text style={{ fontSize: 12 }}>{msg.content}</Typography.Text>
-
-        {suggestedStepMatch && (
-          <div style={{ marginTop: 8 }}>
-            <Button
-              size="small"
-              type="dashed"
-              icon={<PlusCircleOutlined />}
-              onClick={() => onSyncStep(suggestedStepMatch[1], suggestedStepMatch[2])}
-              style={{ fontSize: 11 }}
-            >
-              Add to first scenario
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   )

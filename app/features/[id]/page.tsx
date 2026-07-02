@@ -1,7 +1,7 @@
 // app/features/[id]/page.tsx
 'use client'
 import { useEffect, useState } from 'react'
-import { Layout, Typography, Spin, Select, Button, message } from 'antd'
+import { Layout, Typography, Spin, Select, Button } from 'antd'
 import { useParams, useRouter } from 'next/navigation'
 import { UserStoriesPanel } from './components/UserStoriesPanel'
 import { ScenariosPanel } from './components/ScenariosPanel'
@@ -15,7 +15,11 @@ export interface Step {
 }
 export interface Scenario { id: string; user_story_id: string; title: string; description: string | null; display_order: number; steps: Step[] }
 export interface UserStory { id: string; title: string; as_a: string; i_want: string; so_that: string; scenarios: Scenario[]; featureCount: number }
-export interface Feature { id: string; name: string; description: string | null; status: string; stories: UserStory[] }
+export interface Feature {
+  id: string; name: string; description: string | null; status: string
+  planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
+  stories: UserStory[]
+}
 
 export default function FeatureEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -66,13 +70,12 @@ export default function FeatureEditorPage() {
           <ScenariosPanel featureId={id} featureName={feature.name} story={activeStory} onUpdate={reload} />
         </Content>
         <Sider width={320} style={{ background: '#1a1a1a', borderLeft: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
-          <ClaudePanel featureId={id} onSyncStep={(title, description) => {
-            if (!activeStory?.scenarios[0]) {
-              message.warning('Add a scenario first.')
-              return
-            }
-            fetch('/api/steps', { method: 'POST', body: JSON.stringify({ scenario_id: activeStory.scenarios[0].id, title, description }), headers: { 'Content-Type': 'application/json' } }).then(reload)
-          }} />
+          <ClaudePanel
+            featureId={id}
+            planningPhase={feature.planning_phase}
+            specContent={feature.spec_content}
+            onApplied={reload}
+          />
         </Sider>
       </Layout>
     </Layout>
