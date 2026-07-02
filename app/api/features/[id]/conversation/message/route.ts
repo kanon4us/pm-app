@@ -11,6 +11,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const { content } = await req.json()
   if (!content) return NextResponse.json({ error: 'content required' }, { status: 400 })
-  const result = await sendFeatureMessage(id, content)
+  const result = await sendFeatureMessage(id, content, user.dbId)
   return NextResponse.json(result)
 }

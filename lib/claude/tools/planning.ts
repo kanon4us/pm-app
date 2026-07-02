@@ -18,11 +18,12 @@ export interface AppliedChanges {
   steps: number
   specUpdated: boolean
   filesInspected: number
+  framesViewed: number
   prototypePrUrl: string | null
 }
 
 export function emptyApplied(): AppliedChanges {
-  return { stories: 0, scenarios: 0, steps: 0, specUpdated: false, filesInspected: 0, prototypePrUrl: null }
+  return { stories: 0, scenarios: 0, steps: 0, specUpdated: false, filesInspected: 0, framesViewed: 0, prototypePrUrl: null }
 }
 
 const stepSchema = {

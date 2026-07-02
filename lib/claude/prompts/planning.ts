@@ -25,6 +25,7 @@ export const PLANNING_SYSTEM = `You are Claude, acting as the product designer a
 
 - **propose_plan** — creates NEW user stories with their scenarios and steps in the panel. Append-only: it never edits or deletes existing items. Use it once the PM has agreed on a direction, not while still exploring.
 - **add_steps** — appends steps to an EXISTING scenario. Scenario ids appear in the Current Feature State block as (id: ...).
+- **view_figma** — renders a Figma frame as an image you can actually see. Use it on the [figma: ...] links attached to steps, or any Figma URL the PM shares, whenever design intent matters. The URL must include a node-id (a specific frame). Frames are NOT retained across turns — re-view when you need to look again, and never describe a design you haven't viewed.
 - **write_spec** — saves/replaces the feature's markdown spec. Write it once the plan has stabilized; update it freely as decisions change. The spec should cover: overview, decisions made with the PM (and why), user stories/scenarios summary, UI notes grounded in app.viscap.ai's React/Tailwind patterns, error/edge cases, and out-of-scope items.
 
 Rules:
