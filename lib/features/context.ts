@@ -16,6 +16,8 @@ export async function buildFeatureContext(featureId: string): Promise<string> {
   const lines: string[] = [
     `Feature: ${feature.name}`,
     `Status: ${feature.status}`,
+    `Planning phase: ${feature.planning_phase}`,
+    `Spec: ${feature.spec_content ? 'draft exists (shown below)' : 'not written yet'}`,
     ...(feature.description ? [`Description: ${feature.description}`] : []),
     '',
   ]
@@ -29,7 +31,7 @@ export async function buildFeatureContext(featureId: string): Promise<string> {
       .from('scenarios').select().eq('user_story_id', story.id).order('display_order')
 
     for (const scenario of scenarios ?? []) {
-      lines.push(`  Scenario: ${scenario.title}${scenario.description ? ` — ${scenario.description}` : ''}`)
+      lines.push(`  Scenario (id: ${scenario.id}): ${scenario.title}${scenario.description ? ` — ${scenario.description}` : ''}`)
 
       const { data: steps } = await db
         .from('steps').select().eq('scenario_id', scenario.id).order('display_order')
@@ -43,6 +45,10 @@ export async function buildFeatureContext(featureId: string): Promise<string> {
       }
     }
     lines.push('')
+  }
+
+  if (feature.spec_content) {
+    lines.push('--- Current Spec Draft ---', feature.spec_content, '')
   }
 
   return lines.join('\n').trimEnd()

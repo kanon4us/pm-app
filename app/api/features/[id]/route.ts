@@ -28,11 +28,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
   const body = await req.json()
-  const { status, name, description } = body
+  const { status, name, description, planning_phase } = body
+  if (planning_phase !== undefined && !['planning', 'approved', 'prototyping'].includes(planning_phase)) {
+    return NextResponse.json({ error: 'invalid planning_phase' }, { status: 400 })
+  }
   const feature = await updateFeature(id, {
     ...(status !== undefined && { status }),
     ...(name !== undefined && { name }),
     ...(description !== undefined && { description }),
+    ...(planning_phase !== undefined && { planning_phase }),
   })
   return NextResponse.json(feature)
 }
