@@ -18,6 +18,7 @@ export interface UserStory { id: string; title: string; as_a: string; i_want: st
 export interface Feature {
   id: string; name: string; description: string | null; status: string
   planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
+  prototype_pr_url: string | null
   stories: UserStory[]
 }
 
@@ -74,6 +75,7 @@ export default function FeatureEditorPage() {
             featureId={id}
             planningPhase={feature.planning_phase}
             specContent={feature.spec_content}
+            prototypePrUrl={feature.prototype_pr_url}
             onApplied={reload}
           />
         </Sider>

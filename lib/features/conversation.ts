@@ -2,8 +2,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildFeatureContext } from '@/lib/features/context'
+import { getFeature, type Feature } from '@/lib/features/client'
 import { PLANNING_SYSTEM } from '@/lib/claude/prompts/planning'
+import { PROTOTYPING_SYSTEM } from '@/lib/claude/prompts/prototyping'
 import { PLANNING_TOOLS, executePlanningTool, emptyApplied, type AppliedChanges } from '@/lib/claude/tools/planning'
+import { PROTOTYPING_TOOLS, PROTOTYPING_TOOL_NAMES, executePrototypingTool } from '@/lib/claude/tools/prototyping'
 import type { Tables } from '@/lib/supabase/types'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -56,55 +59,79 @@ export async function getMessages(conversationId: string): Promise<FeatureMessag
   return data ?? []
 }
 
+// Tool-round budget per PM message: planning turns stay conversational (a plan
+// mutation + a narration round); prototyping turns explore the product repo.
+const PLANNING_MAX_TOOL_ROUNDS = 3
+const PROTOTYPING_MAX_TOOL_ROUNDS = 25
+
 export async function sendFeatureMessage(
   featureId: string,
   userContent: string
 ): Promise<{ content: string; applied: AppliedChanges | null }> {
+  const feature = await getFeature(featureId)
+  if (!feature) throw new Error('Feature not found')
   const conversation = await getOrCreateConversation(featureId)
   const history = await getMessages(conversation.id)
   const featureContext = await buildFeatureContext(featureId)
 
   await addMessage(conversation.id, 'user', userContent)
 
-  const messages: Anthropic.MessageParam[] = [
+  const prototypingActive = feature.planning_phase !== 'planning'
+  const tools = prototypingActive ? [...PLANNING_TOOLS, ...PROTOTYPING_TOOLS] : PLANNING_TOOLS
+  const maxToolRounds = prototypingActive ? PROTOTYPING_MAX_TOOL_ROUNDS : PLANNING_MAX_TOOL_ROUNDS
+  const system = buildSystem(feature, featureContext, prototypingActive)
+
+  let messages: Anthropic.MessageParam[] = [
     ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     { role: 'user', content: userContent },
   ]
-  const system = `${PLANNING_SYSTEM}\n\n--- Current Feature State ---\n${featureContext}`
-
-  const request = (msgs: Anthropic.MessageParam[]) =>
-    client.messages.create({ model: MODEL, max_tokens: MAX_TOKENS, system, tools: PLANNING_TOOLS, messages: msgs })
 
   const applied = emptyApplied()
   const textParts: string[] = []
+  let budgetReached = false
 
-  const response = await request(messages)
-  textParts.push(...collectText(response))
+  for (let round = 0; ; round++) {
+    const response = await client.messages.create({
+      model: MODEL, max_tokens: MAX_TOKENS, system, tools, messages,
+    })
+    textParts.push(...collectText(response))
+    if (response.stop_reason !== 'tool_use') break
 
-  if (response.stop_reason === 'tool_use') {
+    // Always execute what the model requested, even on the last round —
+    // a dangling tool_use with no execution would silently drop work.
     const toolResults = await runTools(featureId, response, applied)
-
-    // One continuation so Claude can narrate what it applied. If it tool-calls
-    // again here, we execute but do not continue further (prompt allows one
-    // plan mutation per turn; write_spec commonly rides along).
-    const continuation = await request([
+    if (round + 1 >= maxToolRounds) {
+      budgetReached = true
+      break
+    }
+    messages = [
       ...messages,
       { role: 'assistant', content: response.content },
       { role: 'user', content: toolResults },
-    ])
-    textParts.push(...collectText(continuation))
-    if (continuation.stop_reason === 'tool_use') {
-      await runTools(featureId, continuation, applied)
-    }
+    ]
   }
 
   const markers = buildMarkers(applied)
+  if (budgetReached) markers.push('[Tool budget reached — reply to continue]')
   const assistantContent = [textParts.join('\n\n').trim(), ...markers].filter(Boolean).join('\n\n')
   if (!assistantContent) throw new Error('Claude returned no response')
   await addMessage(conversation.id, 'assistant', assistantContent)
 
-  const anyChange = applied.stories > 0 || applied.scenarios > 0 || applied.steps > 0 || applied.specUpdated
+  const anyChange =
+    applied.stories > 0 || applied.scenarios > 0 || applied.steps > 0 || applied.specUpdated || applied.prototypePrUrl !== null
   return { content: assistantContent, applied: anyChange ? applied : null }
+}
+
+function buildSystem(feature: Feature, featureContext: string, prototypingActive: boolean): string {
+  const parts = [PLANNING_SYSTEM]
+  if (prototypingActive) {
+    parts.push(PROTOTYPING_SYSTEM)
+    if (feature.code_paths?.length) {
+      parts.push(`Suggested Starting Points in the product repo:\n${feature.code_paths.map((p) => `- ${p}`).join('\n')}`)
+    }
+  }
+  parts.push(`--- Current Feature State ---\n${featureContext}`)
+  return parts.join('\n\n')
 }
 
 function collectText(response: Anthropic.Message): string[] {
@@ -119,7 +146,10 @@ async function runTools(
   const results: Anthropic.ToolResultBlockParam[] = []
   for (const block of response.content) {
     if (block.type !== 'tool_use') continue
-    const { result, isError } = await executePlanningTool(featureId, block.name, block.input, applied)
+    const isPrototyping = (PROTOTYPING_TOOL_NAMES as readonly string[]).includes(block.name)
+    const { result, isError } = isPrototyping
+      ? await executePrototypingTool(featureId, block.name, block.input, applied)
+      : await executePlanningTool(featureId, block.name, block.input, applied)
     results.push({ type: 'tool_result', tool_use_id: block.id, content: result, is_error: isError })
   }
   return results
@@ -138,5 +168,7 @@ function buildMarkers(applied: AppliedChanges): string[] {
     markers.push(`[Applied to panel: ${parts.join(', ')}]`)
   }
   if (applied.specUpdated) markers.push('[Spec draft updated]')
+  if (applied.filesInspected > 0) markers.push(`[Inspected ${applied.filesInspected} file(s) in the product repo]`)
+  if (applied.prototypePrUrl) markers.push(`[Prototype PR: ${applied.prototypePrUrl}]`)
   return markers
 }
