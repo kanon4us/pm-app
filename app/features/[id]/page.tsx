@@ -19,6 +19,7 @@ export interface UserStory { id: string; title: string; as_a: string; i_want: st
 export interface Feature {
   id: string; name: string; description: string | null; status: string
   planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
+  app: 'web' | 'cms' | 'mobile' | 'desktop'
   stories: UserStory[]
 }
 
@@ -52,8 +53,8 @@ export default function FeatureEditorPage() {
 
   const activeStory = feature.stories.find((s) => s.id === activeStoryId) ?? null
 
-  async function updateStatus(status: string) {
-    await fetch(`/api/features/${id}`, { method: 'PATCH', body: JSON.stringify({ status }), headers: { 'Content-Type': 'application/json' } })
+  async function patchFeature(patch: Record<string, string>) {
+    await fetch(`/api/features/${id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { 'Content-Type': 'application/json' } })
     reload()
   }
 
@@ -62,7 +63,14 @@ export default function FeatureEditorPage() {
       <Header style={{ background: '#141414', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 16, padding: '0 20px' }}>
         <Button type="text" onClick={() => router.back()}>← Back</Button>
         <Typography.Title level={5} style={{ margin: 0, color: '#fff' }}>{feature.name}</Typography.Title>
-        <Select value={feature.status} onChange={updateStatus} style={{ marginLeft: 'auto' }} size="small"
+        <Select value={feature.app} onChange={(app) => patchFeature({ app })} style={{ marginLeft: 'auto', minWidth: 130 }} size="small"
+          options={[
+            { value: 'web', label: '🌐 Web App' },
+            { value: 'cms', label: '📚 Education CMS' },
+            { value: 'mobile', label: '📱 Mobile' },
+            { value: 'desktop', label: '🖥 Desktop' },
+          ]} />
+        <Select value={feature.status} onChange={(status) => patchFeature({ status })} size="small"
           options={[{ value: 'draft', label: 'draft' }, { value: 'active', label: 'active' }, { value: 'archived', label: 'archived' }]} />
       </Header>
       <Layout>
