@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // DESIGN.md contracts are read from disk at runtime by lib/claude/design-md.ts;
+  // include them in the traced output so the Vercel function can see them.
+  outputFileTracingIncludes: {
+    "/api/features/[id]/conversation/message": ["./design/DESIGN-*.md"],
+  },
 };
 
 export default nextConfig;

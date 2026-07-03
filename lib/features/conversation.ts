@@ -4,6 +4,7 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildFeatureContext } from '@/lib/features/context'
 import { getFeature, type Feature } from '@/lib/features/client'
 import { getAppTarget } from '@/lib/claude/apps'
+import { getDesignContract } from '@/lib/claude/design-md'
 import { PLANNING_SYSTEM } from '@/lib/claude/prompts/planning'
 import { PROTOTYPING_SYSTEM } from '@/lib/claude/prompts/prototyping'
 import { PLANNING_TOOLS, executePlanningTool, emptyApplied, type AppliedChanges } from '@/lib/claude/tools/planning'
@@ -178,6 +179,10 @@ function buildSystem(feature: Feature, featureContext: string, prototypingActive
   ]
   if (prototypingActive) {
     parts.push(PROTOTYPING_SYSTEM)
+    const designContract = getDesignContract(target.slug)
+    if (designContract) {
+      parts.push(`--- DESIGN CONTRACT (${target.label}) — tokens and rules below are authoritative ---\n${designContract}`)
+    }
     if (feature.code_paths?.length) {
       parts.push(`Suggested Starting Points in ${target.repo}:\n${feature.code_paths.map((p) => `- ${p}`).join('\n')}`)
     }
