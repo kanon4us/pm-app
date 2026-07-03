@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendFeatureMessage } from '@/lib/features/conversation'
 import { getSessionUser } from '@/lib/auth'
 
-// Prototyping turns run an agentic tool loop against the product repo
-export const maxDuration = 300
+// Prototyping turns run an agentic tool loop against the product repo and can
+// generate tens of thousands of output tokens in the submit round.
+export const maxDuration = 800
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser()

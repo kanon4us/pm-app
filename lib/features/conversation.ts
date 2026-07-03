@@ -100,11 +100,17 @@ export async function sendFeatureMessage(
   let truncated = false
 
   for (let round = 0; ; round++) {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: prototypingActive ? PROTOTYPING_MAX_TOKENS : PLANNING_MAX_TOKENS,
-      system, tools, messages,
-    })
+    // Streamed then assembled: the SDK refuses non-streaming requests with
+    // max_tokens this large ("Streaming is required for operations that may
+    // take longer than 10 minutes"), and streaming keeps the connection live
+    // through multi-minute prototype generations.
+    const response = await client.messages
+      .stream({
+        model: MODEL,
+        max_tokens: prototypingActive ? PROTOTYPING_MAX_TOKENS : PLANNING_MAX_TOKENS,
+        system, tools, messages,
+      })
+      .finalMessage()
     textParts.push(...collectText(response))
     if (response.stop_reason === 'max_tokens') {
       truncated = true
