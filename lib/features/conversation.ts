@@ -140,7 +140,7 @@ export async function sendFeatureMessage(
   await addMessage(conversation.id, 'assistant', assistantContent)
 
   const anyChange =
-    applied.stories > 0 || applied.scenarios > 0 || applied.steps > 0 || applied.specUpdated || applied.prototypePrUrl !== null
+    applied.stories > 0 || applied.scenarios > 0 || applied.steps > 0 || applied.specUpdated || applied.prototypeUpdated
   return { content: assistantContent, applied: anyChange ? applied : null }
 }
 
@@ -204,6 +204,6 @@ function buildMarkers(applied: AppliedChanges): string[] {
   if (applied.specUpdated) markers.push('[Spec draft updated]')
   if (applied.filesInspected > 0) markers.push(`[Inspected ${applied.filesInspected} file(s) in the product repo]`)
   if (applied.framesViewed > 0) markers.push(`[Viewed ${applied.framesViewed} Figma frame(s)]`)
-  if (applied.prototypePrUrl) markers.push(`[Prototype PR: ${applied.prototypePrUrl}]`)
+  if (applied.prototypeUpdated) markers.push('[Prototype updated — open the Prototype tab]')
   return markers
 }
