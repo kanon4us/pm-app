@@ -59,9 +59,21 @@ Migrate as-is (`Cover` refreshed with the new file name; `Archive` stays the in-
 - Vendor kit (`Ant Design System 5.11`) is consumed ONLY by this file, mirroring how only wrapper components import antd in code.
 - Mirror at milestones, not per iteration. `Components` file: archive after migration (rename `▢ Components (migrated → Foundations — WEB)`).
 
-## Decisions needed from Michael
+## Decisions — LOCKED (Michael, 2026-07-03)
 
-1. `PageHeaderBar` vs `PageHeaderBarNew` — which is canonical?
-2. Delete or repurpose the empty `Multi-Select` page?
-3. `MembershipOffer` (components root) — shared foundation or its own domain file?
-4. CMS / MOBILE foundations — same exercise later; needs their repo names for `codePaths:`.
+1. **Page headers: keep BOTH.** `PageHeaderBar` and `PageHeaderBarNew` are each canonical for a different target user group / permission tier. Draw both on the `Page chrome` page; each frame's description states its audience so nobody "consolidates" them by accident.
+2. **Empty pages: purge.** `Multi-Select` and `---` are deleted, not repurposed — the index stays restricted to active code coverage. The Selects & Inputs page is created fresh when that family gets drawn.
+3. **Pre-App / Funnel Context: new top-level Figma project** (sibling of `▣ WEB APP` / `⬡ FOUNDATIONS`). Holds (a) Webflow page blueprints — static representations of marketing/intake pages that live upstream of the React app — and (b) the team-provisioning flow (what happens before a user reaches the dashboard). This keeps the React-anchored foundation 100% clean while giving prototyping Claude the user-state context. Nuance: `components/MembershipOffer` is React code, so its *component* lives in `Foundations — WEB` (Primitives); its *usage context* is documented in Pre-App / Funnel Context.
+4. **Per-app repo anchors (verified against the GitHub org):**
+   - CMS → `codePaths: Viscap-Media/education-cms@develop`
+   - Mobile → `codePaths: Viscap-Media/media-sync-mobile@main` ⚠️ default branch is `main`, not `develop`
+   - NEW FINDING: the org also has **`media-sync-desktop`** — a fourth app not in the web/cms/mobile plan. Decide whether it gets its own foundation or shares Mobile's.
+
+## Execution roadmap (agreed)
+
+1. **Lock the blueprint** — this file, updated with the decisions above, merges via PR #25.
+2. **Workspace + tokens** — create `Foundations — WEB`, extract design tokens from the antd theme (`WithThemeTokens.tsx`) into the Tokens page.
+3. **Structural porting (~1h)** — Navbar page → `AdminNav`/`AdminHeader`; modal page → `OutOfTokensModal`/`ConfirmModal`; placeholder markers for the missing families (Comments, Selects & Inputs, Page chrome, Primitives).
+4. **Publish the library** — then the absolute rule applies: instance from the library, never draw from scratch.
+5. **Pre-App / Funnel Context project** — created independently; no code anchors (Webflow is upstream of the repos).
+6. **CMS / Mobile (/ Desktop?) foundations** — same worksheet exercise against their repos. Note for pm-app tooling: chat tools currently read a single `CODE_REPO` env; multi-app prototyping requires a per-feature repo mapping (features table or app column) before Claude can research education-cms or media-sync-mobile.
