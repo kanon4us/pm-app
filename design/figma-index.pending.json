@@ -5,6 +5,7 @@
       "featureId": "cms-education-cms-education-cms",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -21,6 +22,7 @@
       "featureId": "mobile-handle-app-crashes-while-keeping-track-of-all-files-handle-app-crashes-while-keeping-track-of-all-files",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -37,6 +39,7 @@
       "featureId": "mobile-mvp-mobile-app-mvp-mobile-app",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -53,6 +56,7 @@
       "featureId": "mobile-mobile-app-v2-mobile-app-v2",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -69,6 +73,7 @@
       "featureId": "mobile-shooting-sessions-mobile-app-shooting-sessions-mobile-app",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -85,6 +90,7 @@
       "featureId": "mobile-viscap-mobile-viscap-mobile",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -101,6 +107,7 @@
       "featureId": "web-actor-hub-actor-hub",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -117,6 +124,7 @@
       "featureId": "web-actor-hub-casting",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -132,6 +140,8 @@
     {
       "featureId": "web-brand-intranet-brand-intranet",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -151,6 +161,7 @@
       "featureId": "web-conversations-conversations",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -166,6 +177,8 @@
     {
       "featureId": "web-creatives-creatives",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -184,6 +197,8 @@
     {
       "featureId": "web-creatives-creative-details",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -202,6 +217,8 @@
     {
       "featureId": "web-creatives-in-app-editor",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -220,6 +237,8 @@
     {
       "featureId": "web-creatives-new-creative",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -238,6 +257,8 @@
     {
       "featureId": "web-creatives-script",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -256,6 +277,8 @@
     {
       "featureId": "web-creatives-storyboard",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -274,6 +297,8 @@
     {
       "featureId": "web-creatives-storyboard-side-panel",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -293,6 +318,7 @@
       "featureId": "web-education-education",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -309,6 +335,7 @@
       "featureId": "web-errors-states",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -325,6 +352,7 @@
       "featureId": "web-frameworks-frameworks",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -341,6 +369,7 @@
       "featureId": "web-help-resources-help-resources",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -356,6 +385,7 @@
     {
       "featureId": "web-ideation-ideation",
       "reason": [
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -373,6 +403,7 @@
     {
       "featureId": "web-ideation-brainstorm",
       "reason": [
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -390,6 +421,7 @@
     {
       "featureId": "web-ideation-idea-bank",
       "reason": [
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -407,6 +439,7 @@
     {
       "featureId": "web-ideation-inspiration",
       "reason": [
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -425,6 +458,7 @@
       "featureId": "web-login-onboarding-login-onboarding",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -440,6 +474,8 @@
     {
       "featureId": "web-media-library-media-library",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -459,6 +495,7 @@
       "featureId": "web-mission-control-mission-control",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -474,6 +511,7 @@
     {
       "featureId": "web-performance-hub-performance-hub",
       "reason": [
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -491,6 +529,7 @@
     {
       "featureId": "web-performance-hub-filters-settings",
       "reason": [
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -509,6 +548,7 @@
       "featureId": "web-permissions-permissions",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -525,6 +565,7 @@
       "featureId": "web-reports-reports",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -540,6 +581,8 @@
     {
       "featureId": "web-settings-account",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -558,6 +601,8 @@
     {
       "featureId": "web-settings-billing-usage",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -576,6 +621,8 @@
     {
       "featureId": "web-settings-brand",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -594,6 +641,8 @@
     {
       "featureId": "web-settings-people",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -612,6 +661,8 @@
     {
       "featureId": "web-settings-position",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -630,6 +681,8 @@
     {
       "featureId": "web-settings-variables",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -648,6 +701,8 @@
     {
       "featureId": "web-settings-workflow",
       "reason": [
+        "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -667,6 +722,7 @@
       "featureId": "web-talent-management-talent-management",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -683,6 +739,7 @@
       "featureId": "web-talent-management-profile",
       "reason": [
         "unassigned-codepaths",
+        "unassigned-figma",
         "placeholder-clickup"
       ],
       "partial": {
@@ -694,6 +751,21 @@
         "figmaFileUrl": "https://figma.com/design/94pt6Tyzqr36vUN7dBtyiy/Talent-Management-Profile",
         "codePaths": []
       }
+    },
+    {
+      "featureId": "ticket-86e218dj4",
+      "reason": [
+        "unassigned-feature",
+        "unassigned-codepaths"
+      ],
+      "partial": {
+        "figmaFileKey": "pXET7AXHraQxHjyX3C8iXW",
+        "figmaFileUrl": "https://www.figma.com/design/pXET7AXHraQxHjyX3C8iXW/Creatives-%E2%80%94-Storyboard---Generative-AI?node-id=62-193983&t=oZcOXhzYRHI6RvqW-0",
+        "codePaths": []
+      },
+      "assignedClickupId": "86e218dj4",
+      "title": "Creatives | Generative AI Integration",
+      "figmaNodeId": "62:193983"
     }
   ]
 }
