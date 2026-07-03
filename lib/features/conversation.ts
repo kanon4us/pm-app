@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildFeatureContext } from '@/lib/features/context'
 import { getFeature, type Feature } from '@/lib/features/client'
+import { getAppTarget } from '@/lib/claude/apps'
 import { PLANNING_SYSTEM } from '@/lib/claude/prompts/planning'
 import { PROTOTYPING_SYSTEM } from '@/lib/claude/prompts/prototyping'
 import { PLANNING_TOOLS, executePlanningTool, emptyApplied, type AppliedChanges } from '@/lib/claude/tools/planning'
@@ -145,7 +146,7 @@ export async function sendFeatureMessage(
 
     // Always execute what the model requested, even on the last round —
     // a dangling tool_use with no execution would silently drop work.
-    const toolResults = await runTools(featureId, userId, response, applied)
+    const toolResults = await runTools(featureId, feature, userId, response, applied)
     if (round + 1 >= maxToolRounds) {
       budgetReached = true
       break
@@ -170,11 +171,15 @@ export async function sendFeatureMessage(
 }
 
 function buildSystem(feature: Feature, featureContext: string, prototypingActive: boolean): string {
-  const parts = [PLANNING_SYSTEM]
+  const target = getAppTarget(feature.app)
+  const parts = [
+    PLANNING_SYSTEM,
+    `## Target application for THIS feature\n\n${target.label} — repo ${target.repo} (base branch ${target.baseBranch}). Stack: ${target.stack}. All code research and design-language fidelity refers to THIS app, not any other Viscap product.`,
+  ]
   if (prototypingActive) {
     parts.push(PROTOTYPING_SYSTEM)
     if (feature.code_paths?.length) {
-      parts.push(`Suggested Starting Points in the product repo:\n${feature.code_paths.map((p) => `- ${p}`).join('\n')}`)
+      parts.push(`Suggested Starting Points in ${target.repo}:\n${feature.code_paths.map((p) => `- ${p}`).join('\n')}`)
     }
   }
   parts.push(`--- Current Feature State ---\n${featureContext}`)
@@ -187,6 +192,7 @@ function collectText(response: Anthropic.Message): string[] {
 
 async function runTools(
   featureId: string,
+  feature: Feature,
   userId: string | undefined,
   response: Anthropic.Message,
   applied: AppliedChanges
@@ -194,7 +200,7 @@ async function runTools(
   const results: Anthropic.ToolResultBlockParam[] = []
   for (const block of response.content) {
     if (block.type !== 'tool_use') continue
-    const { result, isError } = await executeTool(featureId, userId, block.name, block.input, applied)
+    const { result, isError } = await executeTool(featureId, feature, userId, block.name, block.input, applied)
     results.push({ type: 'tool_result', tool_use_id: block.id, content: result, is_error: isError })
   }
   return results
@@ -202,6 +208,7 @@ async function runTools(
 
 function executeTool(
   featureId: string,
+  feature: Feature,
   userId: string | undefined,
   name: string,
   input: unknown,
@@ -210,7 +217,7 @@ function executeTool(
   if (name === FIGMA_TOOL_NAME) return executeViewFigma(userId, input as { url: string }, applied)
   if (name === FIGMA_STYLES_TOOL_NAME) return executeGetFigmaStyles(userId, input as { url: string }, applied)
   if ((PROTOTYPING_TOOL_NAMES as readonly string[]).includes(name)) {
-    return executePrototypingTool(featureId, name, input, applied)
+    return executePrototypingTool(featureId, getAppTarget(feature.app), name, input, applied)
   }
   return executePlanningTool(featureId, name, input, applied)
 }

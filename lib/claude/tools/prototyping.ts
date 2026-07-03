@@ -8,8 +8,8 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { readRepoFile, listRepoDir } from '@/lib/github/design-index-pr'
 import { updateFeature } from '@/lib/features/client'
 import type { AppliedChanges } from '@/lib/claude/tools/planning'
+import type { AppTarget } from '@/lib/claude/apps'
 
-const BASE_BRANCH = 'develop'
 const MAX_FILE_CHARS = 200_000
 const MAX_PROTOTYPE_CHARS = 1_500_000
 
@@ -36,7 +36,7 @@ export const PROTOTYPING_TOOLS: Anthropic.Tool[] = [
       type: 'object',
       properties: {
         path: { type: 'string', description: "File path, e.g. 'components/Admin/Talent/TalentDetails.tsx'" },
-        ref: { type: 'string', description: "Branch to read from (default 'develop')" },
+        ref: { type: 'string', description: "Branch to read from (defaults to the app's base branch)" },
       },
       required: ['path'],
     },
@@ -57,19 +57,15 @@ export const PROTOTYPING_TOOLS: Anthropic.Tool[] = [
   },
 ]
 
-function repoEnv(): { token: string; repo: string } {
+function githubToken(): string {
   const token = process.env.GITHUB_TOKEN
-  const repo = process.env.CODE_REPO
-  if (!token || !repo) {
-    throw new Error(
-      `Not configured: ${[!token && 'GITHUB_TOKEN', !repo && 'CODE_REPO'].filter(Boolean).join(', ')} missing — tell the PM to set it in the pm-app environment`
-    )
-  }
-  return { token, repo }
+  if (!token) throw new Error('Not configured: GITHUB_TOKEN missing — tell the PM to set it in the pm-app environment')
+  return token
 }
 
 export async function executePrototypingTool(
   featureId: string,
+  target: AppTarget,
   toolName: string,
   input: unknown,
   applied: AppliedChanges
@@ -77,9 +73,9 @@ export async function executePrototypingTool(
   try {
     switch (toolName) {
       case 'list_directory':
-        return { result: await executeListDirectory(input as { path: string }), isError: false }
+        return { result: await executeListDirectory(target, input as { path: string }), isError: false }
       case 'read_file':
-        return { result: await executeReadFile(input as { path: string; ref?: string }, applied), isError: false }
+        return { result: await executeReadFile(target, input as { path: string; ref?: string }, applied), isError: false }
       case 'render_prototype':
         return {
           result: await executeRenderPrototype(featureId, input as RenderPrototypeInput, applied),
@@ -93,21 +89,21 @@ export async function executePrototypingTool(
   }
 }
 
-async function executeListDirectory(input: { path: string }): Promise<string> {
-  const { token, repo } = repoEnv()
+async function executeListDirectory(target: AppTarget, input: { path: string }): Promise<string> {
+  const token = githubToken()
   const path = normalizePath(input.path ?? '')
-  const entries = await listRepoDir(token, repo, path, BASE_BRANCH)
-  if (!entries) throw new Error(`Directory not found on ${BASE_BRANCH}: ${path || '(root)'}`)
+  const entries = await listRepoDir(token, target.repo, path, target.baseBranch)
+  if (!entries) throw new Error(`Directory not found in ${target.repo}@${target.baseBranch}: ${path || '(root)'}`)
   if (!entries.length) return `(empty directory: ${path || '(root)'})`
   return entries.map((e) => (e.type === 'dir' ? `${e.path}/` : e.path)).join('\n')
 }
 
-async function executeReadFile(input: { path: string; ref?: string }, applied: AppliedChanges): Promise<string> {
-  const { token, repo } = repoEnv()
+async function executeReadFile(target: AppTarget, input: { path: string; ref?: string }, applied: AppliedChanges): Promise<string> {
+  const token = githubToken()
   const path = normalizePath(input.path)
   if (!path) throw new Error('path required')
-  const ref = input.ref?.trim() || BASE_BRANCH
-  const content = await readRepoFile(token, repo, path, ref)
+  const ref = input.ref?.trim() || target.baseBranch
+  const content = await readRepoFile(token, target.repo, path, ref)
   if (content === null) throw new Error(`File not found on ${ref}: ${path}`)
   if (content.length > MAX_FILE_CHARS) {
     throw new Error(`File too large (${content.length} chars, limit ${MAX_FILE_CHARS}): ${path}. Read a more specific file.`)
