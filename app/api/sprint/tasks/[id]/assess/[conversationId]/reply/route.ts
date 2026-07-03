@@ -181,7 +181,10 @@ Based on this answer, update the score for Objective ${objectiveId ?? '?'} and d
 
   const textBlock = response.content.find((b) => b.type === 'text')
   if (!textBlock || textBlock.type !== 'text') {
-    return NextResponse.json({ error: 'No response from Claude' }, { status: 500 })
+    console.error(
+      `[assess:reply task=${id} conv=${conversationId}] No text block. stop_reason=${response.stop_reason} blocks=[${response.content.map((b) => b.type).join(',')}] output_tokens=${response.usage.output_tokens}`
+    )
+    return NextResponse.json({ error: `No response from Claude (stop_reason: ${response.stop_reason})` }, { status: 500 })
   }
 
   let result: Record<string, unknown>

@@ -257,7 +257,7 @@ ${reassessmentContext}`
   try {
     response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 8192,
+      max_tokens: 16000,
       thinking: { type: 'adaptive' },
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
@@ -270,7 +270,12 @@ ${reassessmentContext}`
 
   const textBlock = response.content.find((b) => b.type === 'text')
   if (!textBlock || textBlock.type !== 'text') {
-    return NextResponse.json({ error: 'No response from Claude' }, { status: 500 })
+    // Adaptive thinking can consume the whole output budget on hard prompts,
+    // leaving thinking blocks but no text (stop_reason: max_tokens).
+    console.error(
+      `[assess:init task=${id}] No text block. stop_reason=${response.stop_reason} blocks=[${response.content.map((b) => b.type).join(',')}] output_tokens=${response.usage.output_tokens}`
+    )
+    return NextResponse.json({ error: `No response from Claude (stop_reason: ${response.stop_reason})` }, { status: 500 })
   }
 
   // Parse JSON — strip markdown fences if present
