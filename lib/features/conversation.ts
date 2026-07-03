@@ -13,7 +13,11 @@ import type { Tables } from '@/lib/supabase/types'
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const MODEL = 'claude-sonnet-4-6'
-const MAX_TOKENS = 4096
+// Planning turns are conversational; prototyping turns must emit COMPLETE file
+// contents inside a single submit_prototype call, which needs a much larger
+// output budget or the tool call gets truncated mid-generation.
+const PLANNING_MAX_TOKENS = 4096
+const PROTOTYPING_MAX_TOKENS = 32000
 
 export type FeatureConversation = Tables<'feature_conversations'>
 export type FeatureMessage = Tables<'feature_messages'>
@@ -93,12 +97,19 @@ export async function sendFeatureMessage(
   const applied = emptyApplied()
   const textParts: string[] = []
   let budgetReached = false
+  let truncated = false
 
   for (let round = 0; ; round++) {
     const response = await client.messages.create({
-      model: MODEL, max_tokens: MAX_TOKENS, system, tools, messages,
+      model: MODEL,
+      max_tokens: prototypingActive ? PROTOTYPING_MAX_TOKENS : PLANNING_MAX_TOKENS,
+      system, tools, messages,
     })
     textParts.push(...collectText(response))
+    if (response.stop_reason === 'max_tokens') {
+      truncated = true
+      break
+    }
     if (response.stop_reason !== 'tool_use') break
 
     // Always execute what the model requested, even on the last round —
@@ -117,6 +128,7 @@ export async function sendFeatureMessage(
 
   const markers = buildMarkers(applied)
   if (budgetReached) markers.push('[Tool budget reached — reply to continue]')
+  if (truncated) markers.push('[Response hit the output limit and was cut off — reply "continue" to resume]')
   const assistantContent = [textParts.join('\n\n').trim(), ...markers].filter(Boolean).join('\n\n')
   if (!assistantContent) throw new Error('Claude returned no response')
   await addMessage(conversation.id, 'assistant', assistantContent)
