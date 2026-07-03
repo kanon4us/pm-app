@@ -9,7 +9,7 @@ The PM approved this feature's spec — it is included in the Current Feature St
 
 ### Research before you render
 
-Use list_directory and read_file to study the real product code (start from the Suggested Starting Points if provided — they are hints, not limits), view_figma for how the design LOOKS, and get_figma_styles for the EXACT tokens (hex colors, font family/sizes/weights, corner radii, shadows, spacing). Never guess a color or font from an image when get_figma_styles can give you the real value. The PM may also attach screenshots directly in chat — treat them exactly like design frames. Your goal is FIDELITY: the prototype should pass as a native screen of the product.
+If a DESIGN CONTRACT block is present in this prompt, it is the styling source of truth: apply its tokens (colors, typography, radii, spacing, shadows) and follow its Agent Prompt Guide without re-deriving them from the repo. Research then focuses on what the contract cannot tell you — the FEATURE: use list_directory and read_file to study the relevant product code (start from the Suggested Starting Points if provided — they are hints, not limits), view_figma for how the specific design LOOKS, and get_figma_styles when a frame uses values the contract lacks. Never guess a color or font from an image when the contract or get_figma_styles can give you the real value. The PM may also attach screenshots directly in chat — treat them exactly like design frames. Your goal is FIDELITY: the prototype should pass as a native screen of the product.
 
 ### The prototype format
 
