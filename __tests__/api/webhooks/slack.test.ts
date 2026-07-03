@@ -89,7 +89,9 @@ jest.mock('@/lib/issue-triage/media', () => ({
 jest.mock('@/lib/slack/client', () => ({
   buildSlackClient: jest.fn().mockReturnValue({
     postMessage: jest.fn().mockResolvedValue('ts-bot'),
+    postBlocks: jest.fn().mockResolvedValue('ts-bot'),
     getThreadReplies: jest.fn().mockResolvedValue([]),
+    getUserProfile: jest.fn().mockResolvedValue({ email: 'reporter@test.com', displayName: 'Reporter One' }),
     openDM: jest.fn().mockResolvedValue('D_DM'),
     addReaction: jest.fn().mockResolvedValue(undefined),
   }),
@@ -167,9 +169,10 @@ describe('POST /api/webhooks/slack', () => {
 
     expect(res.status).toBe(200)
     expect(createTicket).toHaveBeenCalled()
-    expect(slack.postMessage).toHaveBeenCalledWith(
+    expect(slack.postBlocks).toHaveBeenCalledWith(
       'C_ISSUES',
       expect.stringContaining('task-123'),
+      expect.any(Array),
       '1234567890.000001',
     )
   })

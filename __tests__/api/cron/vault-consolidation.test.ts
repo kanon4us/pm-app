@@ -47,9 +47,11 @@ jest.mock('@/lib/supabase/server', () => ({
 
 // ── fixture data ──────────────────────────────────────────────────────────────
 
-// 3 docs: 2 stable (>7 days old), 1 recent
-const STABLE_DATE = '2026-05-01T00:00:00.000Z'   // well over 7 days before 2026-06-17
-const RECENT_DATE = '2026-06-16T00:00:00.000Z'   // 1 day before today
+// 3 docs: 2 stable (>7 days old), 1 recent. Dates are relative to now so the
+// isStable 7-day window holds no matter when the suite runs.
+const DAY_MS = 86_400_000
+const STABLE_DATE = new Date(Date.now() - 30 * DAY_MS).toISOString() // well over 7 days ago
+const RECENT_DATE = new Date(Date.now() - 1 * DAY_MS).toISOString()  // 1 day ago
 
 const MOCK_SNAPSHOT = {
   runId: '2026-W25',

@@ -52,7 +52,7 @@ jest.mock('@/lib/slack/client', () => ({
   }),
 }))
 
-// Mock global fetch for the survey Block Kit call
+// Mock global fetch so no outbound HTTP (e.g. ClickUp API) escapes the tests
 global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) }) as jest.Mock
 
 describe('POST /api/webhooks/clickup', () => {
@@ -94,7 +94,7 @@ describe('POST /api/webhooks/clickup', () => {
     expect(res.status).toBe(200)
   })
 
-  it('sets handoff_status=taken and posts survey when a tracked task status is updated', async () => {
+  it('sets handoff_status=taken and posts claim message when a tracked task status is updated', async () => {
     const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
     const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
     const slack = buildSlackClient()
@@ -131,11 +131,6 @@ describe('POST /api/webhooks/clickup', () => {
     const res = await POST(req)
     expect(res.status).toBe(200)
     expect(slack.postMessage).toHaveBeenCalledWith('C_ISSUES', expect.stringContaining('claimed'), '1.0')
-    // Survey sent via fetch
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://slack.com/api/chat.postMessage',
-      expect.objectContaining({ method: 'POST' }),
-    )
   })
 
   it('posts return message when task is moved back to New Tickets list', async () => {
