@@ -42,12 +42,10 @@ export async function executeViewFigma(
     if (!parsed.nodeId) {
       throw new Error('The URL has no node-id, so it points at a whole file. Ask the PM for a frame link (right-click the frame in Figma → Copy link).')
     }
-    if (!userId) throw new Error('No user session available for Figma access')
+    const auth = await resolveFigmaAuth(userId)
+    if (!auth) throw new Error('Figma access is not configured — set FIGMA_ACCESS_TOKEN in the pm-app environment')
 
-    const token = await getUserFigmaToken(userId)
-    if (!token) throw new Error('No Figma connection for this user — connect Figma in pm-app settings, then try again')
-
-    const png = await renderFrame(token, parsed.fileKey, parsed.nodeId)
+    const png = await renderFrame(auth, parsed.fileKey, parsed.nodeId)
     applied.framesViewed++
 
     return {
@@ -65,23 +63,38 @@ export async function executeViewFigma(
   }
 }
 
-async function getUserFigmaToken(userId: string): Promise<string | null> {
-  const db = await getSupabaseServiceClient()
-  const { data } = await db
-    .from('oauth_tokens')
-    .select('access_token')
-    .eq('user_id', userId)
-    .eq('provider', 'figma')
-    .single()
-  return data?.access_token ?? null
+interface FigmaAuth {
+  headers: Record<string, string>
 }
 
-async function renderFrame(token: string, fileKey: string, nodeId: string): Promise<Buffer> {
+/**
+ * Prefers the user's OAuth token (Bearer) when one exists; falls back to the
+ * app-wide FIGMA_ACCESS_TOKEN PAT (X-Figma-Token) — the same credential the
+ * rest of the Figma read pipeline uses. There is no OAuth connect UI today,
+ * so the PAT is the path that actually works in practice.
+ */
+async function resolveFigmaAuth(userId: string | undefined): Promise<FigmaAuth | null> {
+  if (userId) {
+    const db = await getSupabaseServiceClient()
+    const { data } = await db
+      .from('oauth_tokens')
+      .select('access_token')
+      .eq('user_id', userId)
+      .eq('provider', 'figma')
+      .single()
+    if (data?.access_token) return { headers: { Authorization: `Bearer ${data.access_token}` } }
+  }
+  const pat = process.env.FIGMA_ACCESS_TOKEN
+  if (pat) return { headers: { 'X-Figma-Token': pat } }
+  return null
+}
+
+async function renderFrame(auth: FigmaAuth, fileKey: string, nodeId: string): Promise<Buffer> {
   // scale=2 for legible UI text; drop to scale=1 if the render is too heavy.
   for (const scale of [2, 1]) {
     const res = await fetch(
       `${FIGMA_API}/v1/images/${fileKey}?ids=${encodeURIComponent(nodeId)}&format=png&scale=${scale}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: auth.headers }
     )
     if (!res.ok) throw new Error(`Figma render failed (${res.status}) — check the link and your Figma access`)
     const data = (await res.json()) as { images?: Record<string, string | null>; err?: string }
