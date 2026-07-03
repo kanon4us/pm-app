@@ -1,8 +1,8 @@
 // app/features/[id]/components/PrototypePanel.tsx
 'use client'
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Empty, Spin, Typography, Space } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { Button, Empty, Spin, Typography, Space, message } from 'antd'
+import { ReloadOutlined, CopyOutlined } from '@ant-design/icons'
 
 interface Prototype {
   id: string
@@ -52,7 +52,23 @@ export function PrototypePanel({ featureId, refreshKey }: Props) {
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           Rendered {new Date(prototype.created_at).toLocaleString()}
         </Typography.Text>
-        <Button size="small" icon={<ReloadOutlined />} onClick={load}>Reload</Button>
+        <Space size={6}>
+          <Button
+            size="small"
+            icon={<CopyOutlined />}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(prototype.html_content)
+                message.success('Prototype HTML copied — paste it into the Figma agent')
+              } catch {
+                message.error('Copy failed — check clipboard permissions')
+              }
+            }}
+          >
+            Copy HTML
+          </Button>
+          <Button size="small" icon={<ReloadOutlined />} onClick={load}>Reload</Button>
+        </Space>
       </Space>
       <iframe
         title="Feature prototype"
