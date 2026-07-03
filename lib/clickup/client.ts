@@ -37,6 +37,7 @@ export interface ClickUpTask {
   priority: { id: '1' | '2' | '3' | '4'; priority: string } | null
   url: string
   custom_fields: Array<{ id: string; name: string; value: unknown }>
+  tags?: Array<{ name: string }>
   list: { id: string; name: string }
 }
 
@@ -97,7 +98,9 @@ export function buildClickUpClient(token: string) {
     createWebhook: (teamId: string, endpoint: string) =>
       clickupFetch<{ id: string; webhook: { id: string; secret: string } }>(token, `/team/${teamId}/webhook`, {
         method: 'POST',
-        body: JSON.stringify({ endpoint, events: ['taskStatusUpdated'] }),
+        // taskTagUpdated powers the proto-ready gatekeeper tag; existing webhooks
+        // must be re-registered (lists/resubscribe) before tag events flow.
+        body: JSON.stringify({ endpoint, events: ['taskStatusUpdated', 'taskMoved', 'taskTagUpdated'] }),
       }),
 
     updateTask: (

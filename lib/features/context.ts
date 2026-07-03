@@ -19,6 +19,11 @@ export async function buildFeatureContext(featureId: string): Promise<string> {
     `Planning phase: ${feature.planning_phase}`,
     `Spec: ${feature.spec_content ? 'draft exists (shown below)' : 'not written yet'}`,
     ...(feature.description ? [`Description: ${feature.description}`] : []),
+    ...(feature.fvi_score != null ? [`FVI score: ${feature.fvi_score}`] : []),
+    ...(feature.objectives ? ['', '--- Objectives (from ClickUp) ---', feature.objectives] : []),
+    ...(feature.clickup_details
+      ? ['', '--- ClickUp Task Details ---', truncate(feature.clickup_details, 6000)]
+      : []),
     '',
   ]
 
@@ -52,6 +57,10 @@ export async function buildFeatureContext(featureId: string): Promise<string> {
   }
 
   return lines.join('\n').trimEnd()
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}\n…[truncated]` : text
 }
 
 export async function buildAllFeaturesContext(featureIds?: string[]): Promise<string> {
