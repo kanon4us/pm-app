@@ -7,7 +7,7 @@ import { PLANNING_SYSTEM } from '@/lib/claude/prompts/planning'
 import { PROTOTYPING_SYSTEM } from '@/lib/claude/prompts/prototyping'
 import { PLANNING_TOOLS, executePlanningTool, emptyApplied, type AppliedChanges } from '@/lib/claude/tools/planning'
 import { PROTOTYPING_TOOLS, PROTOTYPING_TOOL_NAMES, executePrototypingTool } from '@/lib/claude/tools/prototyping'
-import { FIGMA_TOOLS, FIGMA_TOOL_NAME, executeViewFigma } from '@/lib/claude/tools/figma'
+import { FIGMA_TOOLS, FIGMA_TOOL_NAME, FIGMA_STYLES_TOOL_NAME, executeViewFigma, executeGetFigmaStyles } from '@/lib/claude/tools/figma'
 import type { Tables } from '@/lib/supabase/types'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -69,18 +69,33 @@ export async function getMessages(conversationId: string): Promise<FeatureMessag
 const PLANNING_MAX_TOOL_ROUNDS = 5
 const PROTOTYPING_MAX_TOOL_ROUNDS = 25
 
+export interface ChatImage {
+  media_type: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+  data: string // base64, no data-URL prefix
+}
+
+const MAX_IMAGES_PER_MESSAGE = 3
+const MAX_IMAGE_BASE64_CHARS = 5_500_000 // ≈4MB raw
+
 export async function sendFeatureMessage(
   featureId: string,
   userContent: string,
-  userId?: string
+  userId?: string,
+  images?: ChatImage[]
 ): Promise<{ content: string; applied: AppliedChanges | null }> {
   const feature = await getFeature(featureId)
   if (!feature) throw new Error('Feature not found')
+  if (images && images.length > MAX_IMAGES_PER_MESSAGE) throw new Error(`At most ${MAX_IMAGES_PER_MESSAGE} images per message`)
+  if (images?.some((i) => i.data.length > MAX_IMAGE_BASE64_CHARS)) throw new Error('Image too large (4MB max)')
   const conversation = await getOrCreateConversation(featureId)
   const history = await getMessages(conversation.id)
   const featureContext = await buildFeatureContext(featureId)
 
-  await addMessage(conversation.id, 'user', userContent)
+  // History is text-only; attachments live only in this turn's API call.
+  const persistedUserContent = images?.length
+    ? `${userContent}\n\n[Attached ${images.length} screenshot(s)]`
+    : userContent
+  await addMessage(conversation.id, 'user', persistedUserContent)
 
   const prototypingActive = feature.planning_phase !== 'planning'
   const tools = prototypingActive
@@ -89,9 +104,19 @@ export async function sendFeatureMessage(
   const maxToolRounds = prototypingActive ? PROTOTYPING_MAX_TOOL_ROUNDS : PLANNING_MAX_TOOL_ROUNDS
   const system = buildSystem(feature, featureContext, prototypingActive)
 
+  const currentUserContent: Anthropic.MessageParam['content'] = images?.length
+    ? [
+        ...images.map((img) => ({
+          type: 'image' as const,
+          source: { type: 'base64' as const, media_type: img.media_type, data: img.data },
+        })),
+        { type: 'text' as const, text: userContent },
+      ]
+    : userContent
+
   let messages: Anthropic.MessageParam[] = [
     ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-    { role: 'user', content: userContent },
+    { role: 'user', content: currentUserContent },
   ]
 
   const applied = emptyApplied()
@@ -183,6 +208,7 @@ function executeTool(
   applied: AppliedChanges
 ): Promise<{ result: string | Anthropic.ToolResultBlockParam['content']; isError: boolean }> {
   if (name === FIGMA_TOOL_NAME) return executeViewFigma(userId, input as { url: string }, applied)
+  if (name === FIGMA_STYLES_TOOL_NAME) return executeGetFigmaStyles(userId, input as { url: string }, applied)
   if ((PROTOTYPING_TOOL_NAMES as readonly string[]).includes(name)) {
     return executePrototypingTool(featureId, name, input, applied)
   }
