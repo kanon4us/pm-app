@@ -96,7 +96,12 @@ async function renderFrame(auth: FigmaAuth, fileKey: string, nodeId: string): Pr
       `${FIGMA_API}/v1/images/${fileKey}?ids=${encodeURIComponent(nodeId)}&format=png&scale=${scale}`,
       { headers: auth.headers }
     )
-    if (!res.ok) throw new Error(`Figma render failed (${res.status}) — check the link and your Figma access`)
+    if (!res.ok) {
+      const apiErr = await res.json().then((d: { err?: string; message?: string }) => d.err ?? d.message).catch(() => null)
+      // Surface Figma's own reason (e.g. "Invalid token", "Token expired") — do
+      // not guess about share settings; report exactly what the API said.
+      throw new Error(`Figma API error ${res.status}${apiErr ? `: ${apiErr}` : ''}. Report this exact error to the PM — do not speculate about causes the API did not state.`)
+    }
     const data = (await res.json()) as { images?: Record<string, string | null>; err?: string }
     const imageUrl = data.images?.[nodeId]
     if (!imageUrl) throw new Error(data.err ?? `Figma returned no image for node ${nodeId} — the frame may not exist`)
