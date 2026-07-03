@@ -27,7 +27,7 @@ describe('buildFeatureContext', () => {
 
   it('includes scenario and step with image reference', async () => {
     const ctx = await buildFeatureContext('f-1')
-    expect(ctx).toContain('Scenario: Happy Path')
+    expect(ctx).toContain('Scenario (id: sc-1): Happy Path')
     expect(ctx).toContain('Step 1: Landing')
     expect(ctx).toContain('https://proj.supabase.co/img.png')
   })

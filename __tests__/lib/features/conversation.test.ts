@@ -11,10 +11,10 @@ jest.mock('@/lib/features/context', () => ({
   buildFeatureContext: jest.fn().mockResolvedValue('Feature: Login\nStatus: draft'),
 }))
 
-const mockCreate = jest.fn()
+const mockStream = jest.fn()
 jest.mock('@anthropic-ai/sdk', () => ({
   __esModule: true,
-  default: jest.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
+  default: jest.fn().mockImplementation(() => ({ messages: { stream: mockStream } })),
 }))
 
 import { getOrCreateConversation, addMessage, sendFeatureMessage } from '@/lib/features/conversation'
@@ -49,14 +49,21 @@ describe('getOrCreateConversation', () => {
 
 describe('sendFeatureMessage', () => {
   it('returns assistant content and saves both messages', async () => {
+    const feature = { id: 'f-1', name: 'Login', app: 'web', planning_phase: 'planning', status: 'draft' }
     const conv = { id: 'c-1', feature_id: 'f-1', status: 'in_progress' as const, created_at: '', updated_at: '' }
     const msg = { id: 'm-1', conversation_id: 'c-1', role: 'user' as const, content: 'test', created_at: '' }
     mockFrom
+      .mockReturnValueOnce(chain({ data: feature, error: null })) // getFeature
       .mockReturnValueOnce(chain({ data: conv, error: null })) // getOrCreate
       .mockReturnValueOnce(chain({ data: [], error: null })) // getMessages history
       .mockReturnValueOnce(chain({ data: msg, error: null })) // insert user message
       .mockReturnValueOnce(chain({ data: msg, error: null })) // insert assistant message
-    mockCreate.mockResolvedValue({ content: [{ type: 'text', text: 'Great flow!' }] })
+    mockStream.mockReturnValue({
+      finalMessage: jest.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'Great flow!' }],
+        stop_reason: 'end_turn',
+      }),
+    })
     const { content } = await sendFeatureMessage('f-1', 'What do you think?')
     expect(content).toBe('Great flow!')
   })

@@ -20,6 +20,7 @@ import crypto from 'crypto'
 let mockEnqueue: jest.Mock
 jest.mock('@/lib/queue/client', () => ({
   enqueue: (...args: unknown[]) => mockEnqueue(...args),
+  enqueueToQueue: (...args: unknown[]) => mockEnqueue(...args),
 }))
 
 let mockOpenModal: jest.Mock
@@ -129,8 +130,10 @@ describe('POST /api/bot/slack/interactions', () => {
     // enqueue must have been called exactly once
     expect(mockEnqueue).toHaveBeenCalledTimes(1)
 
-    // destination URL ends with /api/vault/consolidation/write
-    const [destUrl, body] = mockEnqueue.mock.calls[0] as [string, Record<string, unknown>]
+    // routed through the serialized vault-writes queue; destination URL ends
+    // with /api/vault/consolidation/write
+    const [queueName, destUrl, body] = mockEnqueue.mock.calls[0] as [string, string, Record<string, unknown>]
+    expect(queueName).toBe('vault-writes')
     expect(destUrl).toMatch(/\/api\/vault\/consolidation\/write$/)
 
     // body contains sessionId, actionId, and responseUrl
