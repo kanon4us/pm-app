@@ -1,11 +1,12 @@
 // app/features/[id]/page.tsx
 'use client'
 import { useEffect, useState } from 'react'
-import { Layout, Typography, Spin, Select, Button } from 'antd'
+import { Layout, Typography, Spin, Select, Button, Segmented } from 'antd'
 import { useParams, useRouter } from 'next/navigation'
 import { UserStoriesPanel } from './components/UserStoriesPanel'
 import { ScenariosPanel } from './components/ScenariosPanel'
 import { ClaudePanel } from './components/ClaudePanel'
+import { PrototypePanel } from './components/PrototypePanel'
 
 const { Header, Sider, Content } = Layout
 
@@ -18,7 +19,6 @@ export interface UserStory { id: string; title: string; as_a: string; i_want: st
 export interface Feature {
   id: string; name: string; description: string | null; status: string
   planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
-  prototype_pr_url: string | null
   stories: UserStory[]
 }
 
@@ -28,6 +28,8 @@ export default function FeatureEditorPage() {
   const [feature, setFeature] = useState<Feature | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null)
+  const [centerView, setCenterView] = useState<'Scenarios' | 'Prototype'>('Scenarios')
+  const [protoRefreshKey, setProtoRefreshKey] = useState(0)
 
   async function reload() {
     try {
@@ -67,16 +69,28 @@ export default function FeatureEditorPage() {
         <Sider width={240} style={{ background: '#1a1a1a', borderRight: '1px solid #333', overflow: 'auto' }}>
           <UserStoriesPanel featureId={id} stories={feature.stories} activeStoryId={activeStoryId} onSelect={setActiveStoryId} onUpdate={reload} />
         </Sider>
-        <Content style={{ overflow: 'auto', background: '#141414' }}>
-          <ScenariosPanel featureId={id} featureName={feature.name} story={activeStory} onUpdate={reload} />
+        <Content style={{ background: '#141414', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '8px 20px', borderBottom: '1px solid #262626' }}>
+            <Segmented options={['Scenarios', 'Prototype']} value={centerView} onChange={(v) => setCenterView(v as 'Scenarios' | 'Prototype')} />
+          </div>
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            {centerView === 'Scenarios' ? (
+              <ScenariosPanel featureId={id} featureName={feature.name} story={activeStory} onUpdate={reload} />
+            ) : (
+              <PrototypePanel featureId={id} refreshKey={protoRefreshKey} />
+            )}
+          </div>
         </Content>
         <Sider width={440} style={{ background: '#1a1a1a', borderLeft: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
           <ClaudePanel
             featureId={id}
             planningPhase={feature.planning_phase}
             specContent={feature.spec_content}
-            prototypePrUrl={feature.prototype_pr_url}
             onApplied={reload}
+            onPrototypeUpdated={() => {
+              setProtoRefreshKey((k) => k + 1)
+              setCenterView('Prototype')
+            }}
           />
         </Sider>
       </Layout>

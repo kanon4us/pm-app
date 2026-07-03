@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import { getFeature } from '@/lib/features/client'
+
+/** Current feature-level prototype (rendered by Claude via render_prototype). */
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { id: featureId } = await params
+  const db = await getSupabaseServiceClient()
+  const { data } = await db
+    .from('feature_prototypes')
+    .select('id, html_content, created_at')
+    .eq('feature_id', featureId)
+    .is('scenario_id', null)
+    .eq('is_current', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (!data?.length) return NextResponse.json({ error: 'No prototype yet' }, { status: 404 })
+  return NextResponse.json(data[0])
+}
 import { buildFeatureContext } from '@/lib/features/context'
 import { ensureStepImages } from '@/lib/prototypes/storage'
 import { generatePrototypeHtml } from '@/lib/prototypes/generator'

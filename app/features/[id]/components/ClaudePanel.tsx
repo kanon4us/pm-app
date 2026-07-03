@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Drawer, Input, Popconfirm, Spin, Tag, Typography, Space, message } from 'antd'
-import { SendOutlined, FileTextOutlined, CheckCircleOutlined, PullRequestOutlined } from '@ant-design/icons'
+import { SendOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import type { FeatureMessage } from '@/lib/features/conversation'
 
 type PlanningPhase = 'planning' | 'approved' | 'prototyping'
@@ -13,15 +13,16 @@ interface AppliedChanges {
   steps: number
   specUpdated: boolean
   filesInspected: number
-  prototypePrUrl: string | null
+  framesViewed: number
+  prototypeUpdated: boolean
 }
 
 interface Props {
   featureId: string
   planningPhase: PlanningPhase
   specContent: string | null
-  prototypePrUrl: string | null
   onApplied: () => void
+  onPrototypeUpdated: () => void
 }
 
 const PHASE_COLORS: Record<PlanningPhase, string> = {
@@ -30,7 +31,7 @@ const PHASE_COLORS: Record<PlanningPhase, string> = {
   prototyping: 'purple',
 }
 
-export function ClaudePanel({ featureId, planningPhase, specContent, prototypePrUrl, onApplied }: Props) {
+export function ClaudePanel({ featureId, planningPhase, specContent, onApplied, onPrototypeUpdated }: Props) {
   const [messages, setMessages] = useState<FeatureMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -110,16 +111,12 @@ export function ClaudePanel({ featureId, planningPhase, specContent, prototypePr
       setMessages((prev) => [...prev.filter((m) => m.id !== tempUserMsg.id), tempUserMsg, assistantMsg])
 
       if (data.applied) {
-        // Claude wrote to the panel/spec/PR via tools — refresh the editor state
+        // Claude wrote to the panel/spec/prototype via tools — refresh the editor state
         onApplied()
         if (data.applied.specUpdated) message.success('Spec draft updated')
-        if (data.applied.prototypePrUrl) {
-          message.success(
-            <span>
-              Prototype PR ready — <a href={data.applied.prototypePrUrl} target="_blank" rel="noreferrer">open on GitHub</a>
-            </span>,
-            8
-          )
+        if (data.applied.prototypeUpdated) {
+          message.success('Prototype updated — showing it in the Prototype tab', 6)
+          onPrototypeUpdated()
         }
       }
     } catch {
@@ -157,9 +154,6 @@ export function ClaudePanel({ featureId, planningPhase, specContent, prototypePr
           <Tag color={PHASE_COLORS[planningPhase]} style={{ marginInlineEnd: 0 }}>{planningPhase}</Tag>
         </Space>
         <Space size={6}>
-          {prototypePrUrl && (
-            <Button size="small" icon={<PullRequestOutlined />} href={prototypePrUrl} target="_blank">Prototype PR</Button>
-          )}
           <Button size="small" icon={<FileTextOutlined />} disabled={!specContent} onClick={() => setSpecOpen(true)}>Spec</Button>
           <Button size="small" loading={reviewing} onClick={runReview}>App-wide Review</Button>
         </Space>
@@ -181,7 +175,7 @@ export function ClaudePanel({ featureId, planningPhase, specContent, prototypePr
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {planningPhase === 'planning'
               ? 'Brainstorm this feature with Claude. It will ask questions, populate the scenarios panel, and draft a spec for you to approve.'
-              : 'Spec approved — ask Claude to generate the prototype. It will read the product code, open a PR off develop, and share the link here.'}
+              : 'Spec approved — ask Claude to render the prototype. It will study the product code and Figma, then show the result in the Prototype tab.'}
           </Typography.Text>
         ) : (
           messages.map((msg) => (
