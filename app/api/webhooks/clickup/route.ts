@@ -5,6 +5,8 @@ import { buildClickUpClient } from '@/lib/clickup/client'
 import type { Json } from '@/lib/supabase/types'
 import { maybeQueueDesignIndex } from './design-index-hook'
 import { parseDesignIndexStatuses, isDesignIndexStatus } from '@/lib/design-index/inbox-trigger'
+import { activateFeatureFromTask } from '@/lib/features/gatekeeper'
+import { parsePrototypeStatuses, isPrototypeStatus, hasPrototypeTag } from '@/lib/features/gatekeeper-extract'
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
@@ -111,6 +113,24 @@ export async function POST(req: NextRequest) {
       }
     }
   }
+
+  // ── Prototyping gatekeeper — scaffold/enrich a feature + route its app ──
+  // Trigger: status ∈ CLICKUP_PROTOTYPE_STATUSES, or the proto-ready tag
+  // (CLICKUP_PROTOTYPE_TAG). Independent of the trigger_configs machinery below;
+  // failures are logged, never block the other hooks.
+  const protoStatuses = parsePrototypeStatuses(process.env.CLICKUP_PROTOTYPE_STATUSES)
+  const tagTriggered =
+    event.type === 'taskTagUpdated' &&
+    hasPrototypeTag(event.tags ?? [], process.env.CLICKUP_PROTOTYPE_TAG ?? 'proto-ready')
+  if (isPrototypeStatus(event.toStatus, protoStatuses) || tagTriggered) {
+    try {
+      await activateFeatureFromTask(supabase, event.taskId)
+    } catch (err) {
+      console.warn('[gatekeeper] activation failed for task', event.taskId, err)
+    }
+  }
+  // Tag events carry no status — nothing below applies to them.
+  if (event.type === 'taskTagUpdated') return NextResponse.json({ ok: true })
 
   // taskStatusUpdated — existing behavior unchanged
   let { data: task } = await supabase

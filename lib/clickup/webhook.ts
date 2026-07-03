@@ -6,6 +6,8 @@ export interface ClickUpWebhookEvent {
   toStatus: string
   /** Present on taskMoved events: the destination list ID */
   listId?: string
+  /** Present on taskTagUpdated events: tag names after the change */
+  tags?: string[]
 }
 
 export function verifyClickUpSignature(
@@ -31,6 +33,15 @@ export function parseWebhookEvent(payload: Record<string, unknown>): ClickUpWebh
     const toStatus = historyItems?.[0]?.after?.status
     if (!toStatus) return null
     return { taskId, type: eventType, toStatus }
+  }
+
+  if (eventType === 'taskTagUpdated') {
+    const historyItems = payload.history_items as Array<{ after?: Array<{ name?: string }> | { name?: string } }>
+    const after = historyItems?.[0]?.after
+    const tags = (Array.isArray(after) ? after : after ? [after] : [])
+      .map((t) => t?.name)
+      .filter((n): n is string => typeof n === 'string')
+    return { taskId, type: eventType, toStatus: '', tags }
   }
 
   if (eventType === 'taskMoved') {
