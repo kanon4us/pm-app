@@ -191,25 +191,27 @@ export function ClaudePanel({ featureId, planningPhase, specContent, prototypePr
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ padding: '10px 12px', borderTop: '1px solid #333' }}>
-        <Space.Compact style={{ width: '100%' }}>
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onPressEnter={send}
-            placeholder="Ask Claude…"
-            size="small"
-            disabled={sending}
-          />
-          <Button
-            size="small"
-            type="primary"
-            icon={<SendOutlined />}
-            onClick={send}
-            loading={sending}
-            disabled={!input.trim()}
-          />
-        </Space.Compact>
+      <div style={{ padding: '10px 12px', borderTop: '1px solid #333', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <Input.TextArea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onPressEnter={(e) => {
+            if (e.shiftKey) return // Shift+Enter = newline
+            e.preventDefault()
+            send()
+          }}
+          placeholder="Ask Claude… (Shift+Enter for newline)"
+          autoSize={{ minRows: 2, maxRows: 8 }}
+          disabled={sending}
+          style={{ fontSize: 13 }}
+        />
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={send}
+          loading={sending}
+          disabled={!input.trim()}
+        />
       </div>
 
       <Drawer

@@ -70,7 +70,7 @@ export default function FeatureEditorPage() {
         <Content style={{ overflow: 'auto', background: '#141414' }}>
           <ScenariosPanel featureId={id} featureName={feature.name} story={activeStory} onUpdate={reload} />
         </Content>
-        <Sider width={320} style={{ background: '#1a1a1a', borderLeft: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
+        <Sider width={440} style={{ background: '#1a1a1a', borderLeft: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
           <ClaudePanel
             featureId={id}
             planningPhase={feature.planning_phase}
