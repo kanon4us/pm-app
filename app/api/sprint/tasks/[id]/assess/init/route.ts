@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import { searchFeatureSpecs, searchVault, extractKeywords, readVaultFile, readDevObjectives } from '@/lib/github/vault'
+import { retrieveVaultContext } from '@/lib/vault/manifest-retrieval'
 import Anthropic from '@anthropic-ai/sdk'
 import { mergeRolesWithRegistry } from '@/lib/role-merge'
 import type { AffectedWorkflow } from '@/lib/assessment-types'
@@ -110,30 +111,45 @@ export async function POST(req: NextRequest, { params }: Params) {
     weight: r.weight,
   }))
 
-  // ── Vault search ────────────────────────────────────────────────────────────
+  // ── Vault retrieval: manifest-first, keyword-search fallback ───────────────
   const { data: ghToken } = await supabase.from('oauth_tokens').select('access_token').eq('user_id', user.id).eq('provider', 'github').single()
   const vaultConnected = !!ghToken?.access_token
   const ghAccessToken = ghToken?.access_token ?? process.env.GITHUB_TOKEN
   const vaultFilesRead: string[] = []
   let vaultContext = ''
+  let vaultSource: 'manifest' | 'search' = 'search'
+  let vaultMapText = ''
 
   let devObjectivesContent = ''
 
   if (ghAccessToken) {
     try {
-      const keywords = extractKeywords(task.name)
-      const [specResults, broadResults, devObjContent] = await Promise.all([
-        searchFeatureSpecs(ghAccessToken, keywords),
-        searchVault(ghAccessToken, keywords, 3),
+      const [manifestResult, devObjContent] = await Promise.all([
+        retrieveVaultContext(
+          { readFile: (p) => readVaultFile(ghAccessToken, p) },
+          { taskName: task.name, description: clickupDescription }
+        ),
         readDevObjectives(ghAccessToken),
       ])
       devObjectivesContent = devObjContent
 
-      const allResults = [...specResults, ...broadResults].slice(0, 5)
-      for (const r of allResults) {
-        if (!vaultFilesRead.includes(r.path)) {
-          vaultFilesRead.push(r.path)
-          vaultContext += `\n\n---\nFile: ${r.path}\n${r.snippet}`
+      if (manifestResult) {
+        vaultSource = 'manifest'
+        vaultContext = manifestResult.vaultContext
+        vaultFilesRead.push(...manifestResult.filesRead)
+        vaultMapText = manifestResult.vaultMapText
+      } else {
+        const keywords = extractKeywords(task.name)
+        const [specResults, broadResults] = await Promise.all([
+          searchFeatureSpecs(ghAccessToken, keywords),
+          searchVault(ghAccessToken, keywords, 3),
+        ])
+        const allResults = [...specResults, ...broadResults].slice(0, 5)
+        for (const r of allResults) {
+          if (!vaultFilesRead.includes(r.path)) {
+            vaultFilesRead.push(r.path)
+            vaultContext += `\n\n---\nFile: ${r.path}\n${r.snippet}`
+          }
         }
       }
     } catch { /* non-fatal */ }
@@ -245,6 +261,9 @@ ${clickupDescription || '(No description provided)'}
 CUSTOM FIELDS:
 ${customFields.map((f) => `${f.name}: ${f.value ?? '—'}`).join('\n') || '(None)'}
 
+VAULT MAP (documentation domains available — cite these when noting evidence gaps):
+${vaultMapText || '(No manifest available — retrieval used keyword search)'}
+
 VAULT CONTENT FOUND:
 ${vaultContext || '(Vault not connected or no relevant documents found)'}
 
@@ -334,6 +353,7 @@ ${reassessmentContext}`
     figmaLink,
     vaultConnected,
     vaultFilesRead,
+    vaultSource,
     isReassessment,
   })
 }

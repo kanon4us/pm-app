@@ -229,7 +229,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
     }
     if (!unchanged) {
-      const written = await writeVaultFile(token, MANIFEST_PATH, serializeManifest(manifest), 'chore: refresh vault manifest', 'main')
+      const written = await writeVaultFile(token, MANIFEST_PATH, serializeManifest(manifest), 'chore: refresh vault manifest', VAULT_BRANCH)
       if (!written) console.error('[vault-cron] manifest write failed (writeVaultFile returned null)')
     }
   } catch (err) {
