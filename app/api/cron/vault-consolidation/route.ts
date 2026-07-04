@@ -11,7 +11,8 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { auditDoc, SUPPORT_CRITICAL_PATHS_DEFAULT } from '@/lib/vault/audit'
 import { buildQuestions } from '@/lib/vault/questions'
 import { resolveAuthor } from '@/lib/vault/author-routing'
-import { buildManifest, serializeManifest, manifestContentEquals, MANIFEST_PATH } from '@/lib/vault/manifest'
+import { buildManifest, serializeManifest, manifestContentEquals, manifestLooksDegraded, MANIFEST_PATH } from '@/lib/vault/manifest'
+import type { VaultManifest } from '@/lib/vault/manifest'
 import { readVaultFile, writeVaultFile } from '@/lib/github/vault'
 
 export const maxDuration = 300
@@ -221,14 +222,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const manifest = buildManifest(snap)
     const existing = await readVaultFile(token, MANIFEST_PATH)
     let unchanged = false
+    let parsedExisting: VaultManifest | null = null
     if (existing) {
       try {
-        unchanged = manifestContentEquals(manifest, JSON.parse(existing.content))
+        parsedExisting = JSON.parse(existing.content)
+        unchanged = manifestContentEquals(manifest, parsedExisting)
       } catch {
         // existing manifest unparseable → overwrite it
+        parsedExisting = null
       }
     }
-    if (!unchanged) {
+    if (manifestLooksDegraded(manifest, parsedExisting)) {
+      console.error(`[vault-cron] manifest looks degraded (docs=${snap.docs.length}) — skipping write`)
+    } else if (!unchanged) {
       const written = await writeVaultFile(token, MANIFEST_PATH, serializeManifest(manifest), 'chore: refresh vault manifest', VAULT_BRANCH)
       if (!written) console.error('[vault-cron] manifest write failed (writeVaultFile returned null)')
     }

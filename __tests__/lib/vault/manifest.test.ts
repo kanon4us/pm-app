@@ -4,6 +4,7 @@ import {
   extractSummary,
   serializeManifest,
   manifestContentEquals,
+  manifestLooksDegraded,
   selectVaultDocs,
   truncateDocSyntaxSafe,
   ROOT_DOMAIN,
@@ -196,6 +197,44 @@ describe('serializeManifest / manifestContentEquals', () => {
   it('returns false (never throws) on malformed input', () => {
     expect(manifestContentEquals(buildManifest(base()), null)).toBe(false)
     expect(manifestContentEquals(buildManifest(base()), { junk: true })).toBe(false)
+  })
+})
+
+describe('manifestLooksDegraded', () => {
+  it('flags an empty manifest even with no existing manifest to compare against', () => {
+    const empty = manifestOf({})
+    expect(manifestLooksDegraded(empty, null)).toBe(true)
+  })
+
+  it('does not flag a non-empty manifest when there is no existing manifest', () => {
+    const next = manifestOf({ SOPs: [mf('SOPs/A.md')] })
+    expect(manifestLooksDegraded(next, null)).toBe(false)
+  })
+
+  it('does not flag when next is at least half of existing', () => {
+    const existing = manifestOf({
+      SOPs: Array.from({ length: 10 }, (_, i) => mf(`SOPs/${i}.md`)),
+    })
+    const next = manifestOf({
+      SOPs: Array.from({ length: 5 }, (_, i) => mf(`SOPs/${i}.md`)),
+    })
+    expect(manifestLooksDegraded(next, existing)).toBe(false)
+  })
+
+  it('flags when next drops below half of existing', () => {
+    const existing = manifestOf({
+      SOPs: Array.from({ length: 10 }, (_, i) => mf(`SOPs/${i}.md`)),
+    })
+    const next = manifestOf({
+      SOPs: Array.from({ length: 4 }, (_, i) => mf(`SOPs/${i}.md`)),
+    })
+    expect(manifestLooksDegraded(next, existing)).toBe(true)
+  })
+
+  it('does not flag (returns false) when existing is malformed', () => {
+    const next = manifestOf({ SOPs: [mf('SOPs/A.md')] })
+    const malformed = { junk: true } as unknown as VaultManifest
+    expect(manifestLooksDegraded(next, malformed)).toBe(false)
   })
 })
 

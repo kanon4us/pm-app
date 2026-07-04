@@ -191,6 +191,21 @@ export function manifestContentEquals(a: VaultManifest, b: unknown): boolean {
   }
 }
 
+/**
+ * True when writing `next` over `existing` would shrink the vault index
+ * suspiciously — an empty manifest, or a total file_count drop of more than
+ * half. Guards the weekly cron against committing a manifest built from a
+ * partially-degraded GitHub snapshot (listDocs silently drops failed fetches).
+ */
+export function manifestLooksDegraded(next: VaultManifest, existing: VaultManifest | null): boolean {
+  const count = (m: VaultManifest) =>
+    Object.values(m.domains).reduce((n, d) => n + d.file_count, 0)
+  const nextCount = count(next)
+  if (nextCount === 0) return true
+  if (!existing || typeof existing !== 'object' || !existing.domains) return false
+  return nextCount < count(existing) / 2
+}
+
 export interface DomainBrief {
   name: string
   file_count: number

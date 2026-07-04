@@ -289,5 +289,38 @@ describe('GET /api/cron/vault-consolidation', () => {
       expect(res.status).toBe(200)
       expect(mockWriteVaultFile).not.toHaveBeenCalled()
     })
+
+    it('skips the write when the new manifest would shrink the vault index by more than half', async () => {
+      // Existing manifest has 10 files (a domain with file_count 10); the
+      // fixture snapshot only produces 3 docs → well under half → degraded.
+      const degradedExisting = {
+        version: 1,
+        generated_at: '2026-01-01T00:00:00Z',
+        run_id: '2026-W01',
+        domains: {
+          SOPs: {
+            file_count: 10,
+            top_tags: [],
+            hub_docs: [],
+            files: Array.from({ length: 10 }, (_, i) => ({
+              path: `SOPs/doc-${i}.md`,
+              title: `Doc ${i}`,
+              tags: [],
+              status: null,
+              updated: '2026-01-01',
+              summary: '',
+            })),
+          },
+        },
+      }
+      mockReadVaultFile = jest.fn().mockResolvedValue({
+        content: JSON.stringify(degradedExisting, null, 2) + '\n',
+        sha: 'old',
+      })
+
+      const res = await GET(makeRequest())
+      expect(res.status).toBe(200)
+      expect(mockWriteVaultFile).not.toHaveBeenCalled()
+    })
   })
 })
