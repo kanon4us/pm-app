@@ -266,24 +266,46 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const slackToken = process.env.SLACK_BOT_TOKEN
   const channel = process.env.VAULT_CONSOLIDATION_SLACK_CHANNEL
   if (slackToken && channel) {
-    const slack = buildSlackClient(slackToken)
-    const lines = [
-      `*Vault Weekly Consolidation — ${runId}*`,
-      `Snapshot: ${snap.docs.length} docs scanned`,
-      `Added: ${report.added.length} · Modified: ${report.modified.length} · Deleted: ${report.deleted.length}`,
-    ]
-    await slack.postMessage(channel, lines.join('\n'))
+    try {
+      const slack = buildSlackClient(slackToken)
+      const lines = [
+        `*Vault Weekly Consolidation — ${runId}*`,
+        `Snapshot: ${snap.docs.length} docs scanned`,
+        `Added: ${report.added.length} · Modified: ${report.modified.length} · Deleted: ${report.deleted.length}`,
+      ]
+      await slack.postMessage(channel, lines.join('\n'))
+    } catch (err) {
+      console.error('[vault-cron] slack digest failed:', err)
+    }
   }
 
-  // 6. Fan-out stable docs (already filtered + capped by `limit`) to /process
+  // 6. Fan-out stable docs (already filtered + capped by `limit`) to /process.
+  // Never fatal: the snapshot + manifest are already committed, so a broken
+  // QStash config (e.g. missing QSTASH_TOKEN) must not 500 the whole cron.
   const baseUrl = process.env.VAULT_APP_BASE_URL ?? ''
   const processUrl = `${baseUrl}/api/vault/consolidation/process`
 
   let enqueued = 0
+  let enqueueFailed = 0
   for (const doc of stableDocs) {
-    await enqueue(processUrl, { runId, docPath: doc.path })
-    enqueued++
+    try {
+      await enqueue(processUrl, { runId, docPath: doc.path })
+      enqueued++
+    } catch (err) {
+      enqueueFailed++
+      if (enqueueFailed === 1) {
+        console.error(`[vault-cron] enqueue failed for ${doc.path}:`, err)
+      }
+    }
+  }
+  if (enqueueFailed > 0) {
+    console.error(`[vault-cron] fan-out: ${enqueueFailed}/${stableDocs.length} enqueues failed`)
   }
 
-  return NextResponse.json({ result: 'ok', runId, enqueued })
+  return NextResponse.json({
+    result: 'ok',
+    runId,
+    enqueued,
+    ...(enqueueFailed > 0 ? { enqueueFailed } : {}),
+  })
 }
