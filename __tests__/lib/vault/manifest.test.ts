@@ -1,6 +1,7 @@
 // __tests__/lib/vault/manifest.test.ts
 import {
   buildManifest,
+  extractSummary,
   ROOT_DOMAIN,
 } from '@/lib/vault/manifest'
 import type { RunSnapshot, VaultDoc } from '@/lib/vault/types'
@@ -124,5 +125,38 @@ describe('buildManifest — grouping and file entries', () => {
     expect(m.version).toBe(1)
     expect(m.run_id).toBe('2026-W27')
     expect(m.generated_at).toBe('2026-07-03T00:00:00Z')
+  })
+})
+
+describe('extractSummary', () => {
+  it('prefers the [!abstract] callout body', () => {
+    const content = `---\nstatus: current\n---\n# Heading\n\n> [!abstract] Abstract\n> This vault is read by coding agents.\n> It defines provenance rules.\n\nFirst paragraph prose.`
+    expect(extractSummary(content, { status: 'current' })).toBe(
+      'This vault is read by coding agents. It defines provenance rules.'
+    )
+  })
+
+  it('falls back to frontmatter description, then first paragraph', () => {
+    expect(extractSummary('Body prose only.', { description: 'From meta.' })).toBe('From meta.')
+    expect(extractSummary('# H1\n\nActual first paragraph.\n\nSecond.', {})).toBe('Actual first paragraph.')
+  })
+
+  it('skips code fences and callouts when finding the first paragraph', () => {
+    const content = '```bash\nnot prose\n```\n> [!note] skip me\n> callout body\n\nReal prose here.'
+    expect(extractSummary(content, {})).toBe('Real prose here.')
+  })
+
+  it('flattens wikilinks and caps at 200 chars', () => {
+    expect(extractSummary('See [[RAG|Retrieval Augmented Generation]] and [[Sprint Planner]].', {})).toBe(
+      'See Retrieval Augmented Generation and Sprint Planner.'
+    )
+    const long = 'word '.repeat(100)
+    const out = extractSummary(long, {})
+    expect(out.length).toBeLessThanOrEqual(200)
+    expect(out.endsWith('…')).toBe(true)
+  })
+
+  it('returns empty string for docs with no prose', () => {
+    expect(extractSummary('---\nstatus: stub\n---\n# Only a heading', { status: 'stub' })).toBe('')
   })
 })
