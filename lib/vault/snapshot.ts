@@ -22,7 +22,12 @@ export interface SnapshotDeps {
 // ---------------------------------------------------------------------------
 
 export async function buildSnapshot(runId: string, deps: SnapshotDeps): Promise<RunSnapshot> {
-  const rawDocs = await deps.listDocs()
+  // Strip NUL characters at ingestion: Postgres jsonb rejects \u0000 (22P05),
+  // so a single corrupt byte in one doc would otherwise fail the whole
+  // snapshot upsert (seen live 2026-07-04 with a pasted control char).
+  const rawDocs = (await deps.listDocs()).map((d) =>
+    d.content.includes('\u0000') ? { ...d, content: d.content.replaceAll('\u0000', '') } : d
+  )
 
   const commits = await Promise.all(rawDocs.map((d) => deps.lastCommit(d.path)))
 

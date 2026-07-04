@@ -28,6 +28,18 @@ describe('buildSnapshot', () => {
     expect(bEntry).toBeDefined()
     expect(bEntry![1]).toContain('A.md')
   })
+
+  it('strips NUL characters from doc content (Postgres jsonb rejects them)', async () => {
+    const nulDeps = {
+      ...deps,
+      listDocs: async () => [
+        { path: 'C.md', content: 'control range `\u0000–\u0000` pasted', blobSha: 'sha-c' },
+      ],
+    }
+    const snap = await buildSnapshot('2026-W25', nulDeps)
+    expect(snap.docs[0].content).toBe('control range `–` pasted')
+    expect(snap.docs[0].content.includes('\u0000')).toBe(false)
+  })
 })
 
 describe('serializeBacklinks', () => {
