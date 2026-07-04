@@ -11,6 +11,8 @@ import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { auditDoc, SUPPORT_CRITICAL_PATHS_DEFAULT } from '@/lib/vault/audit'
 import { buildQuestions } from '@/lib/vault/questions'
 import { resolveAuthor } from '@/lib/vault/author-routing'
+import { buildManifest, serializeManifest, manifestContentEquals, MANIFEST_PATH } from '@/lib/vault/manifest'
+import { readVaultFile, writeVaultFile } from '@/lib/github/vault'
 
 export const maxDuration = 300
 
@@ -211,6 +213,28 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // 2. Persist snapshot
   const supabase = await getSupabaseServiceClient()
   await storeSnapshot(supabase, snap)
+
+  // 2b. Refresh MANIFEST.json (Tier-1 vault index) — derived from the same
+  // snapshot, committed straight to main, never fatal to the run.
+  // Spec: docs/superpowers/specs/2026-07-03-vault-manifest-design.md
+  try {
+    const manifest = buildManifest(snap)
+    const existing = await readVaultFile(token, MANIFEST_PATH)
+    let unchanged = false
+    if (existing) {
+      try {
+        unchanged = manifestContentEquals(manifest, JSON.parse(existing.content))
+      } catch {
+        // existing manifest unparseable → overwrite it
+      }
+    }
+    if (!unchanged) {
+      const written = await writeVaultFile(token, MANIFEST_PATH, serializeManifest(manifest), 'chore: refresh vault manifest', 'main')
+      if (!written) console.error('[vault-cron] manifest write failed (writeVaultFile returned null)')
+    }
+  } catch (err) {
+    console.error('[vault-cron] manifest step failed:', err)
+  }
 
   // 3. Insert vault_review_runs row
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

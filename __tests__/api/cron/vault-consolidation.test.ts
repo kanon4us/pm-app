@@ -45,6 +45,13 @@ jest.mock('@/lib/supabase/server', () => ({
   ),
 }))
 
+let mockReadVaultFile: jest.Mock
+let mockWriteVaultFile: jest.Mock
+jest.mock('@/lib/github/vault', () => ({
+  readVaultFile: (...args: unknown[]) => mockReadVaultFile(...args),
+  writeVaultFile: (...args: unknown[]) => mockWriteVaultFile(...args),
+}))
+
 // ── fixture data ──────────────────────────────────────────────────────────────
 
 // 3 docs: 2 stable (>7 days old), 1 recent. Dates are relative to now so the
@@ -106,6 +113,9 @@ describe('GET /api/cron/vault-consolidation', () => {
     const insertFn = jest.fn().mockResolvedValue({ error: null })
     mockSupabaseFrom = jest.fn().mockReturnValue({ insert: insertFn })
     mockSupabaseClient = { from: mockSupabaseFrom }
+
+    mockReadVaultFile = jest.fn().mockResolvedValue(null) // no existing manifest
+    mockWriteVaultFile = jest.fn().mockResolvedValue({ sha: 'new-sha', url: 'https://example.com' })
   })
 
   // ── auth guard ──────────────────────────────────────────────────────────────
@@ -237,5 +247,47 @@ describe('GET /api/cron/vault-consolidation', () => {
     const body = await res.json()
     expect(body).toMatchObject({ result: 'ok', enqueued: 1 })
     expect(mockEnqueue).toHaveBeenCalledTimes(1)
+  })
+
+  // ── manifest step ────────────────────────────────────────────────────────
+
+  describe('manifest step', () => {
+    it('writes MANIFEST.json when none exists', async () => {
+      const res = await GET(makeRequest())
+      expect(res.status).toBe(200)
+      expect(mockWriteVaultFile).toHaveBeenCalledTimes(1)
+      const [, path, content, message, branch] = mockWriteVaultFile.mock.calls[0]
+      expect(path).toBe('MANIFEST.json')
+      expect(branch).toBe('main')
+      expect(message).toBe('chore: refresh vault manifest')
+      expect(JSON.parse(content).version).toBe(1)
+    })
+
+    it('skips the write when the existing manifest is content-equal (volatile fields ignored)', async () => {
+      // First call captures what the cron would write; feed it back with different volatile fields
+      await GET(makeRequest())
+      const written = mockWriteVaultFile.mock.calls[0][2] as string
+      const existing = JSON.parse(written)
+      existing.generated_at = '1999-01-01T00:00:00Z'
+      existing.run_id = '1999-W01'
+      mockWriteVaultFile.mockClear()
+      mockReadVaultFile = jest.fn().mockResolvedValue({ content: JSON.stringify(existing, null, 2) + '\n', sha: 'old' })
+
+      await GET(makeRequest())
+      expect(mockWriteVaultFile).not.toHaveBeenCalled()
+    })
+
+    it('does not fail the run when the manifest step throws', async () => {
+      mockReadVaultFile = jest.fn().mockRejectedValue(new Error('boom'))
+      mockWriteVaultFile = jest.fn().mockRejectedValue(new Error('boom'))
+      const res = await GET(makeRequest())
+      expect(res.status).toBe(200)
+    })
+
+    it('does not write during dry runs', async () => {
+      const res = await GET(makeRequestWithQuery('dryRun=1'))
+      expect(res.status).toBe(200)
+      expect(mockWriteVaultFile).not.toHaveBeenCalled()
+    })
   })
 })
