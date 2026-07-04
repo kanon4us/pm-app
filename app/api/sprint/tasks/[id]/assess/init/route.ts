@@ -278,6 +278,9 @@ ${reassessmentContext}`
       model: CLAUDE_MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
+      // Medium effort: manifest retrieval feeds whole docs (up to 40K chars),
+      // and at default (high) effort the call overran Vercel's 300s ceiling.
+      output_config: { effort: 'medium' },
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     })
