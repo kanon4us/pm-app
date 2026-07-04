@@ -81,7 +81,7 @@ serializeManifest(m: VaultManifest): string   // stable key/array ordering
 
 ### Rules
 
-- **Domain** = first path segment. Root-level `.md` files go under domain `"(root)"`. Excluded domains: any dot-directory (`.obsidian`, `.claude`, `.agents`, `.codex`), `scripts`. (Non-`.md` files never reach the snapshot.)
+- **Domain** = first path segment. Root-level `.md` files go under the semantic domain `"Global Foundations"` (README, CLAUDE.md, AGENTS.md — the vault-wide ground rules; a literal `(root)` label would read as noise in the prompt map). Excluded domains: any dot-directory (`.obsidian`, `.claude`, `.agents`, `.codex`), `scripts`. (Non-`.md` files never reach the snapshot.)
 - **Summary extraction**, in priority order, whitespace-normalized, hard-capped at 200 chars:
   1. First `> [!abstract]` callout body (per Doc Standards).
   2. Frontmatter `title`-adjacent `description`/`summary` key if present.
@@ -94,7 +94,7 @@ serializeManifest(m: VaultManifest): string   // stable key/array ordering
 After `storeSnapshot(...)`:
 
 1. `buildManifest(snapshot)` → `serializeManifest(...)`.
-2. Compare against current `MANIFEST.json` on `main` (`readVaultFile`); byte-identical → skip.
+2. Compare against current `MANIFEST.json` on `main` (`readVaultFile`) using **volatile-field-blind equality**: both sides are re-serialized with `generated_at` and `run_id` omitted before comparison (`manifestContentEquals(a, b)` in `lib/vault/manifest.ts`). Equal → skip the write. Without this, the timestamp and ISO-week run id would differ every run and the cron would spam a commit weekly even when no doc changed.
 3. Otherwise `writeVaultFile(token, 'MANIFEST.json', content, 'chore: refresh vault manifest', 'main')` — the helper resolves the existing-file SHA itself. It returns `null` (rather than throwing) on failure; the cron step treats `null` as a logged failure.
 
 Failure isolation: the whole step is wrapped in try/catch; on error (or `null` write result) it `console.error`s (visible in Vercel runtime logs) and the consolidation run continues unaffected. The manifest write goes straight to `main` (data-only, deterministic artifact), unlike consolidation content changes which go through the review branch.
@@ -113,10 +113,11 @@ selectVaultDocs(manifest: VaultManifest, query: { taskName: string; description?
 ```
 
 - **Scoring:** tokenize task name + ClickUp description with the existing stop-word logic (`extractKeywords` generalized); score each manifest file by weighted hits — title (3), tags (3), path (2), summary (1). Domain affinity bonus so picks cluster in the 1–2 best domains.
-- **Caps:** top 5 files, and a total vault-context budget of 40,000 chars — stop adding docs once the running total of fetched content would exceed it (individual oversized docs are truncated at 15,000 chars with a `[truncated]` marker).
+- **Confidence floor:** picks below an absolute `MIN_SCORE` threshold are discarded before the count check. Weak-but-plural matches must not mask fresh mid-week docs that only the live search can see — the fallback condition is therefore `qualifiedPicks.length < 2`, where qualified means `score >= MIN_SCORE`. `MIN_SCORE` starts at one strong-field hit (i.e. 3 — a title or tag match; pure summary grazes don't qualify alone) and is a named constant so it can be tuned.
+- **Caps:** top 5 files, and a total vault-context budget of 40,000 chars — stop adding docs once the running total of fetched content would exceed it. Individual oversized docs are truncated at 15,000 chars with **syntax-safe truncation**: cut at the last newline before the limit, then if the kept portion contains an odd number of ``` fence delimiters, append a closing ``` — so a truncated doc can never leak an open code fence that swallows the rest of the prompt — and finally append a `\n[truncated]` marker.
 - **Route flow:** fetch manifest → select → parallel `readVaultFile` for picks → build `vaultContext` from full documents (replacing search snippets) + a compact domain map section ("VAULT MAP" — names, file counts, one-line rollups) so Claude can reference unread domains in its evidence fields.
 - **`readDevObjectives` unchanged.**
-- **Fallback:** manifest fetch fails, JSON invalid, `version !== 1`, or `picks.length < 2` → run today's `searchFeatureSpecs` + `searchVault` exactly as-is.
+- **Fallback:** manifest fetch fails, JSON invalid, `version !== 1`, or fewer than 2 picks meet the `MIN_SCORE` confidence floor → run today's `searchFeatureSpecs` + `searchVault` exactly as-is.
 - **Observability:** response JSON gains `vaultSource: 'manifest' | 'search'`; `vaultFilesRead` keeps its current meaning.
 
 ## Error handling summary
@@ -126,13 +127,13 @@ selectVaultDocs(manifest: VaultManifest, query: { taskName: string; description?
 | Compiler throws in cron | Logged, consolidation run continues, stale manifest stays in place |
 | Manifest write 4xx/5xx | Same as above |
 | Manifest missing/invalid at assess time | Fallback to keyword search (status quo) |
-| <2 scoring matches | Fallback to keyword search |
+| <2 matches at or above `MIN_SCORE` | Fallback to keyword search (weak matches don't mask fresh mid-week docs) |
 | Individual doc fetch fails | Skip that doc, keep the rest |
 
 ## Testing
 
-- `__tests__/vault/manifest.test.ts`: domain grouping incl. `(root)` and exclusions; summary extraction (abstract callout, first paragraph, no-prose); 200-char cap; deterministic serialization (double-run byte equality).
-- Selector tests: weighted scoring order, domain clustering, cap enforcement, `<2 matches` signal.
+- `__tests__/vault/manifest.test.ts`: domain grouping incl. `Global Foundations` and exclusions; summary extraction (abstract callout, first paragraph, no-prose); 200-char cap; deterministic serialization (double-run byte equality); `manifestContentEquals` ignores `generated_at`/`run_id` but catches real content changes.
+- Selector tests: weighted scoring order, domain clustering, cap enforcement, confidence floor (weak plural matches → fallback signal; two strong matches → manifest path); syntax-safe truncation (newline slice, odd-fence closing, `[truncated]` marker).
 - Cron test: manifest step throwing does not fail the run; unchanged manifest skips the write.
 - Assess route: existing tests keep passing; add fallback-path test (no manifest → search called).
 
