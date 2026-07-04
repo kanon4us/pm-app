@@ -190,3 +190,97 @@ export function manifestContentEquals(a: VaultManifest, b: unknown): boolean {
     return false
   }
 }
+
+export interface DomainBrief {
+  name: string
+  file_count: number
+  top_tags: string[]
+}
+
+export interface VaultPick {
+  path: string
+  score: number
+}
+
+const STOP_WORDS = new Set(['a', 'an', 'the', 'to', 'for', 'in', 'on', 'at', 'with', 'and', 'or', 'of', 'is', 'are', 'be', 'as'])
+
+function tokenize(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+    ),
+  ].slice(0, 12)
+}
+
+/**
+ * Deterministic manifest-driven doc selection. Weighted keyword scoring
+ * (title 3, tags 3, path 2, summary 1) + a +1 affinity bonus for files in the
+ * two highest-scoring domains. Picks below MIN_SCORE are discarded so weak
+ * matches trigger the caller's live-search fallback instead.
+ */
+export function selectVaultDocs(
+  manifest: VaultManifest,
+  query: { taskName: string; description?: string }
+): { domains: DomainBrief[]; picks: VaultPick[] } {
+  const tokens = tokenize(`${query.taskName} ${query.description ?? ''}`)
+
+  const scored: Array<{ path: string; domain: string; score: number }> = []
+  for (const [domain, d] of Object.entries(manifest.domains)) {
+    for (const f of d.files) {
+      let score = 0
+      const title = f.title.toLowerCase()
+      const path = f.path.toLowerCase()
+      const summary = f.summary.toLowerCase()
+      const tags = f.tags.map((t) => t.toLowerCase())
+      for (const tok of tokens) {
+        if (title.includes(tok)) score += 3
+        if (tags.some((t) => t.includes(tok))) score += 3
+        if (path.includes(tok)) score += 2
+        if (summary.includes(tok)) score += 1
+      }
+      if (score > 0) scored.push({ path: f.path, domain, score })
+    }
+  }
+
+  const domainTotals = new Map<string, number>()
+  for (const s of scored) domainTotals.set(s.domain, (domainTotals.get(s.domain) ?? 0) + s.score)
+  const topDomains = new Set(
+    [...domainTotals.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 2)
+      .map(([name]) => name)
+  )
+
+  const picks = scored
+    .map((s) => ({ path: s.path, score: s.score + (topDomains.has(s.domain) ? 1 : 0) }))
+    .filter((s) => s.score >= MIN_SCORE)
+    .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
+    .slice(0, MAX_PICKS)
+
+  const domains = Object.entries(manifest.domains).map(([name, d]) => ({
+    name,
+    file_count: d.file_count,
+    top_tags: d.top_tags,
+  }))
+
+  return { domains, picks }
+}
+
+/**
+ * Truncate a doc for prompt inclusion without breaking markdown parsing:
+ * cut at the last newline before the limit, close a dangling ``` fence,
+ * then mark the truncation.
+ */
+export function truncateDocSyntaxSafe(content: string, limit: number = DOC_CHAR_LIMIT): string {
+  if (content.length <= limit) return content
+  let cut = content.slice(0, limit)
+  const lastNewline = cut.lastIndexOf('\n')
+  if (lastNewline > 0) cut = cut.slice(0, lastNewline)
+  const fenceCount = cut.split('\n').filter((l) => l.trimStart().startsWith('```')).length
+  if (fenceCount % 2 === 1) cut += '\n```'
+  return cut + '\n[truncated]'
+}

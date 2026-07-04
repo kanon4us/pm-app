@@ -4,8 +4,14 @@ import {
   extractSummary,
   serializeManifest,
   manifestContentEquals,
+  selectVaultDocs,
+  truncateDocSyntaxSafe,
   ROOT_DOMAIN,
+  MIN_SCORE,
+  MAX_PICKS,
+  DOC_CHAR_LIMIT,
 } from '@/lib/vault/manifest'
+import type { VaultManifest, ManifestFile } from '@/lib/vault/manifest'
 import type { RunSnapshot, VaultDoc } from '@/lib/vault/types'
 
 function doc(path: string, content: string, overrides: Partial<VaultDoc> = {}): VaultDoc {
@@ -182,5 +188,106 @@ describe('serializeManifest / manifestContentEquals', () => {
   it('returns false (never throws) on malformed input', () => {
     expect(manifestContentEquals(buildManifest(base()), null)).toBe(false)
     expect(manifestContentEquals(buildManifest(base()), { junk: true })).toBe(false)
+  })
+})
+
+function mf(path: string, over: Partial<ManifestFile> = {}): ManifestFile {
+  return { path, title: basename(path), tags: [], status: 'current', updated: '2026-06-01', summary: '', ...over }
+}
+function basename(p: string): string {
+  return (p.split('/').pop() ?? p).replace(/\.md$/, '')
+}
+function manifestOf(domains: Record<string, ManifestFile[]>): VaultManifest {
+  return {
+    version: 1,
+    generated_at: '2026-07-03T00:00:00Z',
+    run_id: '2026-W27',
+    domains: Object.fromEntries(
+      Object.entries(domains).map(([name, files]) => [
+        name,
+        { file_count: files.length, top_tags: [], hub_docs: [], files },
+      ])
+    ),
+  }
+}
+
+describe('selectVaultDocs', () => {
+  it('scores title/tag hits above path/summary hits', () => {
+    const m = manifestOf({
+      SOPs: [
+        mf('SOPs/Campaign Briefs.md', { title: 'Campaign Briefs' }),          // title hit: 3
+        mf('SOPs/Other.md', { summary: 'mentions campaign in passing' }),      // summary hit: 1
+      ],
+    })
+    const { picks } = selectVaultDocs(m, { taskName: 'Campaign dashboard' })
+    expect(picks[0].path).toBe('SOPs/Campaign Briefs.md')
+  })
+
+  it('drops picks below MIN_SCORE (summary-only grazes do not qualify)', () => {
+    const m = manifestOf({
+      SOPs: [
+        mf('SOPs/A.md', { summary: 'campaign' }),
+        mf('SOPs/B.md', { summary: 'campaign' }),
+        mf('SOPs/C.md', { summary: 'campaign' }),
+      ],
+    })
+    // Each file scores 1 (summary) + 1 (domain affinity) = 2 < MIN_SCORE
+    const { picks } = selectVaultDocs(m, { taskName: 'Campaign dashboard' })
+    expect(MIN_SCORE).toBe(3)
+    expect(picks).toEqual([])
+  })
+
+  it('adds domain-affinity bonus so picks cluster in the top domains', () => {
+    const m = manifestOf({
+      Strong: [
+        mf('Strong/One.md', { title: 'Campaign Setup' }),
+        mf('Strong/Two.md', { title: 'Campaign Review' }),
+      ],
+      Weak: [mf('Weak/Three.md', { title: 'Campaign' })],
+      Zero: [mf('Zero/Off.md', { title: 'Unrelated' })],
+    })
+    const { picks } = selectVaultDocs(m, { taskName: 'campaign setup review' })
+    const strongPick = picks.find((p) => p.path === 'Strong/One.md')!
+    // title 'Campaign Setup' hits 'campaign'(3) + 'setup'(3) + affinity(1) = 7
+    expect(strongPick.score).toBe(7)
+    expect(picks.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('caps picks at MAX_PICKS and includes description tokens', () => {
+    const files = Array.from({ length: 8 }, (_, i) => mf(`SOPs/Editing ${i}.md`, { title: `Editing ${i}` }))
+    const m = manifestOf({ SOPs: files })
+    const { picks } = selectVaultDocs(m, { taskName: 'Untitled', description: 'video editing workflow' })
+    expect(picks.length).toBe(MAX_PICKS)
+  })
+
+  it('returns a domain brief for every domain regardless of picks', () => {
+    const m = manifestOf({ SOPs: [mf('SOPs/A.md')], 'Dev Docs': [mf('Dev Docs/B.md')] })
+    const { domains } = selectVaultDocs(m, { taskName: 'nothing matches' })
+    expect(domains.map((d) => d.name).sort()).toEqual(['Dev Docs', 'SOPs'])
+  })
+})
+
+describe('truncateDocSyntaxSafe', () => {
+  it('returns short content unchanged', () => {
+    expect(truncateDocSyntaxSafe('short')).toBe('short')
+  })
+
+  it('cuts at the last newline before the limit and appends [truncated]', () => {
+    const line = 'x'.repeat(100)
+    const content = Array.from({ length: 200 }, () => line).join('\n') // 20,199 chars
+    const out = truncateDocSyntaxSafe(content)
+    expect(out.length).toBeLessThanOrEqual(DOC_CHAR_LIMIT + 20)
+    expect(out.endsWith('\n[truncated]')).toBe(true)
+    const kept = out.replace(/\n\[truncated\]$/, '')
+    expect(kept.split('\n').every((l) => l === line)).toBe(true) // no mid-line cut
+  })
+
+  it('closes an open code fence left dangling by the cut', () => {
+    const prefix = 'p\n'.repeat(7400) // 14,800 chars — fence opens just before the limit
+    const content = prefix + '```ts\nconst x = 1\n' + 'y\n'.repeat(2000)
+    const out = truncateDocSyntaxSafe(content)
+    const fenceCount = out.split('\n').filter((l) => l.trimStart().startsWith('```')).length
+    expect(fenceCount % 2).toBe(0)
+    expect(out.endsWith('\n[truncated]')).toBe(true)
   })
 })
