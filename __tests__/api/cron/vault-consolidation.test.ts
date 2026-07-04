@@ -249,6 +249,44 @@ describe('GET /api/cron/vault-consolidation', () => {
     expect(mockEnqueue).toHaveBeenCalledTimes(1)
   })
 
+  // ── failure isolation: Slack digest + fan-out ─────────────────────────────
+
+  it('does not fail the run when the Slack digest throws', async () => {
+    mockPostMessage = jest.fn().mockRejectedValue(new Error('slack boom'))
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(200)
+    // Fan-out still runs after the failed digest
+    expect(mockEnqueue).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not fail the run when every enqueue throws (e.g. invalid QSTASH_TOKEN)', async () => {
+    mockEnqueue = jest.fn().mockRejectedValue(
+      new Error('[Upstash QStash] client token is not set'),
+    )
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ result: 'ok', enqueued: 0, enqueueFailed: 2 })
+  })
+
+  it('counts partial enqueue failures without aborting the fan-out', async () => {
+    mockEnqueue = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockResolvedValue(undefined)
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ result: 'ok', enqueued: 1, enqueueFailed: 1 })
+    expect(mockEnqueue).toHaveBeenCalledTimes(2)
+  })
+
+  it('omits enqueueFailed from the body when all enqueues succeed', async () => {
+    const res = await GET(makeRequest())
+    const body = await res.json()
+    expect(body).not.toHaveProperty('enqueueFailed')
+  })
+
   // ── manifest step ────────────────────────────────────────────────────────
 
   describe('manifest step', () => {
