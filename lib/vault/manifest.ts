@@ -115,7 +115,7 @@ function parseTags(d: VaultDoc): string[] {
   for (let i = start + 1; i < lines.length; i++) {
     const item = /^\s+-\s+(.+)$/.exec(lines[i])
     if (!item) break
-    tags.push(item[1].trim())
+    tags.push(item[1].trim().replace(/^["']|["']$/g, ''))
   }
   return tags
 }

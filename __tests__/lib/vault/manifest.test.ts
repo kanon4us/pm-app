@@ -107,6 +107,14 @@ describe('buildManifest — grouping and file entries', () => {
     expect(m.domains['00_Meta'].files[0].tags).toEqual(['meta', 'reference'])
   })
 
+  it('strips wrapping quotes from block-list tags to match inline parsing', () => {
+    const content = `---\ntags:\n  - "reference"\n  - meta\nstatus: current\n---\nBody.`
+    const m = buildManifest(
+      snap([doc('00_Meta/Quoted.md', content, { frontmatter: { status: 'current' } })])
+    )
+    expect(m.domains['00_Meta'].files[0].tags).toEqual(['reference', 'meta'])
+  })
+
   it('rolls up top_tags by frequency (alpha tiebreak, max 8) and hub_docs by backlinks (max 5)', () => {
     const tagged = (p: string, tags: string) =>
       doc(p, `---\ntags: [${tags}]\n---\nx`, { frontmatter: { tags: `[${tags}]` } })
