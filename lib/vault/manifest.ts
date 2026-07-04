@@ -170,3 +170,23 @@ function cleanProse(s: string): string {
 function capSummary(s: string): string {
   return s.length <= SUMMARY_CHAR_LIMIT ? s : s.slice(0, SUMMARY_CHAR_LIMIT - 1).trimEnd() + '…'
 }
+
+/** Stable serialization — buildManifest already emits sorted domains/files. */
+export function serializeManifest(m: VaultManifest): string {
+  return JSON.stringify(m, null, 2) + '\n'
+}
+
+/**
+ * Equality that ignores volatile fields (generated_at, run_id) so the weekly
+ * cron doesn't commit a new MANIFEST.json when no doc actually changed.
+ */
+export function manifestContentEquals(a: VaultManifest, b: unknown): boolean {
+  try {
+    const other = b as VaultManifest
+    if (!other || typeof other !== 'object' || !other.domains) return false
+    const strip = (m: VaultManifest) => serializeManifest({ ...m, generated_at: '', run_id: '' })
+    return strip(a) === strip(other)
+  } catch {
+    return false
+  }
+}

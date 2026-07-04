@@ -2,6 +2,8 @@
 import {
   buildManifest,
   extractSummary,
+  serializeManifest,
+  manifestContentEquals,
   ROOT_DOMAIN,
 } from '@/lib/vault/manifest'
 import type { RunSnapshot, VaultDoc } from '@/lib/vault/types'
@@ -158,5 +160,27 @@ describe('extractSummary', () => {
 
   it('returns empty string for docs with no prose', () => {
     expect(extractSummary('---\nstatus: stub\n---\n# Only a heading', { status: 'stub' })).toBe('')
+  })
+})
+
+describe('serializeManifest / manifestContentEquals', () => {
+  const base = () => snap([doc('SOPs/A.md', 'Alpha prose.')])
+
+  it('is byte-identical across runs on identical content', () => {
+    expect(serializeManifest(buildManifest(base()))).toBe(serializeManifest(buildManifest(base())))
+  })
+
+  it('ignores generated_at and run_id but catches content changes', () => {
+    const a = buildManifest(base())
+    const b = buildManifest({ ...base(), runId: '2026-W28', generatedAt: '2026-07-10T00:00:00Z' })
+    expect(manifestContentEquals(a, b)).toBe(true)
+
+    const c = buildManifest(snap([doc('SOPs/A.md', 'Changed prose.')]))
+    expect(manifestContentEquals(a, c)).toBe(false)
+  })
+
+  it('returns false (never throws) on malformed input', () => {
+    expect(manifestContentEquals(buildManifest(base()), null)).toBe(false)
+    expect(manifestContentEquals(buildManifest(base()), { junk: true })).toBe(false)
   })
 })
