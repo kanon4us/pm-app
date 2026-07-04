@@ -67,4 +67,48 @@ describe('retrieveVaultContext', () => {
     })
     expect(await retrieveVaultContext({ readFile }, query)).toBeNull()
   })
+
+  it('stops filling docs once the char budget would be exceeded (break path)', async () => {
+    // 4 equally-scoring files (all title hits on "vault", same domain →
+    // affinity bonus applies to all) so picks are ordered alphabetically by
+    // path. Each fetched body is 19,990 chars — truncateDocSyntaxSafe has no
+    // newline to cut on, so it slices to exactly DOC_CHAR_LIMIT (15,000) and
+    // appends '\n[truncated]' (12 chars) → 15,012 chars per doc.
+    //   doc1: total 15,012 (fits)
+    //   doc2: total 30,024 (fits)
+    //   doc3: 30,024 + 15,012 = 45,036 > 40,000 → break (doc4 never checked)
+    const bigManifest: VaultManifest = {
+      version: 1,
+      generated_at: '2026-07-03T00:00:00Z',
+      run_id: '2026-W27',
+      domains: {
+        Vault: {
+          file_count: 4,
+          top_tags: [],
+          hub_docs: [],
+          files: [
+            { path: 'Vault/Alpha Vault.md', title: 'Alpha Vault', tags: [], status: 'current', updated: '2026-06-01', summary: '' },
+            { path: 'Vault/Bravo Vault.md', title: 'Bravo Vault', tags: [], status: 'current', updated: '2026-06-01', summary: '' },
+            { path: 'Vault/Charlie Vault.md', title: 'Charlie Vault', tags: [], status: 'current', updated: '2026-06-01', summary: '' },
+            { path: 'Vault/Delta Vault.md', title: 'Delta Vault', tags: [], status: 'current', updated: '2026-06-01', summary: '' },
+          ],
+        },
+      },
+    }
+    const bigBody = 'x'.repeat(19_990)
+    const readFile = readFileFor({
+      [MANIFEST_PATH]: serializeManifest(bigManifest),
+      'Vault/Alpha Vault.md': bigBody,
+      'Vault/Bravo Vault.md': bigBody,
+      'Vault/Charlie Vault.md': bigBody,
+      'Vault/Delta Vault.md': bigBody,
+    })
+    const result = await retrieveVaultContext({ readFile }, { taskName: 'vault' })
+    expect(result).not.toBeNull()
+    expect(result!.filesRead).toEqual(['Vault/Alpha Vault.md', 'Vault/Bravo Vault.md'])
+    expect(result!.filesRead).not.toContain('Vault/Charlie Vault.md')
+    expect(result!.filesRead).not.toContain('Vault/Delta Vault.md')
+    expect(result!.vaultContext).not.toContain('Charlie Vault')
+    expect(result!.vaultContext).not.toContain('Delta Vault')
+  })
 })
