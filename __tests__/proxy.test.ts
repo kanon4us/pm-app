@@ -50,6 +50,18 @@ describe('proxy — public paths', () => {
     const res = await proxy(makeRequest('http://localhost/api/webhooks/clickup'))
     expect(res.headers.get('location')).toBeNull()
   })
+
+  it('passes /api/vault/consolidation/process through (QStash signature-authed)', async () => {
+    const res = await proxy(makeRequest('http://localhost/api/vault/consolidation/process'))
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.status).not.toBe(401)
+  })
+
+  it('passes /api/vault/consolidation/write through (QStash signature-authed)', async () => {
+    const res = await proxy(makeRequest('http://localhost/api/vault/consolidation/write'))
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.status).not.toBe(401)
+  })
 })
 
 describe('proxy — ClickUp OAuth redirect', () => {
@@ -94,6 +106,11 @@ describe('proxy — unauthenticated requests', () => {
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('still gates /api/vault/doc-review — consolidation prefix must not expose the UI routes', async () => {
+    const res = await proxy(makeRequest('http://localhost/api/vault/doc-review'))
+    expect(res.status).toBe(401)
   })
 })
 
