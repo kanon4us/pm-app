@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import { getFeature } from '@/lib/features/client'
 
-/** Current feature-level prototype (rendered by Claude via render_prototype). */
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+/** Current feature-level prototype (rendered by Claude via render_prototype).
+ *  ?meta=1 returns existence metadata only — html_content can be >1MB. */
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id: featureId } = await params
+  const metaOnly = req.nextUrl.searchParams.get('meta') === '1'
   const db = await getSupabaseServiceClient()
   const { data } = await db
     .from('feature_prototypes')
-    .select('id, html_content, created_at')
+    .select(metaOnly ? 'id, created_at' : 'id, html_content, created_at')
     .eq('feature_id', featureId)
     .is('scenario_id', null)
     .eq('is_current', true)

@@ -31,6 +31,13 @@ export default function FeatureEditorPage() {
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null)
   const [centerView, setCenterView] = useState<'Scenarios' | 'Prototype'>('Scenarios')
   const [protoRefreshKey, setProtoRefreshKey] = useState(0)
+  const [hasPrototype, setHasPrototype] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/features/${id}/prototype?meta=1`)
+      .then((res) => setHasPrototype(res.ok))
+      .catch(() => { /* keep existing state on error */ })
+  }, [id, protoRefreshKey])
 
   async function reload() {
     try {
@@ -83,7 +90,14 @@ export default function FeatureEditorPage() {
           </div>
           <div style={{ flex: 1, overflow: 'auto' }}>
             {centerView === 'Scenarios' ? (
-              <ScenariosPanel featureId={id} featureName={feature.name} story={activeStory} onUpdate={reload} />
+              <ScenariosPanel
+                featureId={id}
+                featureName={feature.name}
+                story={activeStory}
+                onUpdate={reload}
+                hasPrototype={hasPrototype}
+                onViewPrototype={() => setCenterView('Prototype')}
+              />
             ) : (
               <PrototypePanel featureId={id} refreshKey={protoRefreshKey} />
             )}

@@ -3,11 +3,18 @@
 import { useState } from 'react'
 import { Tabs, Button, Typography, Space, message } from 'antd'
 import { StepRow } from './StepRow'
-import type { UserStory, Scenario } from '../page'
+import type { UserStory } from '../page'
 
-interface Props { featureId: string; featureName: string; story: UserStory | null; onUpdate: () => void }
+interface Props {
+  featureId: string
+  featureName: string
+  story: UserStory | null
+  onUpdate: () => void
+  hasPrototype: boolean
+  onViewPrototype: () => void
+}
 
-export function ScenariosPanel({ featureId, featureName, story, onUpdate }: Props) {
+export function ScenariosPanel({ featureId, featureName, story, onUpdate, hasPrototype, onViewPrototype }: Props) {
   const [generating, setGenerating] = useState<string | null>(null)
 
   if (!story) return <div style={{ padding: 32, color: '#555' }}>Select a user story to see scenarios.</div>
@@ -47,27 +54,6 @@ export function ScenariosPanel({ featureId, featureName, story, onUpdate }: Prop
     }
   }
 
-  async function generatePrototype(scenario: Scenario) {
-    setGenerating(scenario.id)
-    try {
-      const res = await fetch(`/api/features/${featureId}/prototype`, {
-        method: 'POST',
-        body: JSON.stringify({ scenario_id: scenario.id, scenario_title: scenario.title }),
-        headers: { 'Content-Type': 'application/json' },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        message.error(err.error ?? 'Failed to generate prototype')
-      } else {
-        message.success('Prototype generated!')
-      }
-    } catch {
-      message.error('Failed to generate prototype')
-    } finally {
-      setGenerating(null)
-    }
-  }
-
   async function generateAll() {
     setGenerating('all')
     try {
@@ -99,9 +85,6 @@ export function ScenariosPanel({ featureId, featureName, story, onUpdate }: Prop
         ))}
         <Space style={{ marginTop: 12 }}>
           <Button size="small" type="dashed" onClick={() => addStep(scenario.id)}>+ Add step</Button>
-          <Button size="small" type="primary" loading={generating === scenario.id} onClick={() => generatePrototype(scenario)}>
-            Generate Prototype
-          </Button>
         </Space>
       </div>
     ),
@@ -112,6 +95,9 @@ export function ScenariosPanel({ featureId, featureName, story, onUpdate }: Prop
       <Space style={{ marginBottom: 8, width: '100%', justifyContent: 'space-between' }}>
         <Typography.Text strong>{`As a ${story.as_a}, I want ${story.i_want}`}</Typography.Text>
         <Space>
+          {hasPrototype && (
+            <Button size="small" type="primary" onClick={onViewPrototype}>View Prototype</Button>
+          )}
           <Button size="small" loading={generating === 'all'} onClick={generateAll}>Generate All</Button>
           <Button size="small" type="dashed" onClick={addScenario}>+ Add scenario</Button>
         </Space>
