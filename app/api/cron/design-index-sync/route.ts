@@ -15,7 +15,7 @@ function staticPrefix(glob: string): string {
   return (i === -1 ? glob : glob.slice(0, i)).replace(/\/+$/, '')
 }
 export const dynamic = 'force-dynamic';
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   // Vercel's scheduler marks cron invocations with an `x-vercel-cron` header,
   // which Vercel strips from any external request — so it's a trustworthy signal.
   // Accept those; otherwise require the Bearer secret (for manual triggers).
