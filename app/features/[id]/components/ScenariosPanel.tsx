@@ -1,22 +1,17 @@
 // app/features/[id]/components/ScenariosPanel.tsx
 'use client'
-import { useState } from 'react'
 import { Tabs, Button, Typography, Space, message } from 'antd'
 import { StepRow } from './StepRow'
 import type { UserStory } from '../page'
 
 interface Props {
-  featureId: string
-  featureName: string
   story: UserStory | null
   onUpdate: () => void
   hasPrototype: boolean
   onViewPrototype: () => void
 }
 
-export function ScenariosPanel({ featureId, featureName, story, onUpdate, hasPrototype, onViewPrototype }: Props) {
-  const [generating, setGenerating] = useState<string | null>(null)
-
+export function ScenariosPanel({ story, onUpdate, hasPrototype, onViewPrototype }: Props) {
   if (!story) return <div style={{ padding: 32, color: '#555' }}>Select a user story to see scenarios.</div>
 
   async function addScenario() {
@@ -54,27 +49,6 @@ export function ScenariosPanel({ featureId, featureName, story, onUpdate, hasPro
     }
   }
 
-  async function generateAll() {
-    setGenerating('all')
-    try {
-      const res = await fetch(`/api/features/${featureId}/prototype`, {
-        method: 'POST',
-        body: JSON.stringify({ scenario_title: `${featureName} — All Scenarios` }),
-        headers: { 'Content-Type': 'application/json' },
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        message.error(err.error ?? 'Failed to generate prototype')
-      } else {
-        message.success('Full prototype generated!')
-      }
-    } catch {
-      message.error('Failed to generate prototype')
-    } finally {
-      setGenerating(null)
-    }
-  }
-
   const tabItems = story.scenarios.map((scenario) => ({
     key: scenario.id,
     label: scenario.title,
@@ -98,7 +72,6 @@ export function ScenariosPanel({ featureId, featureName, story, onUpdate, hasPro
           {hasPrototype && (
             <Button size="small" type="primary" onClick={onViewPrototype}>View Prototype</Button>
           )}
-          <Button size="small" loading={generating === 'all'} onClick={generateAll}>Generate All</Button>
           <Button size="small" type="dashed" onClick={addScenario}>+ Add scenario</Button>
         </Space>
       </Space>

@@ -91,8 +91,6 @@ export default function FeatureEditorPage() {
           <div style={{ flex: 1, overflow: 'auto' }}>
             {centerView === 'Scenarios' ? (
               <ScenariosPanel
-                featureId={id}
-                featureName={feature.name}
                 story={activeStory}
                 onUpdate={reload}
                 hasPrototype={hasPrototype}
