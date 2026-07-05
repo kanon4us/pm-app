@@ -18,6 +18,13 @@ const PUBLIC_PATHS = [
   // /api/bot/* is authenticated by BOT_JWT_SECRET (lib/bot/auth.ts), not by session —
   // requests come from viscap-ai-cloud-functions with a signed HS256 JWT.
   '/api/bot',
+  // /api/vault/consolidation/{process,write} are QStash-triggered consumers.
+  // They self-authenticate by verifying the Upstash-Signature header against the
+  // QStash signing keys (see verifyQstashSignature). QStash's POSTs carry no
+  // session cookie, so the proxy must not gate them here or they'd 401 before
+  // signature verification runs. Scoped to /consolidation so the session-gated
+  // /api/vault/doc-review UI routes stay protected.
+  '/api/vault/consolidation',
 ]
 
 function isSafeRedirect(url: string): boolean {
