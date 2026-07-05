@@ -602,8 +602,7 @@
       "featureId": "web-settings-billing-usage",
       "reason": [
         "unassigned-codepaths",
-        "unassigned-figma",
-        "placeholder-clickup"
+        "unassigned-figma"
       ],
       "partial": {
         "id": "web-settings-billing-usage",
@@ -616,7 +615,9 @@
           "app/settings/**",
           "components/settings/**"
         ]
-      }
+      },
+      "assignedClickupId": "86e1xka10",
+      "title": "Billing | Generative AI Token Usage"
     },
     {
       "featureId": "web-settings-brand",
