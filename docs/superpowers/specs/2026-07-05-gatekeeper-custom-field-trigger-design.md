@@ -94,18 +94,41 @@ fetching:
 1. `parseWebhookEvent` handles `taskUpdated`: return
    `{ taskId, type: 'taskUpdated', toStatus: '', changedFieldNames: string[] }`
    where `changedFieldNames` is collected from **all** `history_items`
-   (ClickUp batches updates — use `.some()`/`.flatMap()` across the whole array,
-   never index 0) reading each item's `field === 'custom_field'` →
-   `custom_field.name`.
-2. Route: on `taskUpdated`, proceed only if `changedFieldNames` intersects
-   `['Design states','Figma']` (case-insensitive). Then `getTask`, evaluate
-   `isPrototypeReady(fields)`, and call `activateFeatureFromTask` if true.
+   (ClickUp batches updates — use `.flatMap()`/`.some()` across the whole array,
+   never index 0). For each item, capture the changed field name at **both**
+   levels:
+   - custom-field edits: `field === 'custom_field'` → `custom_field.name`
+   - top-level edits (e.g. description): the item's own `field` value
+     (e.g. `'description'`).
+2. Route: on `taskUpdated`, proceed only if `changedFieldNames` intersects the
+   **re-fetch whitelist** (case-insensitive):
+   `['Design states', 'Figma', 'Relevant App', 'description']`. Then `getTask`,
+   evaluate `isPrototypeReady(fields)`, and call `activateFeatureFromTask` if true.
 3. `taskUpdated` carries no status — it must **early-return** after the gatekeeper
    block (like `taskTagUpdated` already does), so it never falls through into the
    `taskStatusUpdated`-specific handling below.
 
-This makes the gatekeeper fire (roughly) on *transition into* the ready state
-rather than on every edit, while staying idempotent.
+### Why the whitelist is wider than the trigger
+
+The whitelist decides *when to re-fetch*, not *when to activate* — activation is
+always gated by `isPrototypeReady` after the fetch, so a wider whitelist can never
+cause a spurious firing. It only keeps an already-ready feature's enrichment fresh:
+
+- `Design states`, `Figma` — the readiness **trigger** (a change here can newly
+  activate a task).
+- `Relevant App` — a routing correction must propagate (bounded by the
+  planning-phase re-route guard, so it only re-routes pre-planning).
+- `description` — the enrich UPDATE writes `clickup_details` from the task
+  description, so description edits propagate on re-enrich. ClickUp logs this as a
+  **top-level** history item (`field: 'description'`), hence step 1's dual-level
+  collection.
+- **`name` is deliberately excluded** — the enrich UPDATE path does *not* overwrite
+  `features.name` (only INSERT sets it), because a PM may rename the feature
+  independently of the task title. Re-fetching on a name edit would change nothing,
+  so it stays out of the whitelist.
+
+This makes the gatekeeper fire (roughly) on *transition into* the ready state, plus
+re-enrich on the fields that actually flow downstream, while staying idempotent.
 
 Scope note: v1 triggers on `taskUpdated` only. A task *created* already-ready is a
 rare edge case (the PM edits fields on an existing task) and is deferred.
@@ -152,8 +175,12 @@ feature's enrichment fresh — safe.
   Mac→desktop; Relevant App wins over tag and list; unresolvable label → falls
   through to existing precedence.
 - Figma URL detection helper: figma.com present/absent, empty/undefined.
-- `parseWebhookEvent`: `taskUpdated` collects changed custom-field names across
-  multiple `history_items` (batched-update case).
+- `parseWebhookEvent`: `taskUpdated` collects changed field names across multiple
+  `history_items` (batched-update case) — both `custom_field.name` and top-level
+  `field` (e.g. a `description` change is captured).
+- Whitelist gate: a `taskUpdated` touching only an off-list field (e.g. assignee,
+  due date) is dropped without a fetch; one touching `Relevant App` or
+  `description` proceeds to the `isPrototypeReady` check.
 
 ## Out of scope (separate follow-ups)
 
