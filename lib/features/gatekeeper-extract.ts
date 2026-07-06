@@ -4,10 +4,19 @@
 // ClickUp API) lives in lib/features/gatekeeper.ts.
 import { APP_REGISTRY, APP_SLUGS, type AppSlug } from '@/lib/claude/apps'
 
+export interface ClickUpFieldOption {
+  id?: string
+  orderindex?: number
+  name?: string
+  label?: string
+}
+
 export interface ClickUpCustomField {
   id?: string
   name?: string
+  type?: string
   value?: unknown
+  type_config?: { options?: ClickUpFieldOption[] }
 }
 
 /** Comma-separated env list → normalized status set (case-insensitive). */
@@ -26,6 +35,36 @@ export function isPrototypeStatus(status: string | undefined, statuses: string[]
 export function hasPrototypeTag(tags: string[], configured = 'proto-ready'): boolean {
   const want = configured.trim().toLowerCase()
   return tags.some((t) => t.trim().toLowerCase() === want)
+}
+
+/** Display label of a drop_down field's stored value (matched by orderindex OR id). */
+function optionLabel(field: ClickUpCustomField): string | null {
+  const v = field.value
+  if (v === null || v === undefined) return null
+  const opt = (field.type_config?.options ?? []).find((o) => o.orderindex === v || o.id === v)
+  const label = opt?.label ?? opt?.name
+  return label ? label.trim() : null
+}
+
+const FIGMA_HOST = 'figma.com'
+
+/**
+ * Prototype-ready by custom fields: SOME field named "Design states" resolves to
+ * the option label "In progress" AND a "Figma" field holds a figma.com link.
+ * Resolve each drop_down's value to its own option label — never compare the raw
+ * numeric value, which means different things across duplicate fields.
+ */
+export function isPrototypeReady(fields: ClickUpCustomField[] | undefined): boolean {
+  const list = fields ?? []
+  const designReady = list.some(
+    (f) => f.name?.trim().toLowerCase() === 'design states' &&
+      optionLabel(f)?.toLowerCase() === 'in progress'
+  )
+  if (!designReady) return false
+  return list.some(
+    (f) => f.name?.trim().toLowerCase() === 'figma' &&
+      typeof f.value === 'string' && f.value.toLowerCase().includes(FIGMA_HOST)
+  )
 }
 
 /**
