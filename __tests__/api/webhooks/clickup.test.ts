@@ -52,6 +52,10 @@ jest.mock('@/lib/slack/client', () => ({
   }),
 }))
 
+jest.mock('@/lib/features/gatekeeper', () => ({
+  activateFeatureFromTask: jest.fn().mockResolvedValue(null),
+}))
+
 // Mock global fetch so no outbound HTTP (e.g. ClickUp API) escapes the tests
 global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) }) as jest.Mock
 
@@ -265,5 +269,74 @@ describe('POST /api/webhooks/clickup', () => {
     expect(updateFn).toHaveBeenCalledWith(
       expect.objectContaining({ list_id: 'db-list-active' })
     )
+  })
+})
+
+describe('POST /api/webhooks/clickup — prototyping gatekeeper (taskUpdated)', () => {
+  const { activateFeatureFromTask } = jest.requireMock('@/lib/features/gatekeeper')
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  function mockTokenAndTask(customFields: unknown[]) {
+    const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
+    getSupabaseServiceClient.mockResolvedValue(
+      makeSupabaseMock({ oauth_tokens: { data: { access_token: 'cu-tok' } } })
+    )
+    // getTask() → ClickUp task JSON with the given custom_fields
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'cu-abc', name: 'T', description: null, custom_fields: customFields, list: { id: 'L' } }),
+    })
+  }
+
+  const readyFields = [
+    { name: 'Design states', type: 'drop_down', value: 2,
+      type_config: { options: [{ orderindex: 2, label: 'In progress' }] } },
+    { name: 'Figma', type: 'short_text', value: 'https://www.figma.com/design/abc' },
+  ]
+
+  it('activates when a whitelisted field changed and the task is prototype-ready', async () => {
+    mockTokenAndTask(readyFields)
+    const req = makeRequest({
+      event: 'taskUpdated',
+      task_id: 'cu-abc',
+      history_items: [{ field: 'custom_field', custom_field: { name: 'Design states' } }],
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(activateFeatureFromTask).toHaveBeenCalledWith(
+      expect.anything(), 'cu-abc', expect.objectContaining({ id: 'cu-abc' })
+    )
+  })
+
+  it('does NOT fetch or activate when only off-whitelist fields changed', async () => {
+    mockTokenAndTask(readyFields)
+    const req = makeRequest({
+      event: 'taskUpdated',
+      task_id: 'cu-abc',
+      history_items: [{ field: 'assignee' }, { field: 'due_date' }],
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(global.fetch).not.toHaveBeenCalled()
+    expect(activateFeatureFromTask).not.toHaveBeenCalled()
+  })
+
+  it('does NOT activate when a whitelisted field changed but the task is not ready', async () => {
+    mockTokenAndTask([
+      { name: 'Design states', type: 'drop_down', value: 1,
+        type_config: { options: [{ orderindex: 1, label: 'Done' }] } },
+      { name: 'Figma', type: 'short_text', value: 'https://www.figma.com/design/abc' },
+    ])
+    const req = makeRequest({
+      event: 'taskUpdated',
+      task_id: 'cu-abc',
+      history_items: [{ field: 'custom_field', custom_field: { name: 'Figma' } }],
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(activateFeatureFromTask).not.toHaveBeenCalled()
   })
 })
