@@ -26,15 +26,21 @@ export interface GatekeeperResult {
   appSource: string
 }
 
-export async function activateFeatureFromTask(db: Db, clickupTaskId: string): Promise<GatekeeperResult | null> {
-  const { data: tokenRow } = await db
-    .from('oauth_tokens').select('access_token').eq('provider', 'clickup').limit(1).single()
-  if (!tokenRow) {
-    console.warn('[gatekeeper] no ClickUp token — cannot enrich task', clickupTaskId)
-    return null
+export async function activateFeatureFromTask(
+  db: Db,
+  clickupTaskId: string,
+  prefetched?: ClickUpTask,
+): Promise<GatekeeperResult | null> {
+  let cuTask = prefetched
+  if (!cuTask) {
+    const { data: tokenRow } = await db
+      .from('oauth_tokens').select('access_token').eq('provider', 'clickup').limit(1).single()
+    if (!tokenRow) {
+      console.warn('[gatekeeper] no ClickUp token — cannot enrich task', clickupTaskId)
+      return null
+    }
+    cuTask = await buildClickUpClient(tokenRow.access_token).getTask(clickupTaskId)
   }
-
-  const cuTask = await buildClickUpClient(tokenRow.access_token).getTask(clickupTaskId)
   const fields = (cuTask.custom_fields ?? []) as ClickUpCustomField[]
   const tags = (cuTask.tags ?? []).map((t) => t.name)
 
@@ -44,6 +50,7 @@ export async function activateFeatureFromTask(db: Db, clickupTaskId: string): Pr
   const app = resolveAppIdentity({
     tags,
     listRepoFullName: task ? await listRepoFullName(db, task.list_id) : null,
+    fields,
   })
 
   const enrichment = {
