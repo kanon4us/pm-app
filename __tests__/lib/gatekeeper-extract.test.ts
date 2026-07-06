@@ -89,6 +89,35 @@ describe('resolveAppIdentity', () => {
   it('defaults to web', () => {
     expect(resolveAppIdentity({ tags: [], listRepoFullName: null })).toEqual({ app: 'web', source: 'default' })
   })
+
+  const relevantApp = (label: string, id = 'opt1') => ({
+    name: 'Relevant App', type: 'labels', value: [id],
+    type_config: { options: [{ id, orderindex: 0, label }] },
+  })
+
+  it('routes from the Relevant App field (Web → web)', () => {
+    expect(resolveAppIdentity({ tags: [], fields: [relevantApp('Web')] }))
+      .toEqual({ app: 'web', source: 'relevant-app' })
+  })
+
+  it('maps iOS/Android → mobile and Mac/Win → desktop', () => {
+    expect(resolveAppIdentity({ tags: [], fields: [relevantApp('iOS')] }).app).toBe('mobile')
+    expect(resolveAppIdentity({ tags: [], fields: [relevantApp('Android')] }).app).toBe('mobile')
+    expect(resolveAppIdentity({ tags: [], fields: [relevantApp('Mac')] }).app).toBe('desktop')
+    expect(resolveAppIdentity({ tags: [], fields: [relevantApp('Win')] }).app).toBe('desktop')
+  })
+
+  it('Relevant App wins over tag and list repo', () => {
+    expect(resolveAppIdentity({
+      tags: ['app:cms'],
+      listRepoFullName: 'Viscap-Media/media-sync-mobile',
+      fields: [relevantApp('Web')],
+    })).toEqual({ app: 'web', source: 'relevant-app' })
+  })
+
+  it('unresolvable Relevant App label falls through to existing precedence', () => {
+    expect(resolveAppIdentity({ tags: ['app:mobile'], fields: [relevantApp('Linux', 'z')] }).app).toBe('mobile')
+  })
 })
 
 describe('isPrototypeReady', () => {

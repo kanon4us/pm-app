@@ -130,17 +130,46 @@ const TAG_APP_ALIASES: Record<string, AppSlug> = {
   desktop: 'desktop',
 }
 
+// "Relevant App" label options → app slug. Mac/Win → desktop is retained but
+// desktop is slated for retirement (web + mobile are the near-term apps).
+const RELEVANT_APP_LABEL_TO_SLUG: Record<string, AppSlug> = {
+  web: 'web',
+  ios: 'mobile',
+  android: 'mobile',
+  mac: 'desktop',
+  win: 'desktop',
+}
+
+function relevantAppFromFields(fields: ClickUpCustomField[] | undefined): AppSlug | null {
+  const field = (fields ?? []).find((f) => f.name?.trim().toLowerCase() === 'relevant app')
+  if (!field) return null
+  const raw = field.value
+  const ids = Array.isArray(raw) ? raw : raw != null ? [raw] : []
+  const opts = field.type_config?.options ?? []
+  for (const id of ids) {
+    const opt = opts.find((o) => o.id === id || o.orderindex === id)
+    const label = (opt?.label ?? opt?.name)?.trim().toLowerCase()
+    if (label && RELEVANT_APP_LABEL_TO_SLUG[label]) return RELEVANT_APP_LABEL_TO_SLUG[label]
+  }
+  return null
+}
+
 /**
  * App identity, layered:
- * 1. explicit tag — `app:<slug>`, a bare slug, or a known alias
- * 2. the list's linked repo (repo_registry.github_repo_full_name) matched
+ * 1. `Relevant App` custom field (labels) — resolved via its own options
+ * 2. explicit tag — `app:<slug>`, a bare slug, or a known alias
+ * 3. the list's linked repo (repo_registry.github_repo_full_name) matched
  *    against APP_REGISTRY repos
- * 3. default 'web'
+ * 4. default 'web'
  */
 export function resolveAppIdentity(input: {
   tags: string[]
   listRepoFullName?: string | null
-}): { app: AppSlug; source: 'tag' | 'list-repo' | 'default' } {
+  fields?: ClickUpCustomField[]
+}): { app: AppSlug; source: 'relevant-app' | 'tag' | 'list-repo' | 'default' } {
+  const relevant = relevantAppFromFields(input.fields)
+  if (relevant) return { app: relevant, source: 'relevant-app' }
+
   for (const raw of input.tags) {
     const tag = raw.trim().toLowerCase()
     const explicit = tag.startsWith('app:') ? tag.slice(4) : tag
