@@ -8,6 +8,7 @@ import {
 import type { ColumnType } from 'antd/es/table'
 import { SearchOutlined, SaveOutlined, ThunderboltOutlined, DeleteOutlined, UndoOutlined, ReloadOutlined } from '@ant-design/icons'
 import { apiFetch } from '@/lib/fetch'
+import { normalizeWorkflowName } from '@/lib/workflows/normalize'
 import { FeaturesTab } from '@/components/FeaturesTab'
 import { AssessmentButton } from '@/app/sprint/components/AssessmentButton'
 import { loadFieldConfig, loadFieldOrder, type FieldConfig } from '@/lib/field-config'
@@ -298,6 +299,10 @@ export default function SprintPage() {
   const [assessHistoryLoading, setAssessHistoryLoading] = useState(false)
   const [expandedHistoryRuns, setExpandedHistoryRuns] = useState<Set<string>>(new Set())
   const [showArchived, setShowArchived] = useState(false)
+  // Names currently present in workflows_registry (normalized), for Add-vs-Update.
+  const [registryWorkflowNames, setRegistryWorkflowNames] = useState<Set<string>>(new Set())
+  // Workflow names with an in-flight Add/Update request (raw names).
+  const [syncingWorkflows, setSyncingWorkflows] = useState<Set<string>>(new Set())
 
   const [form] = Form.useForm()
 
@@ -353,6 +358,61 @@ export default function SprintPage() {
     }
   }
 
+  async function loadRegistryWorkflowNames() {
+    try {
+      const res = await apiFetch('/api/workflows?summary=true')
+      const data = await res.json()
+      const names: string[] = (data.workflows ?? []).map((w: { name: string }) => normalizeWorkflowName(w.name))
+      setRegistryWorkflowNames(new Set(names))
+    } catch (err) {
+      console.error('[loadRegistryWorkflowNames] fetch failed', err)
+    }
+  }
+
+  async function syncWorkflowToRegistry(
+    conversationId: string,
+    workflow: import('@/lib/assessment-types').AffectedWorkflow
+  ) {
+    const key = normalizeWorkflowName(workflow.name)
+    const wasPresent = registryWorkflowNames.has(key)
+    setSyncingWorkflows((prev) => new Set(prev).add(workflow.name))
+    setAssessError('')
+    // Optimistic: show it as "in registry" immediately.
+    setRegistryWorkflowNames((prev) => new Set(prev).add(key))
+    try {
+      const res = await apiFetch(
+        `/api/sprint/tasks/${detailTask!.id}/assess/${conversationId}/workflows`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: workflow.name,
+            sopImpacted: workflow.sopImpacted,
+            educationImpacted: workflow.educationImpacted,
+            scribehowImpacted: workflow.scribehowImpacted,
+          }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to sync workflow')
+    } catch (e) {
+      // Revert only if this click was the one that added it.
+      if (!wasPresent) {
+        setRegistryWorkflowNames((prev) => {
+          const next = new Set(prev)
+          next.delete(key)
+          return next
+        })
+      }
+      setAssessError(e instanceof Error ? e.message : 'Failed to sync workflow')
+    } finally {
+      setSyncingWorkflows((prev) => {
+        const next = new Set(prev)
+        next.delete(workflow.name)
+        return next
+      })
+    }
+  }
+
   async function openDetail(task: Task) {
     setDetailTask(task)
     detailTaskRef.current = task
@@ -364,6 +424,7 @@ export default function SprintPage() {
     setExpandedHistoryRuns(new Set())
     setShowArchived(false)
     void loadAssessHistory(task.id)
+    void loadRegistryWorkflowNames()
     try {
       const res = await apiFetch(`/api/sprint/tasks/${task.id}`)
       const data = await res.json()
@@ -969,6 +1030,25 @@ export default function SprintPage() {
     await load()
   }
 
+  function renderWorkflowSyncButton(
+    conversationId: string,
+    workflow: import('@/lib/assessment-types').AffectedWorkflow
+  ) {
+    const inRegistry = registryWorkflowNames.has(normalizeWorkflowName(workflow.name))
+    const busy = syncingWorkflows.has(workflow.name)
+    return (
+      <Button
+        size="small"
+        type={inRegistry ? 'default' : 'primary'}
+        loading={busy}
+        onClick={(e) => { e.stopPropagation(); void syncWorkflowToRegistry(conversationId, workflow) }}
+        style={{ fontSize: 11 }}
+      >
+        {inRegistry ? 'Update' : '+ Add'}
+      </Button>
+    )
+  }
+
   const statusOptions = useMemo(() =>
     [...new Set(tasks.map((t) => t.status).filter(Boolean))].map((s) => ({ text: s, value: s })),
     [tasks])
@@ -1272,12 +1352,19 @@ export default function SprintPage() {
                               {run.affectedWorkflows.length > 0 && (
                                 <div style={{ marginTop: 10 }}>
                                   <Typography.Text style={{ color: '#8b949e', fontSize: 10 }}>WORKFLOWS</Typography.Text>
-                                  <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                    {run.affectedWorkflows.map((w) => (
-                                      <Tag key={w.name} style={{ fontSize: 11 }}>
-                                        {w.name}{w.registryStatus === 'proposed' ? ' ✦' : ''}
-                                      </Tag>
-                                    ))}
+                                  <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {run.affectedWorkflows.map((w) => {
+                                      const inRegistry = registryWorkflowNames.has(normalizeWorkflowName(w.name))
+                                      return (
+                                        <div key={w.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                          <Tag style={{ fontSize: 11, margin: 0 }}>
+                                            {w.name}{w.registryStatus === 'proposed' ? ' ✦' : ''}
+                                          </Tag>
+                                          {inRegistry && <Tag color="green" style={{ fontSize: 10, margin: 0 }}>in registry</Tag>}
+                                          {renderWorkflowSyncButton(run.conversationId, w)}
+                                        </div>
+                                      )
+                                    })}
                                   </div>
                                 </div>
                               )}
@@ -1637,6 +1724,8 @@ export default function SprintPage() {
                       {w.sopImpacted && <Tag color="blue" style={{ fontSize: 10 }}>SOP</Tag>}
                       {w.educationImpacted && <Tag color="purple" style={{ fontSize: 10 }}>Education</Tag>}
                       {w.scribehowImpacted && <Tag color="cyan" style={{ fontSize: 10 }}>ScribeHow</Tag>}
+                      {registryWorkflowNames.has(normalizeWorkflowName(w.name)) && <Tag color="green" style={{ fontSize: 10 }}>in registry</Tag>}
+                      <span style={{ marginLeft: 'auto' }}>{renderWorkflowSyncButton(conversation.conversationId, w)}</span>
                     </div>
                   ))}
                 </div>
