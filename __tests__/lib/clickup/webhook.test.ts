@@ -38,4 +38,28 @@ describe('parseWebhookEvent', () => {
   it('returns null for unsupported event type', () => {
     expect(parseWebhookEvent({ event: 'taskCreated', task_id: 'x' })).toBeNull()
   })
+
+  it('collects changed custom-field AND top-level field names from taskUpdated', () => {
+    const payload = {
+      event: 'taskUpdated',
+      task_id: 't1',
+      history_items: [
+        { field: 'custom_field', custom_field: { name: 'Design states' } },
+        { field: 'description' },
+        { field: 'custom_field', custom_field: { name: 'Figma' } },
+      ],
+    }
+    expect(parseWebhookEvent(payload)).toEqual({
+      taskId: 't1',
+      type: 'taskUpdated',
+      toStatus: '',
+      changedFieldNames: ['Design states', 'description', 'Figma'],
+    })
+  })
+
+  it('taskUpdated with no history_items yields empty changedFieldNames', () => {
+    expect(parseWebhookEvent({ event: 'taskUpdated', task_id: 't2' })).toEqual({
+      taskId: 't2', type: 'taskUpdated', toStatus: '', changedFieldNames: [],
+    })
+  })
 })

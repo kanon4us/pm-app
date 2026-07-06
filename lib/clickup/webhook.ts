@@ -8,6 +8,8 @@ export interface ClickUpWebhookEvent {
   listId?: string
   /** Present on taskTagUpdated events: tag names after the change */
   tags?: string[]
+  /** Present on taskUpdated events: names of fields that changed (custom + top-level) */
+  changedFieldNames?: string[]
 }
 
 export function verifyClickUpSignature(
@@ -49,6 +51,22 @@ export function parseWebhookEvent(payload: Record<string, unknown>): ClickUpWebh
     const listId = historyItems?.find((h) => h.field === 'section_moved')?.after?.list?.id
       ?? historyItems?.[0]?.after?.list?.id
     return { taskId, type: eventType, toStatus: '', listId }
+  }
+
+  if (eventType === 'taskUpdated') {
+    // ClickUp batches changes into multiple history_items; scan ALL of them.
+    // Custom-field edits: field==='custom_field' → custom_field.name.
+    // Top-level edits (e.g. description): the item's own `field` string.
+    const historyItems = (payload.history_items as Array<{
+      field?: string
+      custom_field?: { name?: string }
+    }>) ?? []
+    const changedFieldNames = historyItems.flatMap((h) =>
+      h.field === 'custom_field'
+        ? (h.custom_field?.name ? [h.custom_field.name] : [])
+        : (h.field ? [h.field] : [])
+    )
+    return { taskId, type: eventType, toStatus: '', changedFieldNames }
   }
 
   return null
