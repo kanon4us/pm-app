@@ -98,9 +98,10 @@ export function buildClickUpClient(token: string) {
     createWebhook: (teamId: string, endpoint: string) =>
       clickupFetch<{ id: string; webhook: { id: string; secret: string } }>(token, `/team/${teamId}/webhook`, {
         method: 'POST',
-        // taskTagUpdated powers the proto-ready gatekeeper tag; existing webhooks
-        // must be re-registered (lists/resubscribe) before tag events flow.
-        body: JSON.stringify({ endpoint, events: ['taskStatusUpdated', 'taskMoved', 'taskTagUpdated'] }),
+        // taskUpdated carries custom-field edits (Design states / Figma / Relevant App)
+        // that drive the prototyping gatekeeper. Existing webhooks must be
+        // re-registered (POST /api/lists/resubscribe) before the new event flows.
+        body: JSON.stringify({ endpoint, events: ['taskStatusUpdated', 'taskMoved', 'taskTagUpdated', 'taskUpdated'] }),
       }),
 
     updateTask: (
