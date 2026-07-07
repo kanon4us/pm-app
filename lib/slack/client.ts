@@ -111,18 +111,24 @@ export function buildSlackClient(token: string) {
     },
 
     /**
-     * Send a DM to a Slack user by posting to chat.postMessage with channel = userId.
-     * Slack accepts a user ID directly as the channel for a DM.
+     * Send a DM to a Slack user. A user ID is not a valid `channel` for
+     * chat.postMessage (Slack returns channel_not_found), so open/reuse the IM
+     * via conversations.open first to get the D-channel ID, then post to that.
      */
     dm: async (
       userId: string,
       blocks: Record<string, unknown>[],
       text: string,
     ): Promise<{ ok: boolean; ts?: string; channel?: string }> => {
+      const opened = await slackFetch<{ channel: { id: string } }>(
+        token,
+        'conversations.open',
+        { users: userId },
+      )
       const res = await slackFetch<{ ok: boolean; ts?: string; channel?: string }>(
         token,
         'chat.postMessage',
-        { channel: userId, blocks, text },
+        { channel: opened.channel.id, blocks, text },
       )
       return { ok: res.ok, ts: res.ts, channel: res.channel }
     },

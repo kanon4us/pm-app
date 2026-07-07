@@ -15,53 +15,71 @@ describe('buildSlackClient — vault extensions', () => {
   })
 
   describe('dm', () => {
-    it('POSTs to chat.postMessage with channel = userId', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({
+    // A user ID is not a valid `channel` for chat.postMessage — Slack answers
+    // channel_not_found. dm() must open (or reuse) the IM via conversations.open
+    // to get the D-channel ID, then post to that.
+    it('opens a DM channel via conversations.open, then posts to the D-channel', async () => {
+      ;(global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
           ok: true,
-          ts: '1234567890.000001',
-          channel: 'D_USER1',
-        }),
-      })
+          json: async () => ({ ok: true, channel: { id: 'D_USER1' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ ok: true, ts: '1234567890.000001', channel: 'D_USER1' }),
+        })
 
       const client = buildSlackClient(TOKEN)
       const result = await client.dm('U_USER1', BLOCKS, 'Fallback text')
 
-      const [url, opts] = (global.fetch as jest.Mock).mock.calls[0]
-      expect(url).toContain('chat.postMessage')
+      const [openUrl, openOpts] = (global.fetch as jest.Mock).mock.calls[0]
+      expect(openUrl).toContain('conversations.open')
+      expect(JSON.parse(openOpts.body).users).toBe('U_USER1')
 
-      const body = JSON.parse(opts.body)
-      expect(body.channel).toBe('U_USER1')
-      expect(body.blocks).toEqual(BLOCKS)
-      expect(body.text).toBe('Fallback text')
+      const [postUrl, postOpts] = (global.fetch as jest.Mock).mock.calls[1]
+      expect(postUrl).toContain('chat.postMessage')
+      const postBody = JSON.parse(postOpts.body)
+      expect(postBody.channel).toBe('D_USER1')
+      expect(postBody.blocks).toEqual(BLOCKS)
+      expect(postBody.text).toBe('Fallback text')
 
       expect(result.ok).toBe(true)
       expect(result.ts).toBe('1234567890.000001')
       expect(result.channel).toBe('D_USER1')
     })
 
-    it('includes the Authorization header', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ ok: true, ts: '111', channel: 'D1' }),
-      })
+    it('includes the Authorization header on both calls', async () => {
+      ;(global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, channel: { id: 'D1' } }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, ts: '111', channel: 'D1' }) })
 
       const client = buildSlackClient(TOKEN)
       await client.dm('U1', BLOCKS, 'hi')
 
-      const [, opts] = (global.fetch as jest.Mock).mock.calls[0]
-      expect(opts.headers['Authorization']).toBe(`Bearer ${TOKEN}`)
+      const [, openOpts] = (global.fetch as jest.Mock).mock.calls[0]
+      const [, postOpts] = (global.fetch as jest.Mock).mock.calls[1]
+      expect(openOpts.headers['Authorization']).toBe(`Bearer ${TOKEN}`)
+      expect(postOpts.headers['Authorization']).toBe(`Bearer ${TOKEN}`)
     })
 
-    it('throws when Slack returns ok: false', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValue({
+    it('throws when conversations.open fails (never reaches postMessage)', async () => {
+      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ ok: false, error: 'not_in_channel' }),
+        json: async () => ({ ok: false, error: 'channel_not_found' }),
       })
 
       const client = buildSlackClient(TOKEN)
-      await expect(client.dm('U_BAD', BLOCKS, 'hi')).rejects.toThrow('not_in_channel')
+      await expect(client.dm('U_BAD', BLOCKS, 'hi')).rejects.toThrow('channel_not_found')
+      expect((global.fetch as jest.Mock).mock.calls).toHaveLength(1)
+    })
+
+    it('throws when chat.postMessage returns ok: false', async () => {
+      ;(global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, channel: { id: 'D1' } }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: false, error: 'not_in_channel' }) })
+
+      const client = buildSlackClient(TOKEN)
+      await expect(client.dm('U1', BLOCKS, 'hi')).rejects.toThrow('not_in_channel')
     })
   })
 
