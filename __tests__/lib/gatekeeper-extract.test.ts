@@ -3,7 +3,6 @@ import {
   isPrototypeStatus,
   hasPrototypeTag,
   extractFviScore,
-  extractObjectives,
   extractObjectivesJson,
   resolveAppIdentity,
   isPrototypeReady,
@@ -45,29 +44,6 @@ describe('extractFviScore', () => {
 
   it('does not confuse prefixed names like FVIewport', () => {
     expect(extractFviScore([{ name: 'FVIewport', value: 9 }])).toBeNull()
-  })
-})
-
-describe('extractObjectives', () => {
-  it('prefers the custom field', () => {
-    expect(
-      extractObjectives([{ name: 'Objectives', value: 'Ship it' }], '## Objectives\nfrom description')
-    ).toBe('Ship it')
-  })
-
-  it('parses a markdown heading section, stopping at the next heading', () => {
-    const desc = 'Intro\n\n## Objectives\n- faster casting\n- fewer clicks\n\n## Scope\nout'
-    expect(extractObjectives(undefined, desc)).toBe('- faster casting\n- fewer clicks')
-  })
-
-  it('parses bold and colon pseudo-headings', () => {
-    expect(extractObjectives(undefined, '**Goals**\nreduce churn\n\n**Notes**\nx')).toBe('reduce churn')
-    expect(extractObjectives(undefined, 'Objectives:\nimprove NPS')).toBe('improve NPS')
-  })
-
-  it('returns null when absent', () => {
-    expect(extractObjectives(undefined, 'just a description')).toBeNull()
-    expect(extractObjectives(undefined, null)).toBeNull()
   })
 })
 

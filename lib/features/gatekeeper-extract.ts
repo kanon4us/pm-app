@@ -91,46 +91,6 @@ export function extractFviScore(fields: ClickUpCustomField[] | undefined): numbe
 }
 
 /**
- * Objectives: prefer an "Objectives"/"Goals" custom field; else pull the
- * section under an Objectives/Goals heading in the task description
- * (markdown `#`-headings, bold pseudo-headings, or "Objectives:" lines),
- * stopping at the next heading of any of those shapes.
- */
-export function extractObjectives(
-  fields: ClickUpCustomField[] | undefined,
-  description: string | null | undefined
-): string | null {
-  for (const f of fields ?? []) {
-    if (!f.name || !/^(objectives?|goals?)\b/i.test(f.name.trim())) continue
-    if (typeof f.value === 'string' && f.value.trim()) return f.value.trim()
-  }
-
-  if (!description) return null
-  const lines = description.split('\n')
-  const isHeading = (line: string): string | null => {
-    const m =
-      line.match(/^#{1,6}\s+(.+?)\s*:?\s*$/) ??
-      line.match(/^\*\*(.+?)\*\*\s*:?\s*$/) ??
-      line.match(/^([A-Za-z][A-Za-z /&-]{2,40}):\s*$/)
-    return m ? m[1].trim() : null
-  }
-
-  const start = lines.findIndex((l) => {
-    const h = isHeading(l.trim())
-    return !!h && /^(objectives?|goals?)$/i.test(h)
-  })
-  if (start === -1) return null
-
-  const body: string[] = []
-  for (let i = start + 1; i < lines.length; i++) {
-    if (isHeading(lines[i].trim())) break
-    body.push(lines[i])
-  }
-  const text = body.join('\n').trim()
-  return text || null
-}
-
-/**
  * Objectives as strict JSON for the UX pipeline. Reads the `Obj #1…#7 Notes`
  * text fields, pairing each with the strategic-objective NAME defined by the
  * `Objectives` labels field's option at `orderindex N-1` (verified positional
