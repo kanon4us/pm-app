@@ -11,18 +11,12 @@ export interface ClickUpFieldOption {
   label?: string
 }
 
-export interface ClickUpLabelOption {
-  id?: string
-  label?: string
-  name?: string
-  orderindex?: number
-}
 export interface ClickUpCustomField {
   id?: string
   name?: string
   value?: unknown
   type?: string
-  type_config?: { options?: ClickUpLabelOption[] }
+  type_config?: { options?: ClickUpFieldOption[] }
 }
 
 export interface FeatureObjective {
@@ -30,6 +24,7 @@ export interface FeatureObjective {
   name: string
   notes: string
 }
+
 export interface ObjectivesJson {
   objectives: FeatureObjective[]
 }
