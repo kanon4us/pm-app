@@ -1,5 +1,6 @@
 // lib/features/context.ts
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
+import type { ObjectivesJson } from '@/lib/features/gatekeeper-extract'
 
 export async function buildFeatureContext(featureId: string): Promise<string> {
   const db = await getSupabaseServiceClient()
@@ -20,7 +21,8 @@ export async function buildFeatureContext(featureId: string): Promise<string> {
     `Spec: ${feature.spec_content ? 'draft exists (shown below)' : 'not written yet'}`,
     ...(feature.description ? [`Description: ${feature.description}`] : []),
     ...(feature.fvi_score != null ? [`FVI score: ${feature.fvi_score}`] : []),
-    ...(feature.objectives ? ['', '--- Objectives (from ClickUp) ---', feature.objectives] : []),
+    ...renderObjectivesLines(feature),
+    ...renderStitchLines(feature),
     ...(feature.clickup_details
       ? ['', '--- ClickUp Task Details ---', truncate(feature.clickup_details, 6000)]
       : []),
@@ -61,6 +63,21 @@ export async function buildFeatureContext(featureId: string): Promise<string> {
 
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}\n…[truncated]` : text
+}
+
+function renderObjectivesLines(feature: { objectives_json: unknown; objectives: string | null }): string[] {
+  const oj = feature.objectives_json as ObjectivesJson | null
+  if (oj?.objectives?.length) {
+    const lines = oj.objectives.map((o) => `- ${o.name || `Objective #${o.index}`}: ${o.notes}`)
+    return ['', '--- Objectives (from ClickUp) ---', ...lines]
+  }
+  if (feature.objectives) return ['', '--- Objectives (from ClickUp) ---', feature.objectives]
+  return []
+}
+
+function renderStitchLines(feature: { ux_stitch: unknown }): string[] {
+  if (!feature.ux_stitch) return []
+  return ['', '--- UX Structural Plan (Gemini) ---', JSON.stringify(feature.ux_stitch, null, 2)]
 }
 
 export async function buildAllFeaturesContext(featureIds?: string[]): Promise<string> {
