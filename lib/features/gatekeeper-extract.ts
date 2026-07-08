@@ -11,12 +11,27 @@ export interface ClickUpFieldOption {
   label?: string
 }
 
+export interface ClickUpLabelOption {
+  id?: string
+  label?: string
+  name?: string
+  orderindex?: number
+}
 export interface ClickUpCustomField {
   id?: string
   name?: string
-  type?: string
   value?: unknown
-  type_config?: { options?: ClickUpFieldOption[] }
+  type?: string
+  type_config?: { options?: ClickUpLabelOption[] }
+}
+
+export interface FeatureObjective {
+  index: number
+  name: string
+  notes: string
+}
+export interface ObjectivesJson {
+  objectives: FeatureObjective[]
 }
 
 /** Comma-separated env list → normalized status set (case-insensitive). */
@@ -118,6 +133,37 @@ export function extractObjectives(
   }
   const text = body.join('\n').trim()
   return text || null
+}
+
+/**
+ * Objectives as strict JSON for the UX pipeline. Reads the `Obj #1…#7 Notes`
+ * text fields, pairing each with the strategic-objective NAME defined by the
+ * `Objectives` labels field's option at `orderindex N-1` (verified positional
+ * mapping). Scores / ObjTotal / Approved are prioritization signal and dropped.
+ * Returns null when no objective carries notes.
+ */
+export function extractObjectivesJson(
+  fields: ClickUpCustomField[] | undefined
+): ObjectivesJson | null {
+  const list = fields ?? []
+
+  const objectivesField = list.find((f) => f.name?.trim().toLowerCase() === 'objectives')
+  const labelByOrder = new Map<number, string>()
+  for (const opt of objectivesField?.type_config?.options ?? []) {
+    if (typeof opt.orderindex === 'number') {
+      labelByOrder.set(opt.orderindex, (opt.label ?? opt.name ?? '').trim())
+    }
+  }
+
+  const objectives: FeatureObjective[] = []
+  for (let n = 1; n <= 7; n++) {
+    const noteField = list.find((f) => new RegExp(`^Obj #${n} Notes$`, 'i').test(f.name?.trim() ?? ''))
+    const notes = typeof noteField?.value === 'string' ? noteField.value.trim() : ''
+    if (!notes) continue
+    objectives.push({ index: n, name: labelByOrder.get(n - 1) ?? '', notes })
+  }
+
+  return objectives.length ? { objectives } : null
 }
 
 const TAG_APP_ALIASES: Record<string, AppSlug> = {
