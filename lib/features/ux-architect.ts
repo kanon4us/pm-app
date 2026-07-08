@@ -14,7 +14,8 @@ import { getAppTarget } from '@/lib/claude/apps'
 import type { Json } from '@/lib/supabase/types'
 
 const GEMINI_MODEL = 'gemini-2.5-pro'
-const MAX_OUTPUT_TOKENS = 8192 // respect the model revision's output ceiling
+// Cost/latency cap. On gemini-2.5-pro this budget is shared with the model's hidden "thinking" tokens, so keep it generous — hitting it degrades to a skipped write (write-only-on-success), never a corrupt one.
+const MAX_OUTPUT_TOKENS = 32768
 
 const UX_ARCHITECT_SYSTEM = `You are a UX Architect. Given a feature's strategic objectives, its user-story/scenario/step workflows, and the product's design contract, produce a MID-FIDELITY STRUCTURAL PLAN as JSON that satisfies the objectives through the given workflows.
 
@@ -141,9 +142,10 @@ export async function generateUxStitch(featureId: string): Promise<void> {
         maxOutputTokens: MAX_OUTPUT_TOKENS,
       },
     })
+    const finishReason = response.candidates?.[0]?.finishReason
     const text = response.text
     if (!text) {
-      console.warn('[ux-architect] empty Gemini response for', featureId)
+      console.warn('[ux-architect] empty Gemini response for', featureId, 'finishReason:', finishReason)
       return
     }
     stitch = JSON.parse(text)
@@ -152,6 +154,7 @@ export async function generateUxStitch(featureId: string): Promise<void> {
     return // never write on failure
   }
 
+  // Trusted shape: Gemini's responseSchema constrains this server-side.
   await updateFeature(featureId, { ux_stitch: stitch as Json })
   console.log('[ux-architect] stitch stored for', featureId)
 }
