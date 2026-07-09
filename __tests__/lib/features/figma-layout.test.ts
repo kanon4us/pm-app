@@ -23,7 +23,9 @@ jest.mock('@/lib/figma/component-catalog', () => ({
   catalogByKey: jest.requireActual('@/lib/figma/component-catalog').catalogByKey,
 }))
 
-import { resolveFigmaLayout } from '@/lib/features/figma-layout'
+import { resolveFigmaLayout, normalizeLayoutSpec } from '@/lib/features/figma-layout'
+import { catalogByKey } from '@/lib/figma/component-catalog'
+import type { CatalogComponent } from '@/lib/figma/component-catalog'
 
 const feature = { id: 'f1', app: 'web', ux_stitch: { summary: 's', workflows: [{ name: 'W' }] } }
 
@@ -100,4 +102,60 @@ it('returns null (no partial) when Gemini returns unparseable JSON', async () =>
 it('returns null when Gemini throws', async () => {
   mockGenerateContent.mockRejectedValue(new Error('timeout'))
   expect(await resolveFigmaLayout('f1')).toBeNull()
+})
+
+it('returns null and does not call Gemini when GEMINI_API_KEY is unset', async () => {
+  const saved = process.env.GEMINI_API_KEY
+  delete process.env.GEMINI_API_KEY
+  try {
+    expect(await resolveFigmaLayout('f1')).toBeNull()
+    expect(mockGenerateContent).not.toHaveBeenCalled()
+  } finally {
+    process.env.GEMINI_API_KEY = saved
+  }
+})
+
+it('returns null and does not call Gemini when the feature is missing', async () => {
+  mockGetFeature.mockResolvedValue(null)
+  expect(await resolveFigmaLayout('f1')).toBeNull()
+  expect(mockGenerateContent).not.toHaveBeenCalled()
+})
+
+it('returns null when Gemini text is empty', async () => {
+  mockGenerateContent.mockResolvedValue({ text: '' })
+  expect(await resolveFigmaLayout('f1')).toBeNull()
+})
+
+it('returns null when the normalized spec has no pages', async () => {
+  geminiReturns({ pages: [] })
+  expect(await resolveFigmaLayout('f1')).toBeNull()
+})
+
+describe('normalizeLayoutSpec', () => {
+  const catalog = {
+    generatedAt: 'x',
+    libraryFileKey: 'lib',
+    components: [{ name: 'Button', key: 'btnkey', type: 'set' } as CatalogComponent],
+  }
+  const byKey = catalogByKey(catalog)
+
+  it('defaults an invalid frame layout to VERTICAL', () => {
+    const spec = normalizeLayoutSpec(
+      { pages: [{ name: 'P', nodes: [{ type: 'frame', layout: 'SIDEWAYS', children: [] }] }] },
+      byKey,
+    )
+    const frame = spec!.pages[0].nodes[0] as { type: string; layout: string }
+    expect(frame.type).toBe('frame')
+    expect(frame.layout).toBe('VERTICAL')
+  })
+
+  it('omits an invalid text style', () => {
+    const spec = normalizeLayoutSpec(
+      { pages: [{ name: 'P', nodes: [{ type: 'text', characters: 'Hi', style: 'giant' }] }] },
+      byKey,
+    )
+    const text = spec!.pages[0].nodes[0] as { type: string; style?: string }
+    expect(text.type).toBe('text')
+    expect(text.style).toBeUndefined()
+  })
 })

@@ -61,7 +61,7 @@ function normalizeNode(raw: unknown, byKey: Map<string, CatalogComponent>): Layo
       const componentKey = typeof n.componentKey === 'string' ? n.componentKey : ''
       const comp = byKey.get(componentKey)
       if (!comp) {
-        return { type: 'placeholder', name: typeof n.name === 'string' ? n.name : 'Unknown component', note: `unmapped key ${componentKey}` }
+        return { type: 'placeholder', name: typeof n.name === 'string' ? n.name : 'Unknown component', note: `unmapped key ${componentKey || '(none)'}` }
       }
       const node: LayoutNode = { type: 'instance', componentKey }
       if (typeof n.name === 'string') node.name = n.name
@@ -136,22 +136,24 @@ export async function resolveFigmaLayout(featureId: string): Promise<FigmaLayout
     return null
   }
 
-  const catalog = getComponentCatalog()
-  const reuse = await resolveReuseRefs(feature)
-  const prompt = [
-    'UX STITCH (source structure):',
-    JSON.stringify(feature.ux_stitch),
-    '',
-    'ANT DESIGN CATALOG (choose components by key; variant options are authoritative):',
-    JSON.stringify(catalog.components),
-    '',
-    reuse.length ? `REUSE REFERENCES (prefer these where the stitch marks reuseOf):\n${reuse.map((r) => r.resolved).join('\n---\n')}` : '',
-    '',
-    'Produce the Figma layout spec as JSON matching the response schema and the node shapes described.',
-  ].filter(Boolean).join('\n')
-
-  let raw: unknown
+  // Everything that can throw (catalog fs read, reuse resolution, Gemini call,
+  // JSON.parse, normalize) lives inside the try so a bad/missing catalog file
+  // or any downstream throw degrades to `return null`, never into the caller.
   try {
+    const catalog = getComponentCatalog()
+    const reuse = await resolveReuseRefs(feature)
+    const prompt = [
+      'UX STITCH (source structure):',
+      JSON.stringify(feature.ux_stitch),
+      '',
+      'ANT DESIGN CATALOG (choose components by key; variant options are authoritative):',
+      JSON.stringify(catalog.components),
+      '',
+      reuse.length ? `REUSE REFERENCES (prefer these where the stitch marks reuseOf):\n${reuse.map((r) => r.resolved).join('\n---\n')}` : '',
+      '',
+      'Produce the Figma layout spec as JSON matching the response schema and the node shapes described.',
+    ].filter(Boolean).join('\n')
+
     const ai = new GoogleGenAI({ apiKey })
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
@@ -163,21 +165,22 @@ export async function resolveFigmaLayout(featureId: string): Promise<FigmaLayout
         maxOutputTokens: MAX_OUTPUT_TOKENS,
       },
     })
+    const finishReason = response.candidates?.[0]?.finishReason
     const text = response.text
     if (!text) {
-      console.warn('[figma-layout] empty Gemini response for', featureId)
+      console.warn('[figma-layout] empty Gemini response for', featureId, 'finishReason:', finishReason)
       return null
     }
-    raw = JSON.parse(text)
+    const raw = JSON.parse(text)
+
+    const spec = normalizeLayoutSpec(raw, catalogByKey(catalog))
+    if (!spec || spec.pages.length === 0) {
+      console.warn('[figma-layout] normalized spec empty for', featureId)
+      return null
+    }
+    return spec
   } catch (err) {
     console.warn('[figma-layout] generation failed for', featureId, err instanceof Error ? err.message : err)
     return null
   }
-
-  const spec = normalizeLayoutSpec(raw, catalogByKey(catalog))
-  if (!spec || spec.pages.length === 0) {
-    console.warn('[figma-layout] normalized spec empty for', featureId)
-    return null
-  }
-  return spec
 }
