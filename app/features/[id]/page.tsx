@@ -1,12 +1,13 @@
 // app/features/[id]/page.tsx
 'use client'
 import { useEffect, useState } from 'react'
-import { Layout, Typography, Spin, Select, Button, Segmented } from 'antd'
+import { Layout, Typography, Spin, Select, Button, Segmented, Drawer } from 'antd'
 import { useParams, useRouter } from 'next/navigation'
 import { UserStoriesPanel } from './components/UserStoriesPanel'
 import { ScenariosPanel } from './components/ScenariosPanel'
 import { ClaudePanel } from './components/ClaudePanel'
 import { PrototypePanel } from './components/PrototypePanel'
+import { ReuseRefsPanel } from './components/ReuseRefsPanel'
 
 const { Header, Sider, Content } = Layout
 
@@ -20,6 +21,7 @@ export interface Feature {
   id: string; name: string; description: string | null; status: string
   planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
   app: 'web' | 'cms' | 'mobile' | 'desktop'
+  reuse_refs: { refs: { kind: 'figma' | 'code' | 'screenshot'; value: string; note: string }[] } | null
   stories: UserStory[]
 }
 
@@ -32,6 +34,7 @@ export default function FeatureEditorPage() {
   const [centerView, setCenterView] = useState<'Scenarios' | 'Prototype'>('Scenarios')
   const [protoRefreshKey, setProtoRefreshKey] = useState(0)
   const [hasPrototype, setHasPrototype] = useState(false)
+  const [showReuse, setShowReuse] = useState(false)
 
   useEffect(() => {
     fetch(`/api/features/${id}/prototype?meta=1`)
@@ -70,7 +73,8 @@ export default function FeatureEditorPage() {
       <Header style={{ background: '#141414', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 16, padding: '0 20px' }}>
         <Button type="text" onClick={() => router.back()}>← Back</Button>
         <Typography.Title level={5} style={{ margin: 0, color: '#fff' }}>{feature.name}</Typography.Title>
-        <Select value={feature.app} onChange={(app) => patchFeature({ app })} style={{ marginLeft: 'auto', minWidth: 130 }} size="small"
+        <Button size="small" style={{ marginLeft: 'auto' }} onClick={() => setShowReuse(true)}>Design → Figma</Button>
+        <Select value={feature.app} onChange={(app) => patchFeature({ app })} style={{ minWidth: 130 }} size="small"
           options={[
             { value: 'web', label: '🌐 Web App' },
             { value: 'cms', label: '📚 Education CMS' },
@@ -114,6 +118,13 @@ export default function FeatureEditorPage() {
           />
         </Sider>
       </Layout>
+      <Drawer title="Design → Figma" open={showReuse} onClose={() => setShowReuse(false)} width={640}>
+        <ReuseRefsPanel
+          featureId={id}
+          refs={feature.reuse_refs?.refs ?? []}
+          onSaved={() => { setShowReuse(false); reload() }}
+        />
+      </Drawer>
     </Layout>
   )
 }

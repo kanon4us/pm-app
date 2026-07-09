@@ -40,6 +40,7 @@ export function Tag({ children }: any) {
 export const Typography = {
   Title: ({ children, level }: any) => React.createElement(`h${level ?? 1}`, {}, children),
   Text: ({ children }: any) => <span>{children}</span>,
+  Paragraph: ({ children }: any) => <p>{children}</p>,
 }
 
 // Card renders a <div> with its title and children
@@ -62,4 +63,42 @@ export function Alert({ title, message, description }: any) {
   )
 }
 
-export default { Table, Tag, Typography, Card, Alert }
+// Button renders a <button>; forwards onClick, disables while loading
+export function Button({ children, onClick, loading, htmlType }: any) {
+  return (
+    <button type={htmlType ?? 'button'} onClick={onClick} disabled={loading}>
+      {children}
+    </button>
+  )
+}
+
+// Input renders a native <input>; onChange receives the real event (e.target.value)
+export function Input({ value, onChange, placeholder }: any) {
+  return <input value={value ?? ''} onChange={onChange} placeholder={placeholder} />
+}
+
+// Select renders a native <select>; antd's onChange passes the value directly
+export function Select({ value, onChange, options = [] }: any) {
+  return (
+    <select value={value} onChange={(e) => onChange?.(e.target.value)}>
+      {options.map((o: any) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+// Space / Drawer render a passthrough <div>
+export function Space({ children }: any) {
+  return <div>{children}</div>
+}
+export function Drawer({ children, open, title }: any) {
+  return open ? <div aria-label={typeof title === 'string' ? title : undefined}>{children}</div> : null
+}
+
+// message is a fire-and-forget notifier in tests
+export const message = { success: () => {}, error: () => {}, info: () => {}, warning: () => {} }
+
+export default { Table, Tag, Typography, Card, Alert, Button, Input, Select, Space, Drawer, message }
