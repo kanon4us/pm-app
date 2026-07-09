@@ -767,6 +767,19 @@
       "assignedClickupId": "86e218dj4",
       "title": "Creatives | Generative AI Integration",
       "figmaNodeId": "62:193983"
+    },
+    {
+      "featureId": "ticket-86e28uzzu",
+      "reason": [
+        "unassigned-feature",
+        "unassigned-codepaths",
+        "unassigned-figma"
+      ],
+      "partial": {
+        "codePaths": []
+      },
+      "assignedClickupId": "86e28uzzu",
+      "title": "User Story Template"
     }
   ]
 }
