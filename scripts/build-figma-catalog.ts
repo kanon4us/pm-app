@@ -1,7 +1,10 @@
 // scripts/build-figma-catalog.ts
 // Regenerates design/figma-antd-catalog.json from the published antd team library.
 // Run: npm run figma:catalog   (needs FIGMA_MIGRATION_TOKEN or FIGMA_ACCESS_TOKEN + FIGMA_TEAM_ID)
-import 'dotenv/config'
+import * as dotenv from 'dotenv'
+// Next.js keeps secrets in .env.local, which plain `dotenv/config` (loads .env)
+// would miss — match the other scripts/*.ts and load it explicitly.
+dotenv.config({ path: '.env.local' })
 import fs from 'node:fs'
 import path from 'node:path'
 import { figmaGetJson } from '../lib/figma/client'
@@ -43,9 +46,10 @@ async function main() {
     const nodesRes = (await figmaGetJson(
       TOKEN,
       `${FIGMA_API}/v1/files/${LIBRARY_FILE_KEY}/nodes?ids=${encodeURIComponent(batch.join(','))}`
-    )) as { nodes?: Record<string, { document?: { componentPropertyDefinitions?: Record<string, { type?: string; variantOptions?: string[] }> } }> }
+    )) as { nodes?: Record<string, { document?: { componentPropertyDefinitions?: Record<string, { type?: string; variantOptions?: string[] }> } } | null> }
     for (const [nodeId, entry] of Object.entries(nodesRes.nodes ?? {})) {
-      const defs = entry.document?.componentPropertyDefinitions ?? {}
+      // Figma returns null for a requested node it can't resolve — skip those.
+      const defs = entry?.document?.componentPropertyDefinitions ?? {}
       const variants: Record<string, string[]> = {}
       for (const [prop, def] of Object.entries(defs)) {
         if (def.type === 'VARIANT' && Array.isArray(def.variantOptions)) variants[prop] = def.variantOptions
