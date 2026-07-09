@@ -1,9 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getFeature, updateFeature } from '@/lib/features/client'
 import { getFeatureStories, getStoryFeatureCount } from '@/lib/user-stories/client'
 import { getStoryScenarios, getScenarioSteps } from '@/lib/scenarios/client'
 import { getSessionUser } from '@/lib/auth'
 import { APP_SLUGS } from '@/lib/claude/apps'
+import { generateUxStitch } from '@/lib/features/ux-architect'
+
+// after() work (Gemini stitch) counts against the function budget.
+export const maxDuration = 120
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser()
@@ -36,6 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (app !== undefined && !(APP_SLUGS as string[]).includes(app)) {
     return NextResponse.json({ error: 'invalid app' }, { status: 400 })
   }
+  const prev = await getFeature(id)
   const feature = await updateFeature(id, {
     ...(status !== undefined && { status }),
     ...(name !== undefined && { name }),
@@ -43,5 +48,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     ...(planning_phase !== undefined && { planning_phase }),
     ...(app !== undefined && { app }),
   })
+
+  if (prev?.planning_phase === 'planning' && planning_phase === 'approved') {
+    // Background, non-blocking; after() keeps the lambda warm on Vercel.
+    after(async () => {
+      try {
+        await generateUxStitch(id)
+      } catch (err) {
+        console.warn('[ux-architect] background generation error', err)
+      }
+    })
+  }
+
   return NextResponse.json(feature)
 }

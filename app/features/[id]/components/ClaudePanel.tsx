@@ -188,7 +188,7 @@ export function ClaudePanel({ featureId, planningPhase, specContent, onApplied, 
         headers: { 'Content-Type': 'application/json' },
       })
       if (!res.ok) throw new Error('Approve failed')
-      message.success('Spec approved — ready for prototyping')
+      message.success('Spec approved — generating a structural plan in the background; it will inform the next prototype build.')
       setSpecOpen(false)
       onApplied()
     } catch {

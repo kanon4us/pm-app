@@ -12,7 +12,7 @@ import type { Database, Json } from '@/lib/supabase/types'
 import { buildClickUpClient, type ClickUpTask } from '@/lib/clickup/client'
 import {
   extractFviScore,
-  extractObjectives,
+  extractObjectivesJson,
   resolveAppIdentity,
   type ClickUpCustomField,
 } from '@/lib/features/gatekeeper-extract'
@@ -55,7 +55,7 @@ export async function activateFeatureFromTask(
 
   const enrichment = {
     clickup_details: cuTask.description?.trim() || null,
-    objectives: extractObjectives(fields, cuTask.description),
+    objectives_json: (extractObjectivesJson(fields) as unknown as Json) ?? null,
     fvi_score: extractFviScore(fields) ?? task?.fvi_score ?? null,
   }
 

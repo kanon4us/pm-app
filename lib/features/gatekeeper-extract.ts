@@ -14,9 +14,19 @@ export interface ClickUpFieldOption {
 export interface ClickUpCustomField {
   id?: string
   name?: string
-  type?: string
   value?: unknown
+  type?: string
   type_config?: { options?: ClickUpFieldOption[] }
+}
+
+export interface FeatureObjective {
+  index: number
+  name: string
+  notes: string
+}
+
+export interface ObjectivesJson {
+  objectives: FeatureObjective[]
 }
 
 /** Comma-separated env list → normalized status set (case-insensitive). */
@@ -81,43 +91,34 @@ export function extractFviScore(fields: ClickUpCustomField[] | undefined): numbe
 }
 
 /**
- * Objectives: prefer an "Objectives"/"Goals" custom field; else pull the
- * section under an Objectives/Goals heading in the task description
- * (markdown `#`-headings, bold pseudo-headings, or "Objectives:" lines),
- * stopping at the next heading of any of those shapes.
+ * Objectives as strict JSON for the UX pipeline. Reads the `Obj #1…#7 Notes`
+ * text fields, pairing each with the strategic-objective NAME defined by the
+ * `Objectives` labels field's option at `orderindex N-1` (verified positional
+ * mapping). Scores / ObjTotal / Approved are prioritization signal and dropped.
+ * Returns null when no objective carries notes.
  */
-export function extractObjectives(
-  fields: ClickUpCustomField[] | undefined,
-  description: string | null | undefined
-): string | null {
-  for (const f of fields ?? []) {
-    if (!f.name || !/^(objectives?|goals?)\b/i.test(f.name.trim())) continue
-    if (typeof f.value === 'string' && f.value.trim()) return f.value.trim()
+export function extractObjectivesJson(
+  fields: ClickUpCustomField[] | undefined
+): ObjectivesJson | null {
+  const list = fields ?? []
+
+  const objectivesField = list.find((f) => f.name?.trim().toLowerCase() === 'objectives')
+  const labelByOrder = new Map<number, string>()
+  for (const opt of objectivesField?.type_config?.options ?? []) {
+    if (typeof opt.orderindex === 'number') {
+      labelByOrder.set(opt.orderindex, (opt.label ?? opt.name ?? '').trim())
+    }
   }
 
-  if (!description) return null
-  const lines = description.split('\n')
-  const isHeading = (line: string): string | null => {
-    const m =
-      line.match(/^#{1,6}\s+(.+?)\s*:?\s*$/) ??
-      line.match(/^\*\*(.+?)\*\*\s*:?\s*$/) ??
-      line.match(/^([A-Za-z][A-Za-z /&-]{2,40}):\s*$/)
-    return m ? m[1].trim() : null
+  const objectives: FeatureObjective[] = []
+  for (let n = 1; n <= 7; n++) {
+    const noteField = list.find((f) => new RegExp(`^Obj #${n} Notes$`, 'i').test(f.name?.trim() ?? ''))
+    const notes = typeof noteField?.value === 'string' ? noteField.value.trim() : ''
+    if (!notes) continue
+    objectives.push({ index: n, name: labelByOrder.get(n - 1) ?? '', notes })
   }
 
-  const start = lines.findIndex((l) => {
-    const h = isHeading(l.trim())
-    return !!h && /^(objectives?|goals?)$/i.test(h)
-  })
-  if (start === -1) return null
-
-  const body: string[] = []
-  for (let i = start + 1; i < lines.length; i++) {
-    if (isHeading(lines[i].trim())) break
-    body.push(lines[i])
-  }
-  const text = body.join('\n').trim()
-  return text || null
+  return objectives.length ? { objectives } : null
 }
 
 const TAG_APP_ALIASES: Record<string, AppSlug> = {

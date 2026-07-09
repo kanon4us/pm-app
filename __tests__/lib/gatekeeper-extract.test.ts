@@ -3,7 +3,7 @@ import {
   isPrototypeStatus,
   hasPrototypeTag,
   extractFviScore,
-  extractObjectives,
+  extractObjectivesJson,
   resolveAppIdentity,
   isPrototypeReady,
 } from '@/lib/features/gatekeeper-extract'
@@ -44,29 +44,6 @@ describe('extractFviScore', () => {
 
   it('does not confuse prefixed names like FVIewport', () => {
     expect(extractFviScore([{ name: 'FVIewport', value: 9 }])).toBeNull()
-  })
-})
-
-describe('extractObjectives', () => {
-  it('prefers the custom field', () => {
-    expect(
-      extractObjectives([{ name: 'Objectives', value: 'Ship it' }], '## Objectives\nfrom description')
-    ).toBe('Ship it')
-  })
-
-  it('parses a markdown heading section, stopping at the next heading', () => {
-    const desc = 'Intro\n\n## Objectives\n- faster casting\n- fewer clicks\n\n## Scope\nout'
-    expect(extractObjectives(undefined, desc)).toBe('- faster casting\n- fewer clicks')
-  })
-
-  it('parses bold and colon pseudo-headings', () => {
-    expect(extractObjectives(undefined, '**Goals**\nreduce churn\n\n**Notes**\nx')).toBe('reduce churn')
-    expect(extractObjectives(undefined, 'Objectives:\nimprove NPS')).toBe('improve NPS')
-  })
-
-  it('returns null when absent', () => {
-    expect(extractObjectives(undefined, 'just a description')).toBeNull()
-    expect(extractObjectives(undefined, null)).toBeNull()
   })
 })
 
@@ -174,5 +151,54 @@ describe('isPrototypeReady', () => {
   it('false / safe on empty or undefined fields', () => {
     expect(isPrototypeReady([])).toBe(false)
     expect(isPrototypeReady(undefined)).toBe(false)
+  })
+})
+
+describe('extractObjectivesJson', () => {
+  const objectivesField = {
+    name: 'Objectives',
+    type: 'labels',
+    type_config: {
+      options: [
+        { id: 'a', label: 'Data Backed Decisions', orderindex: 0 },
+        { id: 'b', label: 'Modular Content', orderindex: 1 },
+        { id: 'c', label: 'User Success', orderindex: 2 },
+      ],
+    },
+  }
+
+  it('pairs each Obj #N note with the label at orderindex N-1, dropping scores', () => {
+    const result = extractObjectivesJson([
+      objectivesField,
+      { name: 'Obj #1', value: '3' },
+      { name: 'Obj #1 Notes', value: 'improves analytics' },
+      { name: 'Obj #3', value: '-2' },
+      { name: 'Obj #3 Notes', value: 'removes friction' },
+    ])
+    expect(result).toEqual({
+      objectives: [
+        { index: 1, name: 'Data Backed Decisions', notes: 'improves analytics' },
+        { index: 3, name: 'User Success', notes: 'removes friction' },
+      ],
+    })
+  })
+
+  it('emits only objectives that have non-empty notes', () => {
+    const result = extractObjectivesJson([
+      objectivesField,
+      { name: 'Obj #1 Notes', value: '   ' },
+      { name: 'Obj #2 Notes', value: 'keeps it modular' },
+    ])
+    expect(result).toEqual({ objectives: [{ index: 2, name: 'Modular Content', notes: 'keeps it modular' }] })
+  })
+
+  it('falls back to empty name when the label option is missing', () => {
+    const result = extractObjectivesJson([{ name: 'Obj #5 Notes', value: 'integration work' }])
+    expect(result).toEqual({ objectives: [{ index: 5, name: '', notes: 'integration work' }] })
+  })
+
+  it('returns null when no objective has notes', () => {
+    expect(extractObjectivesJson([objectivesField, { name: 'Obj #1', value: '3' }])).toBeNull()
+    expect(extractObjectivesJson(undefined)).toBeNull()
   })
 })
