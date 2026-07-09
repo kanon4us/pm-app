@@ -82,6 +82,37 @@ interface FigmaAuth {
 }
 
 /**
+ * Parses a Figma URL, resolves auth, fetches the node, and returns the compact
+ * style-token summary — the same output get_figma_styles surfaces to chat.
+ * Reused by resolveReuseRefs. Throws with a PM-readable message on failure.
+ */
+export async function getFigmaNodeStyleSummary(
+  userId: string | undefined,
+  url: string
+): Promise<string> {
+  const parsed = parseFigmaUrl(url ?? '')
+  if (!parsed) throw new Error(`Not a Figma URL: ${url}`)
+  if (!parsed.nodeId) throw new Error('The URL has no node-id — get_figma_styles needs a specific frame link.')
+
+  const auth = await resolveFigmaAuth(userId)
+  if (!auth) throw new Error('Figma access is not configured — set FIGMA_ACCESS_TOKEN in the pm-app environment')
+
+  const res = await fetch(
+    `${FIGMA_API}/v1/files/${parsed.fileKey}/nodes?ids=${encodeURIComponent(parsed.nodeId)}`,
+    { headers: auth.headers }
+  )
+  if (!res.ok) {
+    const apiErr = await res.json().then((d: { err?: string }) => d.err).catch(() => null)
+    throw new Error(`Figma API error ${res.status}${apiErr ? `: ${apiErr}` : ''}. Report this exact error to the PM.`)
+  }
+  const data = (await res.json()) as { nodes?: Record<string, { document?: FigmaStyleNode }> }
+  const root = data.nodes?.[parsed.nodeId]?.document
+  if (!root) throw new Error(`Figma returned no node for ${parsed.nodeId}`)
+
+  return summarizeStyles(root)
+}
+
+/**
  * Prefers the user's OAuth token (Bearer) when one exists; falls back to the
  * app-wide FIGMA_ACCESS_TOKEN PAT (X-Figma-Token) — the same credential the
  * rest of the Figma read pipeline uses. There is no OAuth connect UI today,
@@ -93,27 +124,9 @@ export async function executeGetFigmaStyles(
   applied: AppliedChanges
 ): Promise<{ result: ToolResultContent; isError: boolean }> {
   try {
-    const parsed = parseFigmaUrl(input.url ?? '')
-    if (!parsed) throw new Error(`Not a Figma URL: ${input.url}`)
-    if (!parsed.nodeId) throw new Error('The URL has no node-id — get_figma_styles needs a specific frame link.')
-
-    const auth = await resolveFigmaAuth(userId)
-    if (!auth) throw new Error('Figma access is not configured — set FIGMA_ACCESS_TOKEN in the pm-app environment')
-
-    const res = await fetch(
-      `${FIGMA_API}/v1/files/${parsed.fileKey}/nodes?ids=${encodeURIComponent(parsed.nodeId)}`,
-      { headers: auth.headers }
-    )
-    if (!res.ok) {
-      const apiErr = await res.json().then((d: { err?: string }) => d.err).catch(() => null)
-      throw new Error(`Figma API error ${res.status}${apiErr ? `: ${apiErr}` : ''}. Report this exact error to the PM.`)
-    }
-    const data = (await res.json()) as { nodes?: Record<string, { document?: FigmaStyleNode }> }
-    const root = data.nodes?.[parsed.nodeId]?.document
-    if (!root) throw new Error(`Figma returned no node for ${parsed.nodeId}`)
-
+    const summary = await getFigmaNodeStyleSummary(userId, input.url ?? '')
     applied.framesViewed++
-    return { result: summarizeStyles(root), isError: false }
+    return { result: summary, isError: false }
   } catch (err) {
     return { result: err instanceof Error ? err.message : 'get_figma_styles failed', isError: true }
   }
