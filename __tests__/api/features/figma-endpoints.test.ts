@@ -40,6 +40,11 @@ describe('GET figma-layout (token auth)', () => {
     const res = await getLayout(req({ authorization: 'Bearer plug-secret' }), { params })
     expect(res.status).toBe(502)
   })
+  it('500s (not 401) when FIGMA_PLUGIN_TOKEN is unset', async () => {
+    delete process.env.FIGMA_PLUGIN_TOKEN
+    const res = await getLayout(req({ authorization: 'Bearer plug-secret' }), { params })
+    expect(res.status).toBe(500)
+  })
 })
 
 describe('POST figma-file (token auth)', () => {
@@ -55,6 +60,11 @@ describe('POST figma-file (token auth)', () => {
   it('400s when fileKey is missing', async () => {
     const res = await postFile(req({ authorization: 'Bearer plug-secret' }, {}), { params })
     expect(res.status).toBe(400)
+  })
+  it('500s (not 401) when FIGMA_PLUGIN_TOKEN is unset', async () => {
+    delete process.env.FIGMA_PLUGIN_TOKEN
+    const res = await postFile(req({ authorization: 'Bearer plug-secret' }, { fileKey: 'abc' }), { params })
+    expect(res.status).toBe(500)
   })
 })
 

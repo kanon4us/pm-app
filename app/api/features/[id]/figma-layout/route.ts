@@ -7,8 +7,9 @@ export const maxDuration = 120
 /** Returns the fully-resolved Figma layout spec. Token-gated (plugin is external). */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const token = process.env.FIGMA_PLUGIN_TOKEN
+  if (!token) return NextResponse.json({ error: 'FIGMA_PLUGIN_TOKEN not configured' }, { status: 500 })
   const auth = req.headers.get('authorization')
-  if (!token || auth !== `Bearer ${token}`) {
+  if (auth !== `Bearer ${token}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const { id } = await params
