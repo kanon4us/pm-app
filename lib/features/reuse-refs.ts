@@ -31,21 +31,22 @@ export async function resolveReuseRefs(feature: Feature): Promise<ResolvedReuseR
   const refs = parseReuseRefs(feature.reuse_refs)
   if (refs.length === 0) return []
   const target = getAppTarget(feature.app)
+  const token = process.env.GITHUB_TOKEN
   const out: ResolvedReuseRef[] = []
   for (const ref of refs) {
     try {
       let resolved: string
       if (ref.kind === 'figma') {
         const styles = await getFigmaNodeStyleSummary(undefined, ref.value)
-        resolved = `[Figma reuse] ${ref.note}\n${styles}`
+        resolved = `[Figma reuse] ${ref.note ?? ''}\n${styles}`
       } else if (ref.kind === 'code') {
-        const token = process.env.GITHUB_TOKEN
         if (!token) throw new Error('no GITHUB_TOKEN')
         const src = await readRepoFile(token, target.repo, ref.value, target.baseBranch)
         if (src == null) throw new Error(`not found: ${ref.value}`)
-        resolved = `[Code reuse] ${ref.value} — ${ref.note}\n${src.slice(0, MAX_CODE_CHARS)}`
+        const clipped = src.length > MAX_CODE_CHARS ? src.slice(0, MAX_CODE_CHARS) + '\n…[truncated]' : src
+        resolved = `[Code reuse] ${ref.value} — ${ref.note ?? ''}\n${clipped}`
       } else {
-        resolved = `[Screenshot reuse] ${ref.note}: ${ref.value}`
+        resolved = `[Screenshot reuse] ${ref.note ?? ''}: ${ref.value}`
       }
       out.push({ ...ref, resolved })
     } catch (err) {

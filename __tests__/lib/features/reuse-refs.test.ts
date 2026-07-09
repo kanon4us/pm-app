@@ -44,6 +44,17 @@ it('resolves a code ref via readRepoFile against the app repo', async () => {
   expect(out[0].resolved).toContain('TalentCard')
 })
 
+it('marks truncated code and keeps only the first 4000 source chars', async () => {
+  mockReadRepoFile.mockResolvedValue('x'.repeat(5000))
+  const out = await resolveReuseRefs({
+    ...(feature as object),
+    reuse_refs: { refs: [{ kind: 'code', value: 'components/Big.tsx', note: 'reuse' }] },
+  } as never)
+  expect(out[0].resolved.endsWith('…[truncated]')).toBe(true)
+  expect(out[0].resolved).toContain('x'.repeat(4000))
+  expect(out[0].resolved).not.toContain('x'.repeat(4001))
+})
+
 it('passes screenshot refs through as a reference line', async () => {
   const out = await resolveReuseRefs({
     ...(feature as object),
