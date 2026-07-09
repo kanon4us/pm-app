@@ -62,6 +62,18 @@ describe('proxy — public paths', () => {
     expect(res.headers.get('location')).toBeNull()
     expect(res.status).not.toBe(401)
   })
+
+  it('passes /api/features/f1/figma-layout through (plugin token-authed)', async () => {
+    const res = await proxy(makeRequest('http://localhost/api/features/f1/figma-layout'))
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.status).not.toBe(401)
+  })
+
+  it('passes /api/features/f1/figma-file through (plugin token-authed)', async () => {
+    const res = await proxy(makeRequest('http://localhost/api/features/f1/figma-file'))
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.status).not.toBe(401)
+  })
 })
 
 describe('proxy — ClickUp OAuth redirect', () => {
@@ -110,6 +122,16 @@ describe('proxy — unauthenticated requests', () => {
 
   it('still gates /api/vault/doc-review — consolidation prefix must not expose the UI routes', async () => {
     const res = await proxy(makeRequest('http://localhost/api/vault/doc-review'))
+    expect(res.status).toBe(401)
+  })
+
+  it('still gates /api/features/f1/publish-payload — session-gated, not token-gated', async () => {
+    const res = await proxy(makeRequest('http://localhost/api/features/f1/publish-payload'))
+    expect(res.status).toBe(401)
+  })
+
+  it('still gates /api/features/f1 — the base feature route stays session-gated', async () => {
+    const res = await proxy(makeRequest('http://localhost/api/features/f1'))
     expect(res.status).toBe(401)
   })
 })

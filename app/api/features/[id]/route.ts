@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
   const body = await req.json()
-  const { status, name, description, planning_phase, app } = body
+  const { status, name, description, planning_phase, app, reuse_refs } = body
   if (planning_phase !== undefined && !['planning', 'approved', 'prototyping'].includes(planning_phase)) {
     return NextResponse.json({ error: 'invalid planning_phase' }, { status: 400 })
   }
@@ -47,6 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     ...(description !== undefined && { description }),
     ...(planning_phase !== undefined && { planning_phase }),
     ...(app !== undefined && { app }),
+    ...(reuse_refs !== undefined && { reuse_refs }),
   })
 
   if (prev?.planning_phase === 'planning' && planning_phase === 'approved') {
