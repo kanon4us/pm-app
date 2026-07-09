@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   // include them in the traced output so the Vercel function can see them.
   outputFileTracingIncludes: {
     "/api/features/[id]/conversation/message": ["./design/DESIGN-*.md"],
+    "/api/features/[id]/figma-layout": ["./design/figma-antd-catalog.json"],
   },
 };
 

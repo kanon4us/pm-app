@@ -27,6 +27,15 @@ const PUBLIC_PATHS = [
   '/api/vault/consolidation',
 ]
 
+// Token-gated feature sub-routes (FIGMA_PLUGIN_TOKEN bearer, checked in-route).
+// The plugin is external and carries no session cookie, so the proxy must not
+// gate them — same rationale as the cron routes. The [id] segment forces a
+// regex rather than a prefix. NOTE: publish-payload is intentionally NOT here —
+// it stays session-gated.
+const PUBLIC_PATH_PATTERNS: RegExp[] = [
+  /^\/api\/features\/[^/]+\/figma-(layout|file)$/,
+]
+
 function isSafeRedirect(url: string): boolean {
   return url.startsWith('/') && !url.startsWith('//') && !url.includes('://')
 }
@@ -35,7 +44,10 @@ export async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
   // 1. Public paths — no auth required
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+  if (
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/')) ||
+    PUBLIC_PATH_PATTERNS.some((re) => re.test(pathname))
+  ) {
     return NextResponse.next()
   }
 
