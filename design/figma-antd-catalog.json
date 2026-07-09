@@ -1,0 +1,9 @@
+{
+  "generatedAt": "2026-07-08T00:00:00.000Z",
+  "libraryFileKey": "DpIOFPBpzpVVmZyZvzPJS4",
+  "components": [
+    { "name": "Button", "key": "7747670f6c7a9743711e9226f9d66edbf9c20999", "type": "set", "variants": { "Type": ["default", "primary", "dashed", "text", "link"] } },
+    { "name": "Input", "key": "c36bfe7e88fbe39f5262cebfb38a275a94e9e1fe", "type": "set" },
+    { "name": "Card", "key": "637b1836b85464ed4eee80b426e4f9810730ed58", "type": "set" }
+  ]
+}
