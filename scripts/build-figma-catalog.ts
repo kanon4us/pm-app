@@ -4,8 +4,8 @@
 import 'dotenv/config'
 import fs from 'node:fs'
 import path from 'node:path'
-import { figmaGetJson } from '@/lib/figma/client'
-import type { CatalogComponent, ComponentCatalog } from '@/lib/figma/component-catalog'
+import { figmaGetJson } from '../lib/figma/client'
+import type { CatalogComponent, ComponentCatalog } from '../lib/figma/component-catalog'
 
 const FIGMA_API = 'https://api.figma.com'
 const TOKEN = process.env.FIGMA_MIGRATION_TOKEN ?? process.env.FIGMA_ACCESS_TOKEN
@@ -20,14 +20,22 @@ async function main() {
     console.error('✗ Set FIGMA_MIGRATION_TOKEN or FIGMA_ACCESS_TOKEN.')
     process.exit(1)
   }
-  const setsRes = (await figmaGetJson(
-    TOKEN,
-    `${FIGMA_API}/v1/teams/${TEAM_ID}/component_sets`
-  )) as { meta?: { component_sets?: ComponentSetMeta[] } }
-  const sets = (setsRes.meta?.component_sets ?? []).filter((s) => !ICON_NAME_RE.test(s.name))
+  // /v1/teams/{id}/component_sets paginates — follow the cursor until exhausted.
+  const allSets: ComponentSetMeta[] = []
+  let after: string | undefined
+  do {
+    const url = `${FIGMA_API}/v1/teams/${TEAM_ID}/component_sets?page_size=1000${after ? `&after=${after}` : ''}`
+    const res = (await figmaGetJson(TOKEN, url)) as {
+      meta?: { component_sets?: ComponentSetMeta[]; cursor?: { after?: string | number } }
+    }
+    allSets.push(...(res.meta?.component_sets ?? []))
+    const next = res.meta?.cursor?.after
+    after = next != null ? String(next) : undefined
+  } while (after)
 
-  const idsByNode = new Map(sets.map((s) => [s.node_id, s]))
-  const nodeIds = [...idsByNode.keys()]
+  const sets = allSets.filter((s) => !ICON_NAME_RE.test(s.name))
+
+  const nodeIds = [...new Set(sets.map((s) => s.node_id))]
   const variantsByNodeId = new Map<string, Record<string, string[]>>()
   const BATCH = 50
   for (let i = 0; i < nodeIds.length; i += BATCH) {
