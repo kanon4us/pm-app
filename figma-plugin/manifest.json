@@ -1,0 +1,12 @@
+{
+  "name": "Viscap — Publish Stitch",
+  "id": "viscap-publish-stitch-dev",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["https://viscap.edgefixautomation.com", "http://localhost:3000"],
+    "reasoning": "Fetches the resolved layout spec from pm-app and posts the published file key back."
+  }
+}
