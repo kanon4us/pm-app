@@ -241,10 +241,11 @@ export interface Database {
           planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
           app: 'web' | 'cms' | 'mobile' | 'desktop'
           code_paths: string[]; prototype_branch: string | null; prototype_pr_url: string | null
+          reuse_refs: Json | null; figma_file_key: string | null
           created_at: string; updated_at: string
         }
-        Insert: { id?: string; name: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null; app?: 'web' | 'cms' | 'mobile' | 'desktop'; code_paths?: string[]; prototype_branch?: string | null; prototype_pr_url?: string | null; fvi_score?: number | null; objectives?: string | null; objectives_json?: Json | null; ux_stitch?: Json | null; clickup_details?: string | null }
-        Update: { name?: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null; app?: 'web' | 'cms' | 'mobile' | 'desktop'; code_paths?: string[]; prototype_branch?: string | null; prototype_pr_url?: string | null; fvi_score?: number | null; objectives?: string | null; objectives_json?: Json | null; ux_stitch?: Json | null; clickup_details?: string | null }
+        Insert: { id?: string; name: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null; app?: 'web' | 'cms' | 'mobile' | 'desktop'; code_paths?: string[]; prototype_branch?: string | null; prototype_pr_url?: string | null; fvi_score?: number | null; objectives?: string | null; objectives_json?: Json | null; ux_stitch?: Json | null; clickup_details?: string | null; reuse_refs?: Json | null; figma_file_key?: string | null }
+        Update: { name?: string; description?: string | null; status?: 'draft' | 'active' | 'archived'; planning_phase?: 'planning' | 'approved' | 'prototyping'; spec_content?: string | null; app?: 'web' | 'cms' | 'mobile' | 'desktop'; code_paths?: string[]; prototype_branch?: string | null; prototype_pr_url?: string | null; fvi_score?: number | null; objectives?: string | null; objectives_json?: Json | null; ux_stitch?: Json | null; clickup_details?: string | null; reuse_refs?: Json | null; figma_file_key?: string | null }
         Relationships: []
       }
       feature_tasks: {
