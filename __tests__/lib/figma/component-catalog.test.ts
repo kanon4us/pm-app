@@ -28,10 +28,13 @@ describe('getComponentCatalog', () => {
     }
   })
 
-  it('excludes icon-set noise (icons flagged/absent from the resolver catalog)', () => {
+  it('excludes icon-set noise (no component name matches /icon/i)', () => {
     const { getComponentCatalog } = require('@/lib/figma/component-catalog')
     const cat = getComponentCatalog()
-    expect(cat.components.length).toBeLessThan(400)
+    // The generator drops the antd icon set (name /icon/i). Assert the real
+    // exclusion, not just a size bound — the full icon set would be thousands.
+    expect(cat.components.every((c: { name: string }) => !/icon/i.test(c.name))).toBe(true)
+    expect(cat.components.length).toBeLessThan(3000)
   })
 
   it('the on-disk catalog file parses as JSON', () => {
