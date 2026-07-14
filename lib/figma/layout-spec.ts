@@ -1,6 +1,11 @@
 // lib/figma/layout-spec.ts
 // The wire contract between pm-app's layout resolver and the Figma plugin.
-// Pure types only — no runtime deps — so the plugin build can `import type` it.
+// Pure types only — no runtime deps.
+//
+// SOURCE OF TRUTH for this contract. The standalone `viscap-figma-plugin` repo
+// vendors a copy at `src/layout-spec.ts`. When you change the shape here, mirror
+// it into that repo — the plugin builds against the vendored copy, and a
+// mismatch silently breaks Publish.
 
 /** A real antd library instance, keyed by its team-library component-set key. */
 export interface InstanceNode {

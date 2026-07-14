@@ -30,7 +30,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "figma-plugin"],
+  "exclude": ["node_modules"],
   "ts-node": {
     "transpileOnly": true,
     "compilerOptions": {
