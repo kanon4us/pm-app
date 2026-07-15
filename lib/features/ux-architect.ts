@@ -13,8 +13,11 @@ import { getDesignContract } from '@/lib/claude/design-md'
 import { getAppTarget } from '@/lib/claude/apps'
 import type { Json } from '@/lib/supabase/types'
 
-const GEMINI_MODEL = 'gemini-2.5-pro'
-// Cost/latency cap. On gemini-2.5-pro this budget is shared with the model's hidden "thinking" tokens, so keep it generous — hitting it degrades to a skipped write (write-only-on-success), never a corrupt one.
+// Use a stable "-latest" alias, not a pinned version: Google sunsets pinned
+// model ids (gemini-2.5-pro started 404ing "no longer available to new users"),
+// and -latest tracks the current production Pro model so that can't recur.
+const GEMINI_MODEL = 'gemini-pro-latest'
+// Cost/latency cap. On the Pro model this budget is shared with the model's hidden "thinking" tokens, so keep it generous — hitting it degrades to a skipped write (write-only-on-success), never a corrupt one.
 const MAX_OUTPUT_TOKENS = 32768
 
 const UX_ARCHITECT_SYSTEM = `You are a UX Architect. Given a feature's strategic objectives, its user-story/scenario/step workflows, and the product's design contract, produce a MID-FIDELITY STRUCTURAL PLAN as JSON that satisfies the objectives through the given workflows.

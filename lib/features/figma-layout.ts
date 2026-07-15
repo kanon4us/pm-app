@@ -5,14 +5,17 @@
 // against the catalog (unknown key → placeholder; unknown variant → stripped).
 // Discipline mirrors ux-architect.ts: the ONLY Gemini caller here, never throws,
 // returns null rather than a partial spec.
-import { GoogleGenAI, Type, type Schema } from '@google/genai'
+import { GoogleGenAI } from '@google/genai'
 import { getFeature } from '@/lib/features/client'
 import { resolveReuseRefs } from '@/lib/features/reuse-refs'
 import { getComponentCatalog, catalogByKey } from '@/lib/figma/component-catalog'
 import type { CatalogComponent } from '@/lib/figma/component-catalog'
 import type { FigmaLayoutSpec, LayoutNode, LayoutPage } from '@/lib/figma/layout-spec'
 
-const GEMINI_MODEL = 'gemini-2.5-pro'
+// Use a stable "-latest" alias, not a pinned version: Google sunsets pinned
+// model ids (gemini-2.5-pro started 404ing "no longer available to new users"),
+// and -latest tracks the current production Pro model so that can't recur.
+const GEMINI_MODEL = 'gemini-pro-latest'
 const MAX_OUTPUT_TOKENS = 32768
 
 const RESOLVER_SYSTEM = `You convert a mid-fidelity UX stitch into a concrete Figma layout spec built from a fixed Ant Design component library.
@@ -26,28 +29,26 @@ Rules:
 - Apply a baseline spacing scale to EVERY frame so the output breathes: padding 16-24, gaps 8/16/24. Match the design contract's tokens. Never emit tight, hand-detangle spacing.
 - Produce one page named "Components" listing the components you used, plus one page named "Workflow: <name>" per stitch workflow.
 - Node shapes: instance {type:'instance',componentKey,name?,variant?} | frame {type:'frame',name?,layout:'HORIZONTAL'|'VERTICAL',spacing?,padding?,children:[]} | text {type:'text',characters,style?} | placeholder {type:'placeholder',name,note?}.
+- Fill EVERY page's "nodes" with real nodes. NEVER return an empty "nodes" array — a page with no nodes is a failure.
 - NEVER emit code.`
 
-// Shallow schema on purpose: Gemini responseSchema can't express the recursive
-// node union, so nodes come back loosely typed and normalizeLayoutSpec enforces
-// the real structure + key/variant validity in code.
-const LAYOUT_SCHEMA: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    pages: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          nodes: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {}, required: [] } },
-        },
-        required: ['name', 'nodes'],
-      },
-    },
-  },
-  required: ['pages'],
-}
+// We deliberately DON'T pass a Gemini responseSchema. The node union is
+// recursive (frames contain children) and uses a dynamic-key "variant" map —
+// neither is expressible in Gemini's responseSchema, and a shallow schema
+// (nodes as featureless objects) makes the model emit EMPTY nodes. Instead we
+// ask for application/json with an explicit shape example in the prompt (below)
+// and let normalizeLayoutSpec enforce the real structure + key/variant validity.
+// Verified: shallow-schema → empty nodes; example-in-prompt → richly populated.
+const LAYOUT_SHAPE_EXAMPLE = `Output ONLY a JSON object of exactly this shape — fill every "nodes" array, never leave one empty:
+{"pages":[
+  {"name":"Components","nodes":[{"type":"instance","componentKey":"<catalog key>","name":"Primary action","variant":{"PropName":"Option"}}]},
+  {"name":"Workflow: <workflow name>","nodes":[
+    {"type":"frame","name":"Drawer","layout":"VERTICAL","spacing":16,"padding":24,"children":[
+      {"type":"text","characters":"Heading","style":"heading"},
+      {"type":"instance","componentKey":"<catalog key>"}
+    ]}
+  ]}
+]}`
 
 const LAYOUTS = ['HORIZONTAL', 'VERTICAL'] as const
 const TEXT_STYLES = ['heading', 'body', 'caption'] as const
@@ -151,7 +152,7 @@ export async function resolveFigmaLayout(featureId: string): Promise<FigmaLayout
       '',
       reuse.length ? `REUSE REFERENCES (prefer these where the stitch marks reuseOf):\n${reuse.map((r) => r.resolved).join('\n---\n')}` : '',
       '',
-      'Produce the Figma layout spec as JSON matching the response schema and the node shapes described.',
+      LAYOUT_SHAPE_EXAMPLE,
     ].filter(Boolean).join('\n')
 
     const ai = new GoogleGenAI({ apiKey })
@@ -161,7 +162,6 @@ export async function resolveFigmaLayout(featureId: string): Promise<FigmaLayout
       config: {
         systemInstruction: RESOLVER_SYSTEM,
         responseMimeType: 'application/json',
-        responseSchema: LAYOUT_SCHEMA,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
       },
     })
