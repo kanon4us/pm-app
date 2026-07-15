@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 import { buildClickUpClient } from '@/lib/clickup/client'
 import { detectArchivalChanges } from '@/lib/clickup/archive-detection'
+import { groupStatusUpdates } from '@/lib/clickup/status-updates'
 
 // POST /api/sprint/tasks/sync-status — refresh task statuses from ClickUp into Supabase
 export async function POST() {
@@ -69,16 +70,17 @@ export async function POST() {
     await supabase.from('tasks').update({ is_archived: false }).in('id', reactivatedIds)
   }
 
-  // Update only tasks whose status changed
+  // Update tasks whose status changed — ONE batched UPDATE per distinct new
+  // status (was: one parallel UPDATE per task via Promise.all, which fanned out
+  // N concurrent writes and could exhaust the PostgREST connection pool on a
+  // large sync, wedging every other query). Distinct statuses are few, so this
+  // is a short sequential loop.
   let updated = archivedIds.length + reactivatedIds.length
-  await Promise.all(
-    tasks.map(async (t) => {
-      const newStatus = statusMap.get(t.clickup_task_id)
-      if (newStatus === undefined || newStatus === t.status) return
-      await supabase.from('tasks').update({ status: newStatus }).eq('id', t.id)
-      updated++
-    })
-  )
+  const statusGroups = groupStatusUpdates(tasks, statusMap)
+  for (const [newStatus, ids] of statusGroups) {
+    const { error } = await supabase.from('tasks').update({ status: newStatus }).in('id', ids)
+    if (!error) updated += ids.length
+  }
 
   return NextResponse.json({ updated })
 }

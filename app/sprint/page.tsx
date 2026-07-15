@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Layout, Typography, Table, Button, Tag, Modal, Form, Input,
   DatePicker, InputNumber, Select, Space, Spin, Alert, Drawer,
-  Switch, Tooltip, Divider, Slider, Progress, Popconfirm, Tabs,
+  Switch, Tooltip, Divider, Slider, Progress, Popconfirm, Tabs, Segmented,
 } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 import { SearchOutlined, SaveOutlined, ThunderboltOutlined, DeleteOutlined, UndoOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -217,10 +217,15 @@ interface Task {
   inverted_influence: number | null
   is_feature_flagged: boolean
   git_branch: string | null
-  custom_fields: CustomField[] | null
+  custom_fields?: CustomField[] | null   // not returned by the list query; loaded in the drawer
   list_id: string
   listName: string
 }
+
+// Default Sprint Planner view: only tasks in the working design status. The
+// server accepts ?status=<value> (case-insensitive) or status=all; the toggle
+// below lets the user switch to All. Change this if your working status differs.
+const DEFAULT_STATUS_FILTER = 'ui/ux'
 
 interface Sprint {
   id: string
@@ -242,6 +247,7 @@ export default function SprintPage() {
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [assigning, setAssigning] = useState(false)
@@ -310,7 +316,7 @@ export default function SprintPage() {
 
   async function load() {
     const [tasksRes, sprintsRes] = await Promise.all([
-      apiFetch('/api/sprint/tasks').then((r) => r.json()),
+      apiFetch(`/api/sprint/tasks?status=${encodeURIComponent(statusFilter)}`).then((r) => r.json()),
       apiFetch('/api/sprint').then((r) => r.json()),
     ])
     const newTasks: Task[] = tasksRes.tasks ?? []
@@ -334,7 +340,10 @@ export default function SprintPage() {
     }
   }
 
-  useEffect(() => { load().then(() => syncClickUp()) }, [])
+  const didInit = useRef(false)
+  useEffect(() => { load().then(() => syncClickUp()); didInit.current = true }, [])
+  // Re-load (no re-sync) when the status filter toggles.
+  useEffect(() => { if (didInit.current) { setLoading(true); void load() } }, [statusFilter])
 
   useEffect(() => { detailTaskRef.current = detailTask }, [detailTask])
 
@@ -1124,6 +1133,11 @@ export default function SprintPage() {
           <Typography.Text style={{ color: '#8b949e' }}>Assign tasks to sprints</Typography.Text>
         </div>
         <Space>
+          <Segmented
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(String(v))}
+            options={[{ label: 'UI/UX', value: DEFAULT_STATUS_FILTER }, { label: 'All', value: 'all' }]}
+          />
           <Button icon={<ReloadOutlined />} loading={syncing} onClick={syncClickUp}>Refresh ClickUp</Button>
           <Button type="primary" onClick={() => setSprintModalOpen(true)}>+ New Sprint</Button>
         </Space>
