@@ -28,11 +28,11 @@ beforeEach(() => {
   process.env.GEMINI_API_KEY = 'test-key'
 })
 
-it('writes ux_stitch when Gemini returns valid JSON', async () => {
+it('writes ux_stitch and returns ok when Gemini returns valid JSON', async () => {
   mockGetFeature.mockResolvedValue(approvedFeature)
   const stitch = { summary: 's', workflows: [{ name: 'w' }] }
   mockGenerateContent.mockResolvedValue({ text: JSON.stringify(stitch) })
-  await generateUxStitch('f-1')
+  expect(await generateUxStitch('f-1')).toEqual({ ok: true })
   expect(mockUpdateFeature).toHaveBeenCalledWith('f-1', { ux_stitch: stitch })
 })
 
@@ -52,9 +52,34 @@ it('does NOT write when Gemini returns unparseable text', async () => {
 
 it('skips (no Gemini call) while still planning', async () => {
   mockGetFeature.mockResolvedValue({ ...approvedFeature, planning_phase: 'planning' })
-  await generateUxStitch('f-1')
+  expect(await generateUxStitch('f-1')).toEqual({ ok: false, reason: 'feature still planning' })
   expect(mockGenerateContent).not.toHaveBeenCalled()
   expect(mockUpdateFeature).not.toHaveBeenCalled()
+})
+
+it('force:true generates even while still planning', async () => {
+  mockGetFeature.mockResolvedValue({ ...approvedFeature, planning_phase: 'planning' })
+  const stitch = { summary: 's', workflows: [{ name: 'w' }] }
+  mockGenerateContent.mockResolvedValue({ text: JSON.stringify(stitch) })
+  expect(await generateUxStitch('f-1', { force: true })).toEqual({ ok: true })
+  expect(mockUpdateFeature).toHaveBeenCalledWith('f-1', { ux_stitch: stitch })
+})
+
+it('force:true still requires objectives_json', async () => {
+  mockGetFeature.mockResolvedValue({ ...approvedFeature, planning_phase: 'planning', objectives_json: null })
+  expect(await generateUxStitch('f-1', { force: true })).toEqual({ ok: false, reason: 'no objectives yet' })
+  expect(mockGenerateContent).not.toHaveBeenCalled()
+})
+
+it('returns ok:false when Gemini fails', async () => {
+  mockGetFeature.mockResolvedValue(approvedFeature)
+  mockGenerateContent.mockRejectedValue(new Error('timeout'))
+  expect(await generateUxStitch('f-1')).toEqual({ ok: false, reason: 'stitch generation failed' })
+})
+
+it('returns ok:false when the feature is missing', async () => {
+  mockGetFeature.mockResolvedValue(null)
+  expect(await generateUxStitch('f-1')).toEqual({ ok: false, reason: 'feature not found' })
 })
 
 it('skips when objectives_json is absent', async () => {

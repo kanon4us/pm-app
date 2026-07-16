@@ -95,27 +95,37 @@ const UX_STITCH_SCHEMA: Schema = {
   required: ['summary', 'workflows'],
 }
 
+/** Outcome of a stitch generation attempt. Callers that fire-and-forget (the
+ * PATCH after() hook) ignore it; the manual regenerate endpoint surfaces reason. */
+export interface StitchResult {
+  ok: boolean
+  reason?: string
+}
+
 /**
  * Generate and persist the UX structural stitch for a feature. Fires on the
- * planning→approved transition (see the PATCH route). No-ops (never throws,
- * never writes) if planning hasn't produced a tree, objectives are missing,
- * the API key is unset, or Gemini fails/returns unparseable output.
+ * planning→approved transition (see the PATCH route) and from the manual
+ * regenerate endpoint. Never throws and NEVER writes on failure; returns
+ * { ok:false, reason } instead so a caller can report it.
+ *
+ * `force` skips ONLY the still-planning guard (the manual button lets you
+ * regenerate before the phase flips); the objectives and API-key guards remain.
  */
-export async function generateUxStitch(featureId: string): Promise<void> {
+export async function generateUxStitch(featureId: string, opts?: { force?: boolean }): Promise<StitchResult> {
   const feature = await getFeature(featureId)
-  if (!feature) return
-  if (feature.planning_phase === 'planning') {
+  if (!feature) return { ok: false, reason: 'feature not found' }
+  if (feature.planning_phase === 'planning' && !opts?.force) {
     console.log('[ux-architect] skip: feature still planning', featureId)
-    return
+    return { ok: false, reason: 'feature still planning' }
   }
   if (!feature.objectives_json) {
     console.log('[ux-architect] skip: no objectives_json', featureId)
-    return
+    return { ok: false, reason: 'no objectives yet' }
   }
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     console.warn('[ux-architect] skip: GEMINI_API_KEY unset')
-    return
+    return { ok: false, reason: 'GEMINI_API_KEY unset' }
   }
 
   const context = await buildFeatureContext(featureId)
@@ -149,15 +159,16 @@ export async function generateUxStitch(featureId: string): Promise<void> {
     const text = response.text
     if (!text) {
       console.warn('[ux-architect] empty Gemini response for', featureId, 'finishReason:', finishReason)
-      return
+      return { ok: false, reason: 'empty Gemini response' }
     }
     stitch = JSON.parse(text)
   } catch (err) {
     console.warn('[ux-architect] generation failed for', featureId, err instanceof Error ? err.message : err)
-    return // never write on failure
+    return { ok: false, reason: 'stitch generation failed' } // never write on failure
   }
 
   // Trusted shape: Gemini's responseSchema constrains this server-side.
   await updateFeature(featureId, { ux_stitch: stitch as Json })
   console.log('[ux-architect] stitch stored for', featureId)
+  return { ok: true }
 }
