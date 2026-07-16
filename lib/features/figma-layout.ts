@@ -16,7 +16,11 @@ import type { FigmaLayoutSpec, LayoutNode, LayoutPage } from '@/lib/figma/layout
 // model ids (gemini-2.5-pro started 404ing "no longer available to new users"),
 // and -latest tracks the current production Pro model so that can't recur.
 const GEMINI_MODEL = 'gemini-pro-latest'
-const MAX_OUTPUT_TOKENS = 32768
+// The full layout JSON for a rich feature is large, and on the Pro model this
+// budget is SHARED with the model's hidden "thinking" tokens — so 32768 could
+// leave too little for the JSON, truncating it mid-object (invalid JSON →
+// "generation failed"). Use the model's max so thinking + output both fit.
+const MAX_OUTPUT_TOKENS = 65536
 
 const RESOLVER_SYSTEM = `You convert a mid-fidelity UX stitch into a concrete Figma layout spec built from a fixed Ant Design component library.
 
@@ -169,6 +173,12 @@ export async function resolveFigmaLayout(featureId: string): Promise<FigmaLayout
     const text = response.text
     if (!text) {
       console.warn('[figma-layout] empty Gemini response for', featureId, 'finishReason:', finishReason)
+      return null
+    }
+    // A MAX_TOKENS finish means the JSON was cut off — parsing it throws a
+    // cryptic "Expected ',' or '}'" error. Fail cleanly with a clear signal.
+    if (finishReason === 'MAX_TOKENS') {
+      console.warn('[figma-layout] truncated (MAX_TOKENS) for', featureId, '— layout too large for the output budget')
       return null
     }
     const raw = JSON.parse(text)
