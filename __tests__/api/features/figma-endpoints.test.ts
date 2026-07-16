@@ -6,8 +6,8 @@ jest.mock('@/lib/features/client', () => ({ updateFeature: (...a: unknown[]) => 
 const mockGetSessionUser = jest.fn()
 jest.mock('@/lib/auth', () => ({ getSessionUser: (...a: unknown[]) => mockGetSessionUser(...a) }))
 
-import { GET as getLayout } from '@/app/api/features/[id]/figma-layout/route'
-import { POST as postFile } from '@/app/api/features/[id]/figma-file/route'
+import { GET as getLayout, OPTIONS as optionsLayout } from '@/app/api/features/[id]/figma-layout/route'
+import { POST as postFile, OPTIONS as optionsFile } from '@/app/api/features/[id]/figma-file/route'
 import { GET as getPayload } from '@/app/api/features/[id]/publish-payload/route'
 
 const params = Promise.resolve({ id: 'f1' })
@@ -40,6 +40,22 @@ describe('GET figma-layout (token auth)', () => {
     const res = await getLayout(req({ authorization: 'Bearer plug-secret' }), { params })
     expect(res.status).toBe(502)
   })
+  it('sets CORS Allow-Origin on responses so the plugin sandbox can read them', async () => {
+    mockResolveLayout.mockResolvedValue({ pages: [] })
+    const ok = await getLayout(req({ authorization: 'Bearer plug-secret' }), { params })
+    expect(ok.headers.get('access-control-allow-origin')).toBe('*')
+    // Error responses need it too — the sandbox reads the error body.
+    mockResolveLayout.mockResolvedValue(null)
+    const err = await getLayout(req({ authorization: 'Bearer plug-secret' }), { params })
+    expect(err.status).toBe(502)
+    expect(err.headers.get('access-control-allow-origin')).toBe('*')
+  })
+  it('answers the OPTIONS preflight with 204 + CORS headers', async () => {
+    const res = optionsLayout()
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    expect(res.headers.get('access-control-allow-headers')).toMatch(/authorization/i)
+  })
   it('500s (not 401) when FIGMA_PLUGIN_TOKEN is unset', async () => {
     delete process.env.FIGMA_PLUGIN_TOKEN
     const res = await getLayout(req({ authorization: 'Bearer plug-secret' }), { params })
@@ -55,7 +71,13 @@ describe('POST figma-file (token auth)', () => {
   it('persists figma_file_key with the token', async () => {
     const res = await postFile(req({ authorization: 'Bearer plug-secret' }, { fileKey: 'abc' }), { params })
     expect(res.status).toBe(200)
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
     expect(mockUpdateFeature).toHaveBeenCalledWith('f1', { figma_file_key: 'abc' })
+  })
+  it('answers the OPTIONS preflight with 204 + CORS headers', async () => {
+    const res = optionsFile()
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
   })
   it('400s when fileKey is missing', async () => {
     const res = await postFile(req({ authorization: 'Bearer plug-secret' }, {}), { params })
