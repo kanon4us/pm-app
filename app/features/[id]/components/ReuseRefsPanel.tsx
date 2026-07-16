@@ -23,6 +23,7 @@ export function ReuseRefsPanel({
 }) {
   const [rows, setRows] = useState<ReuseRef[]>(refs)
   const [saving, setSaving] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
 
   function update(i: number, patch: Partial<ReuseRef>) {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -46,6 +47,24 @@ export function ReuseRefsPanel({
       onSaved()
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function regenerateStitch() {
+    setRegenerating(true)
+    const hide = message.loading('Regenerating stitch…', 0)
+    try {
+      const res = await fetch(`/api/features/${featureId}/regenerate-stitch`, { method: 'POST' })
+      hide()
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        message.error(`Could not regenerate stitch: ${body.error ?? res.status}`)
+        return
+      }
+      message.success('Stitch regenerated — you can publish to Figma now')
+    } finally {
+      hide()
+      setRegenerating(false)
     }
   }
 
@@ -76,6 +95,7 @@ export function ReuseRefsPanel({
       <Space>
         <Button onClick={add}>+ Add reference</Button>
         <Button type="primary" loading={saving} onClick={save}>Save</Button>
+        <Button loading={regenerating} onClick={regenerateStitch}>Regenerate stitch</Button>
         <Button onClick={copyPayload}>Copy Publish Payload</Button>
       </Space>
     </Space>
