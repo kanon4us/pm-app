@@ -53,6 +53,13 @@ it('includes stitch + catalog in the prompt', async () => {
   expect(JSON.stringify(call.contents)).toContain('workflows')
 })
 
+it('instructs the resolver to prefer the viscap library', async () => {
+  geminiReturns({ pages: [{ name: 'Components', nodes: [] }] })
+  await resolveFigmaLayout('f1')
+  const call = mockGenerateContent.mock.calls[0][0]
+  expect(call.config.systemInstruction).toMatch(/prefer components with library "viscap"/i)
+})
+
 it('keeps a valid instance + valid variant', async () => {
   geminiReturns({ pages: [{ name: 'Components', nodes: [
     { type: 'instance', componentKey: 'btnkey', name: 'CTA', variant: { Type: 'primary' } },
