@@ -99,6 +99,16 @@ it('returns null (no partial) when Gemini returns unparseable JSON', async () =>
   expect(await resolveFigmaLayout('f1')).toBeNull()
 })
 
+it('returns null cleanly on a truncated (MAX_TOKENS) response — no parse attempt', async () => {
+  // Truncated JSON that WOULD throw on JSON.parse; the finishReason guard must
+  // short-circuit before that so the failure is clean, not a cryptic parse error.
+  mockGenerateContent.mockResolvedValue({
+    text: '{"pages":[{"name":"Components","nodes":[{"type":"instance","componentKey":"btnk',
+    candidates: [{ finishReason: 'MAX_TOKENS' }],
+  })
+  expect(await resolveFigmaLayout('f1')).toBeNull()
+})
+
 it('returns null when Gemini throws', async () => {
   mockGenerateContent.mockRejectedValue(new Error('timeout'))
   expect(await resolveFigmaLayout('f1')).toBeNull()
