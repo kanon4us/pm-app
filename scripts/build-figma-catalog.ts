@@ -60,7 +60,7 @@ async function main() {
 
   const components: CatalogComponent[] = sets.map((s) => {
     const variants = variantsByNodeId.get(s.node_id)
-    return { name: s.name, key: s.key, type: 'set' as const, ...(variants ? { variants } : {}) }
+    return { name: s.name, key: s.key, type: 'set' as const, library: 'antd' as const, ...(variants ? { variants } : {}) }
   })
 
   const catalog: ComponentCatalog = {

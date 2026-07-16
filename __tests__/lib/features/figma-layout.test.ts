@@ -15,8 +15,8 @@ jest.mock('@/lib/figma/component-catalog', () => ({
   getComponentCatalog: () => ({
     generatedAt: 'x', libraryFileKey: 'lib',
     components: [
-      { name: 'Button', key: 'btnkey', type: 'set', variants: { Type: ['default', 'primary'] } },
-      { name: 'Input', key: 'inpkey', type: 'set' },
+      { name: 'Button', key: 'btnkey', type: 'set', library: 'antd', variants: { Type: ['default', 'primary'] } },
+      { name: 'Input', key: 'inpkey', type: 'set', library: 'antd' },
     ],
   }),
   findComponentByName: jest.requireActual('@/lib/figma/component-catalog').findComponentByName,
@@ -145,7 +145,7 @@ describe('normalizeLayoutSpec', () => {
   const catalog = {
     generatedAt: 'x',
     libraryFileKey: 'lib',
-    components: [{ name: 'Button', key: 'btnkey', type: 'set' } as CatalogComponent],
+    components: [{ name: 'Button', key: 'btnkey', type: 'set', library: 'antd' } as CatalogComponent],
   }
   const byKey = catalogByKey(catalog)
 

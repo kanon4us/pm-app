@@ -10,6 +10,8 @@ export interface CatalogComponent {
   name: string
   key: string
   type: 'set' | 'component'
+  /** Source library. The resolver prefers 'viscap' over 'antd' where both fit. */
+  library: 'viscap' | 'antd'
   /** propName → allowed option strings, read from the set's VARIANT property defs. */
   variants?: Record<string, string[]>
 }
