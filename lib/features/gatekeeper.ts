@@ -30,6 +30,7 @@ export async function activateFeatureFromTask(
   db: Db,
   clickupTaskId: string,
   prefetched?: ClickUpTask,
+  opts?: { scaffoldIfMissing?: boolean },
 ): Promise<GatekeeperResult | null> {
   let cuTask = prefetched
   if (!cuTask) {
@@ -72,6 +73,14 @@ export async function activateFeatureFromTask(
     if (error) throw new Error(`gatekeeper enrich failed: ${error.message}`)
     console.log('[gatekeeper] enriched feature', existing.id, 'app:', app.app, `(${app.source})`)
     return { featureId: existing.id, created: false, app: app.app, appSource: app.source }
+  }
+
+  // No feature yet for this task. Enrichment-only callers (objectives sync,
+  // manual re-sync) pass scaffoldIfMissing:false so we never create a feature
+  // from a task that hasn't cleared the prototype-ready admission gate.
+  if (opts?.scaffoldIfMissing === false) {
+    console.log('[gatekeeper] skip scaffold (enrich-only) for task', clickupTaskId)
+    return null
   }
 
   const { data: created, error } = await db.from('features').insert({

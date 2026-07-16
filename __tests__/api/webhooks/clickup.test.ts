@@ -297,7 +297,13 @@ describe('POST /api/webhooks/clickup — prototyping gatekeeper (taskUpdated)', 
     { name: 'Figma', type: 'short_text', value: 'https://www.figma.com/design/abc' },
   ]
 
-  it('activates when a whitelisted field changed and the task is prototype-ready', async () => {
+  const notReadyFields = [
+    { name: 'Design states', type: 'drop_down', value: 1,
+      type_config: { options: [{ orderindex: 1, label: 'Done' }] } },
+    { name: 'Figma', type: 'short_text', value: 'https://www.figma.com/design/abc' },
+  ]
+
+  it('scaffolds (scaffoldIfMissing:true) when a whitelisted field changed and the task is prototype-ready', async () => {
     mockTokenAndTask(readyFields)
     const req = makeRequest({
       event: 'taskUpdated',
@@ -307,7 +313,8 @@ describe('POST /api/webhooks/clickup — prototyping gatekeeper (taskUpdated)', 
     const res = await POST(req)
     expect(res.status).toBe(200)
     expect(activateFeatureFromTask).toHaveBeenCalledWith(
-      expect.anything(), 'cu-abc', expect.objectContaining({ id: 'cu-abc' })
+      expect.anything(), 'cu-abc', expect.objectContaining({ id: 'cu-abc' }),
+      { scaffoldIfMissing: true },
     )
   })
 
@@ -324,12 +331,8 @@ describe('POST /api/webhooks/clickup — prototyping gatekeeper (taskUpdated)', 
     expect(activateFeatureFromTask).not.toHaveBeenCalled()
   })
 
-  it('does NOT activate when a whitelisted field changed but the task is not ready', async () => {
-    mockTokenAndTask([
-      { name: 'Design states', type: 'drop_down', value: 1,
-        type_config: { options: [{ orderindex: 1, label: 'Done' }] } },
-      { name: 'Figma', type: 'short_text', value: 'https://www.figma.com/design/abc' },
-    ])
+  it('enriches without scaffolding (scaffoldIfMissing:false) when a whitelisted field changed but the task is not ready', async () => {
+    mockTokenAndTask(notReadyFields)
     const req = makeRequest({
       event: 'taskUpdated',
       task_id: 'cu-abc',
@@ -337,6 +340,39 @@ describe('POST /api/webhooks/clickup — prototyping gatekeeper (taskUpdated)', 
     })
     const res = await POST(req)
     expect(res.status).toBe(200)
-    expect(activateFeatureFromTask).not.toHaveBeenCalled()
+    expect(activateFeatureFromTask).toHaveBeenCalledWith(
+      expect.anything(), 'cu-abc', expect.objectContaining({ id: 'cu-abc' }),
+      { scaffoldIfMissing: false },
+    )
+  })
+
+  it('re-enriches on an objectives edit even when the task is not prototype-ready', async () => {
+    mockTokenAndTask(notReadyFields)
+    const req = makeRequest({
+      event: 'taskUpdated',
+      task_id: 'cu-abc',
+      history_items: [{ field: 'custom_field', custom_field: { name: 'Obj #1 Notes' } }],
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(activateFeatureFromTask).toHaveBeenCalledWith(
+      expect.anything(), 'cu-abc', expect.objectContaining({ id: 'cu-abc' }),
+      { scaffoldIfMissing: false },
+    )
+  })
+
+  it('re-enriches on an FVI edit', async () => {
+    mockTokenAndTask(readyFields)
+    const req = makeRequest({
+      event: 'taskUpdated',
+      task_id: 'cu-abc',
+      history_items: [{ field: 'custom_field', custom_field: { name: 'FVI Score' } }],
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(activateFeatureFromTask).toHaveBeenCalledWith(
+      expect.anything(), 'cu-abc', expect.objectContaining({ id: 'cu-abc' }),
+      { scaffoldIfMissing: true },
+    )
   })
 })
