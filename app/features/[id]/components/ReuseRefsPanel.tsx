@@ -24,6 +24,7 @@ export function ReuseRefsPanel({
   const [rows, setRows] = useState<ReuseRef[]>(refs)
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  const [resyncing, setResyncing] = useState(false)
 
   function update(i: number, patch: Partial<ReuseRef>) {
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -47,6 +48,25 @@ export function ReuseRefsPanel({
       onSaved()
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function resyncFromClickup() {
+    setResyncing(true)
+    const hide = message.loading('Re-syncing from ClickUp…', 0)
+    try {
+      const res = await fetch(`/api/features/${featureId}/resync`, { method: 'POST' })
+      hide()
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        message.error(`Could not re-sync: ${body.error ?? res.status}`)
+        return
+      }
+      message.success(`Synced ${body.objectivesCount ?? 0} objective(s) from ClickUp`)
+      onSaved()
+    } finally {
+      hide()
+      setResyncing(false)
     }
   }
 
@@ -95,6 +115,7 @@ export function ReuseRefsPanel({
       <Space>
         <Button onClick={add}>+ Add reference</Button>
         <Button type="primary" loading={saving} onClick={save}>Save</Button>
+        <Button loading={resyncing} onClick={resyncFromClickup}>Re-sync from ClickUp</Button>
         <Button loading={regenerating} onClick={regenerateStitch}>Regenerate stitch</Button>
         <Button onClick={copyPayload}>Copy Publish Payload</Button>
       </Space>

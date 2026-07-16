@@ -115,22 +115,29 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Prototyping gatekeeper — custom-field trigger ──
-  // Fire when the PM marks a task prototype-ready via custom fields:
-  // Design states == "In progress" AND a Figma link. Those edits arrive as
-  // taskUpdated; a whitelist pre-filter avoids a getTask on unrelated edits, and
-  // isPrototypeReady re-checks after the fetch. activateFeatureFromTask is idempotent.
+  // Two concerns, deliberately decoupled:
+  //   • Enrichment (objectives_json / FVI / description / app) keeps an EXISTING
+  //     feature in sync whenever its source fields change in ClickUp.
+  //   • Scaffolding a NEW feature stays gated on prototype-readiness
+  //     (Design states == "In progress" + a Figma link) — the admission gate.
+  // A whitelist pre-filter avoids a getTask on unrelated edits; objectives/FVI
+  // edits are included so post-scaffold assessment work actually syncs.
+  // activateFeatureFromTask enriches-or-scaffolds; scaffoldIfMissing carries the gate.
   if (event.type === 'taskUpdated') {
     const REFETCH_FIELDS = ['design states', 'figma', 'relevant app', 'description']
     const changed = (event.changedFieldNames ?? []).map((n) => n.trim().toLowerCase())
-    if (changed.some((n) => REFETCH_FIELDS.includes(n))) {
+    const relevant = changed.some(
+      (n) => REFETCH_FIELDS.includes(n) || n === 'objectives' || /^obj #\d/.test(n) || n.startsWith('fvi'),
+    )
+    if (relevant) {
       const { data: token } = await supabase
         .from('oauth_tokens').select('access_token').eq('provider', 'clickup').limit(1).single()
       if (token) {
         try {
           const cuTask = await buildClickUpClient(token.access_token).getTask(event.taskId)
-          if (isPrototypeReady(cuTask.custom_fields as ClickUpCustomField[])) {
-            await activateFeatureFromTask(supabase, event.taskId, cuTask)
-          }
+          await activateFeatureFromTask(supabase, event.taskId, cuTask, {
+            scaffoldIfMissing: isPrototypeReady(cuTask.custom_fields as ClickUpCustomField[]),
+          })
         } catch (err) {
           console.warn('[gatekeeper] taskUpdated activation failed for task', event.taskId, err)
         }

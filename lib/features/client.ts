@@ -47,6 +47,19 @@ export async function unlinkTask(featureId: string, taskId: string): Promise<voi
   if (error) throw new Error(error.message)
 }
 
+/** ClickUp task id of a task ASSOCIATED with this feature (via feature_tasks),
+ * or null if none is linked. Used by the manual re-sync path so it only ever
+ * enriches from a task the feature already owns — never an arbitrary task. */
+export async function getClickupTaskIdForFeature(featureId: string): Promise<string | null> {
+  const db = await getSupabaseServiceClient()
+  const { data: link } = await db
+    .from('feature_tasks').select('task_id').eq('feature_id', featureId).limit(1).single()
+  if (!link) return null
+  const { data: task } = await db
+    .from('tasks').select('clickup_task_id').eq('id', link.task_id).single()
+  return task?.clickup_task_id ?? null
+}
+
 export async function getTaskFeatures(taskId: string): Promise<Feature[]> {
   const db = await getSupabaseServiceClient()
   const { data, error } = await db
