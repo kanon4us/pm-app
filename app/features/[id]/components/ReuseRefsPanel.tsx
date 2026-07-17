@@ -15,13 +15,19 @@ const KIND_OPTIONS = [
 export function ReuseRefsPanel({
   featureId,
   refs,
+  workflows,
+  scopedWorkflow,
   onSaved,
 }: {
   featureId: string
   refs: ReuseRef[]
+  /** Workflow names from the feature's ux_stitch; empty until a stitch exists. */
+  workflows: string[]
+  scopedWorkflow: string | null
   onSaved: () => void
 }) {
   const [rows, setRows] = useState<ReuseRef[]>(refs)
+  const [scope, setScope] = useState<string | null>(scopedWorkflow)
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [resyncing, setResyncing] = useState(false)
@@ -42,7 +48,9 @@ export function ReuseRefsPanel({
       await fetch(`/api/features/${featureId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reuse_refs: { refs: rows.filter((r) => r.value.trim()) } }),
+        body: JSON.stringify({
+          reuse_refs: { refs: rows.filter((r) => r.value.trim()), scopedWorkflow: scope || null },
+        }),
       })
       message.success('Reuse references saved')
       onSaved()
@@ -104,6 +112,22 @@ export function ReuseRefsPanel({
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
         Components to recycle when generating this feature&apos;s Figma layout. Curate once; feeds every resolve.
       </Typography.Paragraph>
+      {workflows.length > 0 && (
+        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <Typography.Text type="secondary">
+            Publish scope — draft one workflow into the open Figma file (keeps files small).
+          </Typography.Text>
+          <Select
+            value={scope ?? ''}
+            onChange={(v) => setScope(v || null)}
+            style={{ minWidth: 260 }}
+            options={[
+              { value: '', label: 'All workflows' },
+              ...workflows.map((w) => ({ value: w, label: w })),
+            ]}
+          />
+        </Space>
+      )}
       {rows.map((r, i) => (
         <Space key={i} align="start" style={{ width: '100%' }}>
           <Select value={r.kind} onChange={(kind) => update(i, { kind })} options={KIND_OPTIONS} style={{ minWidth: 130 }} />
