@@ -9,6 +9,7 @@ import { GoogleGenAI } from '@google/genai'
 import { getFeature } from '@/lib/features/client'
 import { resolveReuseRefs } from '@/lib/features/reuse-refs'
 import { anchorNavbar } from '@/lib/features/navbar-anchor'
+import { scopeSpecToWorkflow, parseScopedWorkflow } from '@/lib/features/workflow-scope'
 import { getComponentCatalog, catalogByKey } from '@/lib/figma/component-catalog'
 import type { CatalogComponent } from '@/lib/figma/component-catalog'
 import type { FigmaLayoutSpec, LayoutNode, LayoutPage } from '@/lib/figma/layout-spec'
@@ -194,7 +195,10 @@ export async function resolveFigmaLayout(featureId: string): Promise<FigmaLayout
     // menu item is a deferred plugin-side concern). No-op if the library isn't
     // in the catalog.
     const navbar = catalog.components.find((c) => c.name === 'Navbar' && c.library === 'viscap')
-    return anchorNavbar(spec, navbar?.key ?? null)
+    const anchored = anchorNavbar(spec, navbar?.key ?? null)
+    // Then narrow to the PM's chosen workflow, so one workflow can be published
+    // into its own file. Fails open when nothing is selected.
+    return scopeSpecToWorkflow(anchored, parseScopedWorkflow(feature.reuse_refs))
   } catch (err) {
     console.warn('[figma-layout] generation failed for', featureId, err instanceof Error ? err.message : err)
     return null

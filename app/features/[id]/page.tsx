@@ -21,7 +21,9 @@ export interface Feature {
   id: string; name: string; description: string | null; status: string
   planning_phase: 'planning' | 'approved' | 'prototyping'; spec_content: string | null
   app: 'web' | 'cms' | 'mobile' | 'desktop'
-  reuse_refs: { refs: { kind: 'figma' | 'code' | 'screenshot'; value: string; note: string }[] } | null
+  reuse_refs: { refs: { kind: 'figma' | 'code' | 'screenshot'; value: string; note: string }[]; scopedWorkflow?: string | null } | null
+  /** Source of the workflow names the PM can scope a publish to. */
+  ux_stitch: { workflows?: { name?: string }[] } | null
   stories: UserStory[]
 }
 
@@ -122,6 +124,8 @@ export default function FeatureEditorPage() {
         <ReuseRefsPanel
           featureId={id}
           refs={feature.reuse_refs?.refs ?? []}
+          workflows={(feature.ux_stitch?.workflows ?? []).map((w) => w.name).filter((n): n is string => !!n)}
+          scopedWorkflow={feature.reuse_refs?.scopedWorkflow ?? null}
           onSaved={() => { setShowReuse(false); reload() }}
         />
       </Drawer>
