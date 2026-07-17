@@ -15,8 +15,8 @@ jest.mock('@/lib/figma/component-catalog', () => ({
   getComponentCatalog: () => ({
     generatedAt: 'x', libraryFileKey: 'lib',
     components: [
-      { name: 'Button', key: 'btnkey', type: 'set', variants: { Type: ['default', 'primary'] } },
-      { name: 'Input', key: 'inpkey', type: 'set' },
+      { name: 'Button', key: 'btnkey', type: 'set', library: 'antd', variants: { Type: ['default', 'primary'] } },
+      { name: 'Input', key: 'inpkey', type: 'set', library: 'antd' },
     ],
   }),
   findComponentByName: jest.requireActual('@/lib/figma/component-catalog').findComponentByName,
@@ -51,6 +51,13 @@ it('includes stitch + catalog in the prompt', async () => {
   const call = mockGenerateContent.mock.calls[0][0]
   expect(JSON.stringify(call.contents)).toContain('btnkey')
   expect(JSON.stringify(call.contents)).toContain('workflows')
+})
+
+it('instructs the resolver to prefer the viscap library', async () => {
+  geminiReturns({ pages: [{ name: 'Components', nodes: [] }] })
+  await resolveFigmaLayout('f1')
+  const call = mockGenerateContent.mock.calls[0][0]
+  expect(call.config.systemInstruction).toMatch(/prefer components with library "viscap"/i)
 })
 
 it('keeps a valid instance + valid variant', async () => {
@@ -145,7 +152,7 @@ describe('normalizeLayoutSpec', () => {
   const catalog = {
     generatedAt: 'x',
     libraryFileKey: 'lib',
-    components: [{ name: 'Button', key: 'btnkey', type: 'set' } as CatalogComponent],
+    components: [{ name: 'Button', key: 'btnkey', type: 'set', library: 'antd' } as CatalogComponent],
   }
   const byKey = catalogByKey(catalog)
 

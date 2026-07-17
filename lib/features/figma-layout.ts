@@ -26,6 +26,7 @@ const RESOLVER_SYSTEM = `You convert a mid-fidelity UX stitch into a concrete Fi
 
 Rules:
 - For each screen region, choose the CLOSEST real component from the catalog and reference it by its exact "key". Use ONLY keys present in the catalog.
+- Each catalog component carries a "library" field. PREFER components with library "viscap" (the real product design system) over "antd" whenever a Viscap component fits — especially navigation, menus, and media cards. Use "antd" only as a fallback for standard UI the Viscap library does not provide.
 - Compose components with auto-layout FRAMES to match each screen's structure.
 - When the stitch marks a component as reuseOf, prefer that reused component.
 - Emit a "placeholder" node ONLY when nothing in the catalog fits and no key is available.
