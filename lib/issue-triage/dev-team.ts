@@ -29,27 +29,59 @@ const FALLBACK_MEMBERS: DevTeamMember[] = [
   { name: 'Artem', slackId: 'U09SPSFBBQE', clickupEmail: 'artem@viscapmedia.com' },
 ]
 
-/** Hardcoded fallback Slack IDs. Prefer getDevTeamIds() (DB-backed) at call sites. */
-export const DEV_TEAM_IDS = new Set(FALLBACK_MEMBERS.map((m) => m.slackId))
-
 let cache: { members: DevTeamMember[]; at: number } | null = null
 const TTL_MS = 60_000
 
-/** Active dev-team members from the DB (cached ~60s), falling back to the seed. */
+/**
+ * Active dev-team members from the DB (cached ~60s).
+ *
+ * The seed is used ONLY when the table is unreachable — a genuine error, where
+ * degrading to a stale roster beats treating everyone as a non-dev. A query that
+ * succeeds and returns zero rows is an intentional empty roster and is honoured.
+ *
+ * Previously `data.length === 0` also fell through to the seed, so an admin who
+ * removed every dev in the PM app resurrected all 8 hardcoded people — removing
+ * members caused MORE members to be tagged.
+ */
 export async function getDevTeam(): Promise<DevTeamMember[]> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.members
+  const { members } = await loadRoster()
+  return members
+}
+
+/**
+ * Load the roster, reporting whether the DB answered.
+ *
+ * `degraded: true` means the table was unreachable and `members` is the seed.
+ * Callers that TAG people must refuse to use a degraded roster — the seed is a
+ * point-in-time snapshot that will contain anyone since removed from the Dev
+ * Team page, and @-mentioning an ex-teammate is the bug this all started from.
+ * Callers that merely READ (is this Slack user a dev?) can use it safely: a
+ * stale-but-generous answer only affects internal detection.
+ */
+async function loadRoster(): Promise<{ members: DevTeamMember[]; degraded: boolean }> {
+  if (cache && Date.now() - cache.at < TTL_MS) return { members: cache.members, degraded: false }
   try {
     const supabase = await getSupabaseServiceClient()
     const { data, error } = await supabase
       .from('dev_team_members')
       .select('name, slack_id, clickup_email')
       .eq('active', true)
-    if (error || !data || data.length === 0) return FALLBACK_MEMBERS
+
+    if (error || !data) {
+      console.warn('[dev-team] dev_team_members unreachable, using seed roster for reads only:', error)
+      return { members: FALLBACK_MEMBERS, degraded: true }
+    }
+
     const members = data.map((m) => ({ name: m.name, slackId: m.slack_id, clickupEmail: m.clickup_email }))
+    if (members.length === 0) {
+      // Legitimate, but worth surfacing: nudges will mention nobody.
+      console.warn('[dev-team] roster is empty — dev nudges will not mention anyone')
+    }
     cache = { members, at: Date.now() }
-    return members
-  } catch {
-    return FALLBACK_MEMBERS
+    return { members, degraded: false }
+  } catch (err) {
+    console.warn('[dev-team] dev_team_members lookup threw, using seed roster for reads only:', err)
+    return { members: FALLBACK_MEMBERS, degraded: true }
   }
 }
 
@@ -64,9 +96,29 @@ export async function clickupEmailForSlackId(slackId: string): Promise<string | 
   return member?.clickupEmail ?? null
 }
 
-/** Slack mention string for the dev team — user group if configured, else individuals. */
-export function devMention(): string {
+/**
+ * Slack mention string for the dev team — user group if configured, else the
+ * current DB roster.
+ *
+ * MUST stay async. This was previously synchronous and mentioned a Set built
+ * from FALLBACK_MEMBERS at module load, so it could not see the DB at all:
+ * every nudge tagged the same 8 seeded people no matter who was on the Dev Team
+ * page, and removing someone in the PM app never stopped the bot tagging them.
+ *
+ * Returns '' for an empty roster, and also when the DB is unreachable: the seed
+ * would contain anyone since removed from the Dev Team page, so tagging from it
+ * would re-create the original bug on any transient Supabase error. Better to
+ * nudge without a mention than to ping an ex-teammate. Callers must handle ''
+ * rather than emit a dangling mention into Slack.
+ */
+export async function devMention(): Promise<string> {
   const groupId = process.env.SLACK_DEV_USERGROUP_ID?.trim()
   if (groupId) return `<!subteam^${groupId}>`
-  return Array.from(DEV_TEAM_IDS).map((id) => `<@${id}>`).join(' ')
+
+  const { members, degraded } = await loadRoster()
+  if (degraded) {
+    console.warn('[dev-team] roster degraded — posting nudge without a dev mention')
+    return ''
+  }
+  return members.map((m) => `<@${m.slackId}>`).join(' ')
 }
