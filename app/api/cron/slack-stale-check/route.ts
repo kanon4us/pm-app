@@ -37,18 +37,25 @@ interface IssueRow {
   metadata: SlackIssueMetadata | null
 }
 
-function actionText(action: StaleAction, issue: IssueRow, rules: ResolvedStaleRules): string {
+/**
+ * @param mention Pre-resolved dev-team mention (see devMention). Passed in
+ *   rather than resolved here so the roster is read once per run, and so an
+ *   empty roster can't leave a dangling mention or stray comma in the message.
+ */
+function actionText(action: StaleAction, issue: IssueRow, rules: ResolvedStaleRules, mention: string): string {
   switch (action.type) {
     case 'reporter_and_dev_nudge':
-      return `<@${issue.reporter_id}> just checking in — are you still running into this? ${devMention()}, could we get a status update on this ticket?`
+      return mention
+        ? `<@${issue.reporter_id}> just checking in — are you still running into this? ${mention}, could we get a status update on this ticket?`
+        : `<@${issue.reporter_id}> just checking in — are you still running into this? Could we get a status update on this ticket?`
     case 'dev_renudge':
-      return `${devMention()} this ticket is still open and unresolved — can we get an update? (We'll keep checking every ${rules.devNudgeRepeatHours}h until it's closed.)`
+      return `${mention ? mention + ' ' : ''}This ticket is still open and unresolved — can we get an update? (We'll keep checking every ${rules.devNudgeRepeatHours}h until it's closed.)`
     case 'reaction_no_reply':
       return `<@${action.devId}> you reacted here but haven't posted an update yet — what's the status on this ticket?`
     case 'resolution_confirm':
       return `<@${action.devId}> looks like a fix may have gone out. Can you confirm this is resolved so we can close the ticket?`
     case 'overdue':
-      return `⏰ ${devMention()} this ticket has been open more than ${rules.maxResolutionHours}h (our close target). Please prioritize or post an update.`
+      return `⏰ ${mention ? mention + ' ' : ''}This ticket has been open more than ${rules.maxResolutionHours}h (our close target). Please prioritize or post an update.`
   }
 }
 
@@ -87,6 +94,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!openIssues?.length) return NextResponse.json({ ticketsNudged: 0, inBusinessHours })
 
   const devIds = await getDevTeamIds()
+  // Resolve the roster once per run: it drives who the bot @-mentions, and it
+  // must reflect the Dev Team page rather than the hardcoded seed.
+  const mention = await devMention()
   let ticketsNudged = 0
   let totalActions = 0
 
@@ -135,7 +145,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       if (!actions.length) continue
 
       for (const action of actions) {
-        await slack.postMessage(issue.channel_id, actionText(action, issue, rules), issue.thread_ts)
+        await slack.postMessage(issue.channel_id, actionText(action, issue, rules, mention), issue.thread_ts)
       }
 
       const newMetadata: SlackIssueMetadata = { ...(issue.metadata ?? { logrocket_links: [], file_ids: [], vault_snippets_used: [], triage_reasoning: '' }), nudges: nextState }
