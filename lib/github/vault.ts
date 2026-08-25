@@ -2,7 +2,7 @@
  * GitHub API wrapper for reading and writing the Viscap documentation vault.
  * All vault reads/writes go through this file — never call GitHub API directly.
  *
- * Vault repo: process.env.GITHUB_VAULT_REPO (e.g. "ViscapMedia/documentation")
+ * Vault repo: process.env.GITHUB_VAULT_REPO (e.g. "Viscap-Media/documentation")
  */
 
 const GITHUB_API = 'https://api.github.com'
@@ -16,7 +16,7 @@ function headers(token: string) {
   }
 }
 
-const VAULT_REPO = process.env.GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'
+const VAULT_REPO = process.env.GITHUB_VAULT_REPO ?? 'Viscap-Media/documentation'
 
 // ── Read ─────────────────────────────────────────────────────────────────────
 

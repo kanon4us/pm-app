@@ -44,7 +44,7 @@ export function isoWeek(date: Date): string {
 // ---------------------------------------------------------------------------
 
 const GITHUB_API = 'https://api.github.com'
-const VAULT_REPO = process.env.GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'
+const VAULT_REPO = process.env.GITHUB_VAULT_REPO ?? 'Viscap-Media/documentation'
 const VAULT_BRANCH = 'main'
 
 function githubHeaders(token: string) {
