@@ -261,6 +261,34 @@ describe('POST /api/webhooks/slack', () => {
     expect(opsAlert).toBeDefined()
   })
 
+  it('alerts operators when SLACK_ISSUES_CHANNEL_ID is missing', async () => {
+    const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+    const slack = buildSlackClient()
+    slack.postMessage.mockClear()
+    const saved = process.env.SLACK_ISSUES_CHANNEL_ID
+    delete process.env.SLACK_ISSUES_CHANNEL_ID
+
+    try {
+      const req = makeSlackRequest({
+        type: 'event_callback',
+        event: { type: 'message', user: 'U001', channel: 'C_ANYWHERE', text: 'anyone home?', ts: '1234567890.000012' },
+      })
+      const res = await POST(req)
+      await flushAfter()
+
+      expect(res.status).toBe(200)
+      const calls = slack.postMessage.mock.calls
+      const opsAlert = calls.find(([channel]: [string]) => channel === 'C_IMPROVEMENTS')
+      expect(opsAlert).toBeDefined()
+      expect(opsAlert[1]).toContain('SLACK_ISSUES_CHANNEL_ID')
+
+      // The bot must not speak into a channel it cannot confirm is the support channel.
+      expect(calls.some(([channel]: [string]) => channel === 'C_ANYWHERE')).toBe(false)
+    } finally {
+      process.env.SLACK_ISSUES_CHANNEL_ID = saved
+    }
+  })
+
   it('returns 200 for a reaction_added event', async () => {
     const req = makeSlackRequest({
       type: 'event_callback',

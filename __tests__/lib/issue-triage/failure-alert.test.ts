@@ -1,4 +1,4 @@
-import { alertIntakeFailure } from '@/lib/issue-triage/failure-alert'
+import { alertIntakeFailure, alertConfigError, CONFIG_ALERT_THROTTLE_MS } from '@/lib/issue-triage/failure-alert'
 
 process.env.SLACK_BOT_TOKEN = 'xoxb-test'
 process.env.SLACK_WORKSPACE_URL = 'https://test.slack.com'
@@ -143,5 +143,51 @@ describe('alertIntakeFailure', () => {
     const threadPost = posts().find(([channel]) => channel === 'C_ISSUES')
     expect(threadPost![1]).not.toContain('<@')
     expect(threadPost![1]).not.toMatch(/\s,|,\s*$/)
+  })
+})
+
+describe('alertConfigError', () => {
+  const T0 = 1_700_000_000_000
+
+  it('alerts the operators the first time a config error is reported', async () => {
+    await alertConfigError('FIRST_REPORT', 'FIRST_REPORT is not set', T0)
+
+    expect(posts()).toHaveLength(1)
+    expect(posts()[0][0]).toBe('C_IMPROVEMENTS')
+    expect(posts()[0][1]).toContain('FIRST_REPORT is not set')
+  })
+
+  it('names the offending variable as the stage so the alert is self-explanatory', async () => {
+    await alertConfigError('NAMED_VAR', 'NAMED_VAR is not set', T0)
+
+    expect(posts()[0][1]).toContain('NAMED_VAR')
+  })
+
+  it('posts no thread reply, since a config error has no thread to reply in', async () => {
+    await alertConfigError('NO_THREAD', 'broken', T0)
+
+    expect(posts().every(([channel]) => channel === 'C_IMPROVEMENTS')).toBe(true)
+  })
+
+  it('stays quiet for a repeat of the same config error inside the throttle window', async () => {
+    await alertConfigError('REPEATED', 'REPEATED is not set', T0)
+    await alertConfigError('REPEATED', 'REPEATED is not set', T0 + 1000)
+    await alertConfigError('REPEATED', 'REPEATED is not set', T0 + CONFIG_ALERT_THROTTLE_MS - 1)
+
+    expect(posts()).toHaveLength(1)
+  })
+
+  it('alerts again once the throttle window has elapsed', async () => {
+    await alertConfigError('ELAPSED', 'ELAPSED is not set', T0)
+    await alertConfigError('ELAPSED', 'ELAPSED is not set', T0 + CONFIG_ALERT_THROTTLE_MS)
+
+    expect(posts()).toHaveLength(2)
+  })
+
+  it('throttles each config key independently', async () => {
+    await alertConfigError('KEY_ONE', 'one is not set', T0)
+    await alertConfigError('KEY_TWO', 'two is not set', T0)
+
+    expect(posts()).toHaveLength(2)
   })
 })

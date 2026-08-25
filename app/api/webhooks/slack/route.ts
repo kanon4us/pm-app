@@ -23,7 +23,7 @@ import {
   resolveClickUpUserId,
 } from '@/lib/issue-triage/ticket-actions'
 import { validateIntakePromptChange } from '@/lib/issue-triage/sop-proposal-guard'
-import { alertIntakeFailure } from '@/lib/issue-triage/failure-alert'
+import { alertIntakeFailure, alertConfigError } from '@/lib/issue-triage/failure-alert'
 
 interface SlackFile {
   id: string
@@ -150,7 +150,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const issuesChannel = process.env.SLACK_ISSUES_CHANNEL_ID
   if (!issuesChannel) {
+    // Logged unthrottled (cheap, and what you grep for); alerted throttled.
+    // Runs in after() so the config alert cannot eat into Slack's 3s ack.
     console.error('[slack-webhook] SLACK_ISSUES_CHANNEL_ID is not set')
+    after(async () => {
+      await alertConfigError(
+        'SLACK_ISSUES_CHANNEL_ID',
+        'SLACK_ISSUES_CHANNEL_ID is not set, so every inbound Slack event is being dropped before triage. No tickets can be created until it is set in the Vercel environment.',
+      )
+    })
     return NextResponse.json({ ok: true })
   }
 
