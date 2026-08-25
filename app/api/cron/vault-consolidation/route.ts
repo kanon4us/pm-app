@@ -14,6 +14,7 @@ import { resolveAuthor } from '@/lib/vault/author-routing'
 import { buildManifest, serializeManifest, manifestContentEquals, manifestLooksDegraded, MANIFEST_PATH } from '@/lib/vault/manifest'
 import type { VaultManifest } from '@/lib/vault/manifest'
 import { readVaultFile, writeVaultFile } from '@/lib/github/vault'
+import { mapWithConcurrency } from '@/lib/vault/concurrency'
 
 export const maxDuration = 300
 
@@ -54,28 +55,104 @@ function githubHeaders(token: string) {
   }
 }
 
-// Chunk an array into sub-arrays of size `n`
-function chunk<T>(arr: T[], n: number): T[][] {
-  const chunks: T[][] = []
-  for (let i = 0; i < arr.length; i += n) chunks.push(arr.slice(i, i + n))
-  return chunks
+// ---------------------------------------------------------------------------
+// Rate-limit-aware GitHub fetch
+//
+// The snapshot costs ~2 requests per vault doc (one content read, one
+// last-commit lookup). At that volume GitHub's *secondary* rate limit — the
+// burst/concurrency one, separate from the 5,000/hr primary quota — is the
+// binding constraint. It answers 429, or 403 with `retry-after`, and a caller
+// that neither backs off nor bounds concurrency simply converts the whole run
+// into failed requests.
+// ---------------------------------------------------------------------------
+
+/** Max concurrent GitHub calls per phase. Deliberately well under the ~100 GitHub tolerates. */
+const GITHUB_CONCURRENCY = 8
+/** Retries per request when GitHub asks us to slow down. */
+const GITHUB_MAX_RETRIES = 4
+/** Ceiling on a single backoff sleep — the cron's own budget is maxDuration (300s). */
+const GITHUB_MAX_BACKOFF_MS = 15_000
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * True when GitHub is throttling us rather than reporting a real error.
+ * Covers 429 and the 403-with-retry-after / 403-with-zero-remaining variants
+ * the secondary limit uses.
+ */
+function isThrottled(res: Response): boolean {
+  if (res.status === 429) return true
+  if (res.status !== 403) return false
+  return (
+    res.headers.get('retry-after') !== null ||
+    res.headers.get('x-ratelimit-remaining') === '0'
+  )
+}
+
+/** How long to wait before retrying, honouring GitHub's own hint when it gives one. */
+function backoffMs(res: Response, attempt: number): number {
+  const retryAfter = Number(res.headers.get('retry-after'))
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter * 1000, GITHUB_MAX_BACKOFF_MS)
+  }
+  const reset = Number(res.headers.get('x-ratelimit-reset'))
+  if (Number.isFinite(reset) && reset > 0) {
+    const waitMs = reset * 1000 - Date.now()
+    if (waitMs > 0) return Math.min(waitMs, GITHUB_MAX_BACKOFF_MS)
+  }
+  // Exponential backoff with jitter so the pool's workers don't resynchronise.
+  const base = Math.min(500 * 2 ** attempt, GITHUB_MAX_BACKOFF_MS)
+  return base / 2 + Math.random() * (base / 2)
+}
+
+/** GET a GitHub API URL, retrying with backoff while GitHub is throttling us. */
+async function githubFetch(url: string, token: string): Promise<Response> {
+  let res = await fetch(url, { headers: githubHeaders(token) })
+  for (let attempt = 0; isThrottled(res) && attempt < GITHUB_MAX_RETRIES; attempt++) {
+    await sleep(backoffMs(res, attempt))
+    res = await fetch(url, { headers: githubHeaders(token) })
+  }
+  return res
+}
+
+// ---------------------------------------------------------------------------
+// GitHub deps builder (isolated so tests can mock snapshot/enqueue without
+// needing real GitHub connectivity).
+// ---------------------------------------------------------------------------
+
+/** Per-run counters, so a partially-degraded snapshot is visible instead of silent. */
+export interface GithubDepsStats {
+  /** Docs whose content read failed — they are missing from the snapshot entirely. */
+  contentFailures: number
+  /** Docs whose last-commit lookup failed — treated as recently-touched, so skipped this run. */
+  commitFailures: number
+}
+
+export interface GithubDeps extends SnapshotDeps {
+  stats: GithubDepsStats
 }
 
 /**
  * Build a SnapshotDeps implementation backed by real GitHub REST calls.
  * Exported so integration / smoke tests can call it directly.
  */
-export function buildGithubDeps(token: string): SnapshotDeps {
+export function buildGithubDeps(token: string): GithubDeps {
+  const stats: GithubDepsStats = { contentFailures: 0, commitFailures: 0 }
+
   return {
+    stats,
+
     /**
      * List all .md blob paths via the git trees API (single call, recursive),
-     * then fetch each file's content with bounded concurrency (~20 at once).
+     * then fetch each file's content with bounded concurrency.
      */
     async listDocs() {
       // GET /repos/{owner}/{repo}/git/trees/{branch}?recursive=1
-      const treeRes = await fetch(
+      const treeRes = await githubFetch(
         `${GITHUB_API}/repos/${VAULT_REPO}/git/trees/${VAULT_BRANCH}?recursive=1`,
-        { headers: githubHeaders(token) }
+        token
       )
       if (!treeRes.ok) {
         throw new Error(
@@ -89,51 +166,60 @@ export function buildGithubDeps(token: string): SnapshotDeps {
         (item) => item.type === 'blob' && item.path.endsWith('.md')
       )
 
-      // Fetch content in chunks to avoid overwhelming the GitHub API or the
-      // Vercel function's network concurrency limit.
-      const CHUNK_SIZE = 20
-      const results: Array<{ path: string; content: string; blobSha: string }> = []
+      type DocContent = { path: string; content: string; blobSha: string }
 
-      for (const blobChunk of chunk(blobs, CHUNK_SIZE)) {
-        const chunkResults = await Promise.all(
-          blobChunk.map(async ({ path, sha }) => {
-            const contentRes = await fetch(
-              `${GITHUB_API}/repos/${VAULT_REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${VAULT_BRANCH}`,
-              { headers: githubHeaders(token) }
-            )
-            if (!contentRes.ok) return null
-            const data: { content?: string; type?: string } = await contentRes.json()
-            if (data.type !== 'file' || !data.content) return null
-            const content = Buffer.from(data.content, 'base64').toString('utf-8')
-            return { path, content, blobSha: sha }
-          })
+      const fetched = await mapWithConcurrency<
+        { path: string; type: string; sha: string },
+        DocContent | null
+      >(blobs, GITHUB_CONCURRENCY, async ({ path, sha }) => {
+        const contentRes = await githubFetch(
+          `${GITHUB_API}/repos/${VAULT_REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${VAULT_BRANCH}`,
+          token
         )
-        for (const r of chunkResults) {
-          if (r) results.push(r)
+        if (!contentRes.ok) {
+          stats.contentFailures++
+          return null
         }
-      }
+        const data: { content?: string; type?: string } = await contentRes.json()
+        if (data.type !== 'file' || !data.content) {
+          stats.contentFailures++
+          return null
+        }
+        const content = Buffer.from(data.content, 'base64').toString('utf-8')
+        return { path, content, blobSha: sha }
+      })
 
-      return results
+      return fetched.filter((r): r is DocContent => r !== null)
     },
 
     /**
      * Fetch the most recent commit for a path.
      * GET /repos/{owner}/{repo}/commits?path=<path>&per_page=1
+     *
+     * On failure we report the doc as committed *now*. That is the fail-safe
+     * direction: `isStable` then reads it as freshly-touched and skips it this
+     * run, to be picked up next week. The previous epoch fallback did the
+     * opposite of what its comment claimed — epoch is maximally old, so every
+     * throttled doc was marked stable AND lost its committer email, routing a
+     * DM about it to the PM fallback.
      */
     async lastCommit(path: string) {
-      const res = await fetch(
-        `${GITHUB_API}/repos/${VAULT_REPO}/commits?path=${encodeURIComponent(path)}&per_page=1`,
-        { headers: githubHeaders(token) }
-      )
-      if (!res.ok) {
-        // Fallback: epoch so the doc won't be filtered as stable
-        return { iso: new Date(0).toISOString(), email: 'unknown' }
+      const unknown = () => {
+        stats.commitFailures++
+        return { iso: new Date().toISOString(), email: 'unknown' }
       }
+
+      const res = await githubFetch(
+        `${GITHUB_API}/repos/${VAULT_REPO}/commits?path=${encodeURIComponent(path)}&per_page=1`,
+        token
+      )
+      if (!res.ok) return unknown()
+
       const data: Array<{
         commit: { committer: { date: string }; author: { email: string } }
       }> = await res.json()
       const first = data[0]
-      if (!first) return { iso: new Date(0).toISOString(), email: 'unknown' }
+      if (!first) return unknown()
       return {
         iso: first.commit.committer.date,
         email: first.commit.author.email,
@@ -178,6 +264,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const deps = buildGithubDeps(token)
   const snap = await buildSnapshot(runId, deps)
 
+  // Surface partial GitHub failures. Both counters degrade the run silently
+  // otherwise: a content failure drops the doc from the snapshot, a commit
+  // failure makes the doc look freshly-touched so it is skipped this week.
+  const { contentFailures, commitFailures } = deps.stats
+  if (contentFailures > 0 || commitFailures > 0) {
+    console.error(
+      `[vault-cron] degraded snapshot for ${runId}: ${contentFailures} content read(s) and ` +
+        `${commitFailures} commit lookup(s) failed after retries (${snap.docs.length} docs in snapshot)`
+    )
+  }
+  const githubFailures =
+    contentFailures > 0 || commitFailures > 0
+      ? { githubFailures: { contentFailures, commitFailures } }
+      : {}
+
   // Stable docs (the consolidation candidates), capped by `limit`.
   const stableDocs = snap.docs.filter((d) => isStable(d.lastCommitISO, now)).slice(0, limit)
 
@@ -204,6 +305,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({
       dryRun: true,
       runId,
+      ...githubFailures,
       totalDocs: snap.docs.length,
       stableDocs: stableDocs.length,
       withQuestions: docs.filter((d) => d.questions.length > 0).length,
@@ -305,6 +407,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     result: 'ok',
     runId,
+    ...githubFailures,
     enqueued,
     ...(enqueueFailed > 0 ? { enqueueFailed } : {}),
   })

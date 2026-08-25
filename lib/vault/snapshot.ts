@@ -3,6 +3,7 @@
 // All I/O is injected via SnapshotDeps so this module is fully unit-testable.
 
 import { buildBacklinkMap, BacklinkMap } from '@/lib/vault/backlinks'
+import { mapWithConcurrency } from '@/lib/vault/concurrency'
 import { readFrontmatter } from '@/lib/vault/frontmatter'
 import type { VaultDoc, RunSnapshot } from '@/lib/vault/types'
 import type { Json } from '@/lib/supabase/types'
@@ -21,6 +22,10 @@ export interface SnapshotDeps {
 // Core builder (fully testable — no GitHub / Supabase coupling)
 // ---------------------------------------------------------------------------
 
+// Max concurrent `lastCommit` lookups. GitHub's secondary rate limit punishes
+// wide bursts far more aggressively than sustained moderate concurrency.
+export const LAST_COMMIT_CONCURRENCY = 8
+
 export async function buildSnapshot(runId: string, deps: SnapshotDeps): Promise<RunSnapshot> {
   // Strip NUL characters at ingestion: Postgres jsonb rejects \u0000 (22P05),
   // so a single corrupt byte in one doc would otherwise fail the whole
@@ -29,7 +34,13 @@ export async function buildSnapshot(runId: string, deps: SnapshotDeps): Promise<
     d.content.includes('\u0000') ? { ...d, content: d.content.replaceAll('\u0000', '') } : d
   )
 
-  const commits = await Promise.all(rawDocs.map((d) => deps.lastCommit(d.path)))
+  // Bounded fan-out: `lastCommit` is one API call PER DOC. An unbounded
+  // Promise.all over the whole vault opens every connection at once, which
+  // trips GitHub's secondary (concurrency/burst) rate limit and turns a normal
+  // run into hundreds of failed requests inside the cron's 5-minute window.
+  const commits = await mapWithConcurrency(rawDocs, LAST_COMMIT_CONCURRENCY, (d) =>
+    deps.lastCommit(d.path)
+  )
 
   const docs: VaultDoc[] = rawDocs.map((raw, i) => ({
     path: raw.path,
