@@ -83,3 +83,40 @@ export async function alertIntakeFailure(failure: IntakeFailure): Promise<void> 
     console.error('[slack-webhook] failure alert: operator alert failed:', postErr)
   }
 }
+
+/** How long a given config error stays quiet after being reported once. */
+export const CONFIG_ALERT_THROTTLE_MS = 60 * 60 * 1000
+
+// Last time each config key was alerted on. In-memory, so it is per-lambda-
+// instance: several warm instances may each alert once an hour rather than
+// exactly once globally. That is the deliberate trade. A misconfigured env var
+// is reported on EVERY inbound event, so unthrottled this would bury the
+// operators channel; and the durable alternative (a Supabase dedup row) would
+// put a DB round trip on the one path we already know is broken, and fails
+// entirely when Supabase is what broke. A handful of duplicate alerts an hour
+// is a much better failure mode than either silence or a flood.
+const lastConfigAlert = new Map<string, number>()
+
+/**
+ * Report a misconfiguration that is stopping the bot from working at all.
+ *
+ * Unlike alertIntakeFailure there is no thread to reply in — a config error is
+ * caught before we know whether the event even belongs to the support channel,
+ * so replying could put bot noise into an unrelated conversation. Operators
+ * only. Never throws.
+ *
+ * @param key   The offending setting, e.g. 'SLACK_ISSUES_CHANNEL_ID'. Throttled
+ *              per key, so one broken variable cannot mask another.
+ * @param now   Injected for tests, mirroring decideStaleActions.
+ */
+export async function alertConfigError(
+  key: string,
+  detail: string,
+  now: number = Date.now(),
+): Promise<void> {
+  const last = lastConfigAlert.get(key)
+  if (last !== undefined && now - last < CONFIG_ALERT_THROTTLE_MS) return
+  lastConfigAlert.set(key, now)
+
+  await alertIntakeFailure({ stage: `config:${key}`, err: detail })
+}
