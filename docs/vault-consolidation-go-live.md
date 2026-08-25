@@ -39,10 +39,17 @@ The answer flow breaks silently without these:
 - The bot must be a **member of** `VAULT_CONSOLIDATION_SLACK_CHANNEL` to post the digest.
 
 ### ❗ GitHub token capability
-- `GITHUB_TOKEN` must have **write/push access to `ViscapMedia/documentation`** — the
+- `GITHUB_TOKEN` must have **write/push access to `Viscap-Media/documentation`** — the
   write path commits files and creates branches (`writeVaultFile`, `createBranch`).
   Read-only or expired = the answer→commit step fails. The dry-run confirms *read*;
   write must be verified on the first scoped run.
+- **Verify `GITHUB_VAULT_REPO` reads `Viscap-Media/documentation`** — the org is
+  hyphenated. It is listed as already present in prod (above), so this is a value
+  check, not a new var. It matters because the code fallback said `ViscapMedia` until
+  2026-08 and worked only by accident: GitHub 301-redirects a renamed org and `fetch`
+  follows it on the same host, so the `Authorization` header survives. That redirect
+  holds only while nobody claims the old name. If the env var is ever unset or wrong,
+  the app silently rides that redirect until it stops existing.
 
 ### ✅ Queue serialization (fixed 2026-06)
 - `lib/queue/client.ts` now exposes `enqueueToQueue(queueName, url, body)` which routes
@@ -60,6 +67,42 @@ The answer flow breaks silently without these:
 - **Full multi-author production** — ✅ queue serialization now wired (see above);
   remaining requirement is just the same env/Slack/GitHub setup as the scoped run.
 
+## GitHub rate limiting (fixed 2026-08)
+
+The snapshot costs ~2 GitHub requests per doc — one content read, one last-commit
+lookup — so at 374 docs a run is ~749 requests. The commit lookups used to fire
+through an unbounded `Promise.all`, which trips GitHub's **secondary** rate limit
+(the burst/concurrency one, separate from the 5,000/hr primary quota). A run was
+observed failing ~766 requests in its 5-minute window: essentially the whole run.
+
+Worse, the failure fallback stamped the epoch, so `isStable()` read every throttled
+doc as stale, fanned it out, and — with `email: 'unknown'` missing the Slack map —
+routed the resulting DMs to the PM fallback.
+
+Now: lookups run 8-at-a-time through `lib/vault/concurrency.ts`, `githubFetch` backs
+off on 429 / 403-with-`retry-after` honouring GitHub's own hints, and an unreadable
+doc is stamped *now* (skipped this week, retried next) instead of the epoch. Failures
+are counted and surfaced as `githubFailures`.
+
+At 374 docs the primary quota is ~15% used, so it is not the constraint. Note the
+secondary limit also caps ~900 points/min; 8-way concurrency can still brush it, but
+that now degrades to backoff-and-retry and the run still completes inside
+`maxDuration` (300s). If `githubFailures` shows up repeatedly, lower the concurrency
+constant — ~3 fits under 900/min.
+
+## QStash retry behaviour (fixed 2026-08)
+
+Every non-2xx from `/process` and `/write` is redelivered by QStash, so a throw is a
+request to be retried. Failures that no retry could fix — a malformed
+`VAULT_AUTHOR_SLACK_MAP`, an empty DM target, `user_not_found` — used to throw and
+loop. Now they are classified: transient Slack errors return 503 so QStash retries,
+permanent ones ack with 200 and write a `status: 'undelivered'` session row so the doc
+is not silently lost.
+
+`/write` also gained a replay guard — a session already `answered`/`aborted` is acked
+rather than re-applied, so a redelivery can no longer downgrade a completed review to
+`aborted` and warn the author about their own edit.
+
 ## Runbook (in order)
 
 1. **Dry-run** (read-only, zero side effects):
@@ -68,7 +111,14 @@ The answer flow breaks silently without these:
      "https://viscap.edgefixautomation.com/api/cron/vault-consolidation?dryRun=1"
    ```
    Confirm `totalDocs > 0` (proves the GitHub token can read the vault) and eyeball the
-   proposed questions + author routing.
+   proposed questions + author routing. As of 2026-08-25 the vault holds **374 `.md`
+   files**, of which ~299 are stable (>7 days untouched) — that stable count is the
+   fan-out size, i.e. how many messages the live run enqueues to `/process`.
+
+   **`githubFailures` must be absent from the response.** If it appears, the snapshot
+   is degraded: `contentFailures` means those docs are missing from the snapshot
+   entirely, `commitFailures` means they were treated as freshly-touched and skipped
+   this week. Either way the run is incomplete — see "GitHub rate limiting" below.
 2. **Add the env vars** above; **redeploy** (`npx vercel --prod`).
 3. **Configure the Slack app**: Interactivity Request URL + bot scopes + add the bot to
    the test channel.
