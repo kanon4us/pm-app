@@ -1,4 +1,4 @@
-import { buildSlackClient } from '@/lib/slack/client'
+import { buildSlackClient, SlackApiError, isTransientSlackError } from '@/lib/slack/client'
 
 const TOKEN = 'xoxb-test-token'
 
@@ -79,5 +79,58 @@ describe('buildSlackClient', () => {
       const [url] = (global.fetch as jest.Mock).mock.calls[0]
       expect(url).toContain('conversations.replies')
     })
+  })
+})
+
+describe('SlackApiError', () => {
+  beforeEach(() => { global.fetch = jest.fn() })
+
+  it('carries the Slack error code so callers can classify the failure', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: false, error: 'user_not_found' }),
+    })
+
+    const client = buildSlackClient(TOKEN)
+    await expect(client.postMessage('C1', 'Hi')).rejects.toThrow(SlackApiError)
+    await expect(client.postMessage('C1', 'Hi')).rejects.toMatchObject({
+      code: 'user_not_found',
+      method: 'chat.postMessage',
+    })
+  })
+
+  it('stays a plain Error subclass so existing .message handling is unchanged', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: false, error: 'channel_not_found' }),
+    })
+
+    const err = await buildSlackClient(TOKEN).postMessage('C1', 'Hi').catch((e) => e)
+    expect(err).toBeInstanceOf(Error)
+    expect(err.message).toBe('channel_not_found')
+  })
+})
+
+describe('isTransientSlackError', () => {
+  it.each(['ratelimited', 'internal_error', 'service_unavailable', 'fatal_error'])(
+    'treats %s as transient (worth retrying)',
+    (code) => {
+      expect(isTransientSlackError(new SlackApiError(code, 'chat.postMessage'))).toBe(true)
+    }
+  )
+
+  it.each(['user_not_found', 'channel_not_found', 'invalid_blocks', 'is_archived', 'cannot_dm_bot'])(
+    'treats %s as permanent (retrying cannot help)',
+    (code) => {
+      expect(isTransientSlackError(new SlackApiError(code, 'chat.postMessage'))).toBe(false)
+    }
+  )
+
+  it('treats a network-level failure as transient', () => {
+    expect(isTransientSlackError(new TypeError('fetch failed'))).toBe(true)
+  })
+
+  it('treats an unrecognised Slack code as permanent so a bad message cannot loop forever', () => {
+    expect(isTransientSlackError(new SlackApiError('some_new_code', 'chat.postMessage'))).toBe(false)
   })
 })

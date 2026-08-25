@@ -11,6 +11,7 @@ process.env.PM_SLACK_ID = 'U_PM'
 
 import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/vault/consolidation/process/route'
+import { SlackApiError } from '@/lib/slack/client'
 
 // ── mock helpers ──────────────────────────────────────────────────────────────
 // IMPORTANT: jest.mock factories are hoisted above all declarations, so outer
@@ -33,6 +34,7 @@ jest.mock('@/lib/vault/llm', () => ({
 
 let mockDm: jest.Mock
 jest.mock('@/lib/slack/client', () => ({
+  ...jest.requireActual('@/lib/slack/client'),
   buildSlackClient: jest.fn().mockImplementation(() => ({
     dm: (...args: unknown[]) => mockDm(...args),
   })),
@@ -180,5 +182,85 @@ describe('POST /api/vault/consolidation/process', () => {
         status: 'digest',
       })
     )
+  })
+
+  // ── failure isolation ───────────────────────────────────────────────────────
+  //
+  // Every non-2xx from this route is retried by QStash. A failure that a retry
+  // cannot fix must therefore be acked (200), or one bad message becomes an
+  // unbounded stream of failed requests against this route.
+
+  describe('failure isolation', () => {
+    const ORIGINAL_MAP = process.env.VAULT_AUTHOR_SLACK_MAP
+    const ORIGINAL_PM = process.env.PM_SLACK_ID
+
+    afterEach(() => {
+      process.env.VAULT_AUTHOR_SLACK_MAP = ORIGINAL_MAP
+      process.env.PM_SLACK_ID = ORIGINAL_PM
+    })
+
+    it('acks instead of throwing when VAULT_AUTHOR_SLACK_MAP is malformed', async () => {
+      // A bad env var fails identically for every message in the run, so a
+      // 500 here would retry the entire fan-out to no purpose.
+      process.env.VAULT_AUTHOR_SLACK_MAP = '{not valid json'
+
+      const res = await POST(makeRequest({ runId: '2026-W25', docPath: 'docs/stable-doc.md' }))
+
+      expect(res.status).toBe(200)
+    })
+
+    it('still routes to the PM fallback when the author map is malformed', async () => {
+      process.env.VAULT_AUTHOR_SLACK_MAP = '{not valid json'
+
+      await POST(makeRequest({ runId: '2026-W25', docPath: 'docs/stable-doc.md' }))
+
+      expect(mockDm).toHaveBeenCalledWith('U_PM', expect.anything(), expect.any(String))
+    })
+
+    it('acks without calling Slack when no DM target can be resolved', async () => {
+      process.env.VAULT_AUTHOR_SLACK_MAP = '{}'
+      process.env.PM_SLACK_ID = ''
+
+      const res = await POST(makeRequest({ runId: '2026-W25', docPath: 'docs/stable-doc.md' }))
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ result: 'no-slack-target' })
+      expect(mockDm).not.toHaveBeenCalled()
+    })
+
+    it('acks a permanent Slack failure so QStash stops retrying', async () => {
+      mockDm.mockRejectedValue(new SlackApiError('user_not_found', 'conversations.open'))
+
+      const res = await POST(makeRequest({ runId: '2026-W25', docPath: 'docs/stable-doc.md' }))
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ result: 'dm-failed', error: 'user_not_found' })
+    })
+
+    it('records the undelivered session when a permanent Slack failure is acked', async () => {
+      mockDm.mockRejectedValue(new SlackApiError('cannot_dm_bot', 'conversations.open'))
+
+      await POST(makeRequest({ runId: '2026-W25', docPath: 'docs/stable-doc.md' }))
+
+      expect(mockInsertChain).toHaveBeenCalledWith(
+        expect.objectContaining({ doc_path: 'docs/stable-doc.md', status: 'undelivered' })
+      )
+    })
+
+    it('returns 503 on a transient Slack failure so QStash does retry', async () => {
+      mockDm.mockRejectedValue(new SlackApiError('ratelimited', 'chat.postMessage'))
+
+      const res = await POST(makeRequest({ runId: '2026-W25', docPath: 'docs/stable-doc.md' }))
+
+      expect(res.status).toBe(503)
+    })
+
+    it('does not insert a session row when the DM will be retried', async () => {
+      mockDm.mockRejectedValue(new SlackApiError('internal_error', 'chat.postMessage'))
+
+      await POST(makeRequest({ runId: '2026-W25', docPath: 'docs/stable-doc.md' }))
+
+      expect(mockInsertChain).not.toHaveBeenCalled()
+    })
   })
 })
