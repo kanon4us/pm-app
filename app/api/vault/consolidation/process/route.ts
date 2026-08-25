@@ -9,7 +9,7 @@ import { buildQuestions } from '@/lib/vault/questions'
 import { phraseQuestionText } from '@/lib/vault/llm'
 import { buildQuestionCard } from '@/lib/vault/blockkit'
 import { resolveAuthor } from '@/lib/vault/author-routing'
-import { buildSlackClient } from '@/lib/slack/client'
+import { buildSlackClient, isTransientSlackError, SlackApiError } from '@/lib/slack/client'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
 
 export const maxDuration = 60
@@ -72,7 +72,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // 6. Resolve author route
   const slackMapRaw = process.env.VAULT_AUTHOR_SLACK_MAP ?? '{}'
-  const slackMap: Record<string, string> = JSON.parse(slackMapRaw)
+  // A malformed map is a deploy-config error: it fails identically for every
+  // message in the run, so throwing here would make QStash retry the whole
+  // fan-out to no purpose. Fall back to the PM and keep going.
+  let slackMap: Record<string, string> = {}
+  try {
+    slackMap = JSON.parse(slackMapRaw)
+  } catch {
+    console.error('[vault/process] VAULT_AUTHOR_SLACK_MAP is not valid JSON — routing to PM fallback')
+  }
   const pmFallback = process.env.PM_SLACK_ID ?? ''
   const route = resolveAuthor(doc, slackMap, pmFallback)
 
@@ -119,6 +127,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ result: 'digest-queued' }, { status: 200 })
   }
 
+  // No target means no PM_SLACK_ID and no mapping — Slack would reject the
+  // conversations.open call every time, so ack rather than retry.
+  if (!dmTarget) {
+    console.error(`[vault/process] no Slack target for ${docPath} (author ${route.key})`)
+    return NextResponse.json({ result: 'no-slack-target' }, { status: 200 })
+  }
+
   // Under cap: DM the primary question
   const primaryQuestion = questions[0]
   const bodyText = await phraseQuestionText(primaryQuestion, {
@@ -134,12 +149,46 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     blockId,
   })
 
+  // Every non-2xx from this route is retried by QStash, so a Slack failure has
+  // to be classified rather than thrown: retry what a retry can fix, ack what
+  // it cannot. Left unguarded, one undeliverable DM becomes a retry loop.
   const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
-  const dmResult = await slack.dm(
-    dmTarget,
-    blocks as Record<string, unknown>[],
-    bodyText,
-  )
+  let dmResult: { ok: boolean; ts?: string; channel?: string }
+  try {
+    dmResult = await slack.dm(
+      dmTarget,
+      blocks as Record<string, unknown>[],
+      bodyText,
+    )
+  } catch (err) {
+    if (isTransientSlackError(err)) {
+      console.error(`[vault/process] transient Slack failure for ${docPath} — will retry:`, err)
+      return NextResponse.json({ error: 'Slack unavailable' }, { status: 503 })
+    }
+
+    // Permanent: record the doc as undelivered so the run still has a trace of
+    // it, and ack so QStash drops the message.
+    const code = err instanceof SlackApiError ? err.code : 'unknown'
+    console.error(`[vault/process] permanent Slack failure for ${docPath} (${code}) — acking`)
+
+    const { error: undeliveredError } = await supabase
+      .from('vault_review_sessions')
+      .insert({
+        run_id: runId,
+        doc_path: docPath,
+        author_email: route.key,
+        author_slack_id: dmTarget,
+        status: 'undelivered',
+        base_blob_sha: doc.blobSha,
+        branch: `vault-consolidation/${runId}`,
+        question_id: primaryQuestion.id,
+      })
+    if (undeliveredError) {
+      console.error('[vault/process] undelivered insert failed:', undeliveredError)
+    }
+
+    return NextResponse.json({ result: 'dm-failed', error: code }, { status: 200 })
+  }
 
   // Insert open session row
   const { error: insertError } = await supabase

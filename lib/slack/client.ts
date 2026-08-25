@@ -7,6 +7,45 @@ export interface SlackMessage {
   ts: string
 }
 
+/**
+ * A Slack API call that came back `ok: false`.
+ *
+ * Carries the raw Slack error code so callers can tell a permanent failure
+ * (`user_not_found` — retrying will never help) from a transient one
+ * (`ratelimited` — retrying is exactly right). `message` is the code itself,
+ * so existing `err.message` handling is unaffected.
+ */
+export class SlackApiError extends Error {
+  readonly code: string
+  readonly method: string
+
+  constructor(code: string, method: string) {
+    super(code)
+    this.name = 'SlackApiError'
+    this.code = code
+    this.method = method
+  }
+}
+
+/**
+ * Slack error codes worth retrying. Everything else is a property of the
+ * message or the target, not of the moment, so a retry just reproduces it.
+ *
+ * A non-Slack throw (network reset, DNS, timeout) is treated as transient.
+ */
+const TRANSIENT_SLACK_CODES = new Set([
+  'ratelimited',
+  'internal_error',
+  'service_unavailable',
+  'fatal_error',
+  'request_timeout',
+])
+
+export function isTransientSlackError(err: unknown): boolean {
+  if (err instanceof SlackApiError) return TRANSIENT_SLACK_CODES.has(err.code)
+  return true
+}
+
 async function slackFetch<T>(token: string, method: string, body: object): Promise<T> {
   const res = await fetch(`${SLACK_BASE}/${method}`, {
     method: 'POST',
@@ -17,7 +56,7 @@ async function slackFetch<T>(token: string, method: string, body: object): Promi
     body: JSON.stringify(body),
   })
   const json = (await res.json()) as { ok: boolean; error?: string } & T
-  if (!json.ok) throw new Error(json.error ?? `Slack API error on ${method}`)
+  if (!json.ok) throw new SlackApiError(json.error ?? `Slack API error on ${method}`, method)
   return json
 }
 
