@@ -1,5 +1,6 @@
 import { POST } from '@/app/api/webhooks/slack/route'
 import { NextRequest } from 'next/server'
+import { STATUS_ACTION_ID } from '@/lib/issue-triage/ticket-actions'
 import crypto from 'crypto'
 
 const SIGNING_SECRET = 'test-signing-secret'
@@ -114,6 +115,24 @@ function makeSlackRequest(body: object): NextRequest {
   })
 }
 
+/** Slack sends interactive payloads form-encoded, not as JSON. */
+function makeSlackFormRequest(payloadJson: string): NextRequest {
+  const body = `payload=${encodeURIComponent(payloadJson)}`
+  const ts = String(Math.floor(Date.now() / 1000))
+  const base = `v0:${ts}:${body}`
+  const sig = 'v0=' + crypto.createHmac('sha256', SIGNING_SECRET).update(base).digest('hex')
+
+  return new NextRequest('http://localhost/api/webhooks/slack', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'x-slack-request-timestamp': ts,
+      'x-slack-signature': sig,
+    },
+    body,
+  })
+}
+
 describe('POST /api/webhooks/slack', () => {
   it('echoes the URL verification challenge', async () => {
     const req = makeSlackRequest({ type: 'url_verification', challenge: 'xyz-challenge' })
@@ -175,6 +194,71 @@ describe('POST /api/webhooks/slack', () => {
       expect.any(Array),
       '1234567890.000001',
     )
+  })
+
+  it('warns the thread and alerts operators when ticket creation throws', async () => {
+    const { createTicket } = jest.requireMock('@/lib/issue-triage/router')
+    const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+    const slack = buildSlackClient()
+    slack.postMessage.mockClear()
+    createTicket.mockRejectedValueOnce(new Error('CLICKUP_BOT_TOKEN is not set'))
+
+    const req = makeSlackRequest({
+      type: 'event_callback',
+      event: { type: 'message', user: 'U001', channel: 'C_ISSUES', text: 'everything is broken', ts: '1234567890.000009' },
+    })
+    const res = await POST(req)
+    await flushAfter()
+
+    expect(res.status).toBe(200)
+
+    const calls = slack.postMessage.mock.calls
+    const threadWarning = calls.find(([channel]: [string]) => channel === 'C_ISSUES')
+    expect(threadWarning).toBeDefined()
+    expect(threadWarning[2]).toBe('1234567890.000009')
+
+    const opsAlert = calls.find(([channel]: [string]) => channel === 'C_IMPROVEMENTS')
+    expect(opsAlert).toBeDefined()
+    expect(opsAlert[1]).toContain('CLICKUP_BOT_TOKEN is not set')
+  })
+
+  it('stays quiet when intake succeeds', async () => {
+    const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+    const slack = buildSlackClient()
+    slack.postMessage.mockClear()
+
+    const req = makeSlackRequest({
+      type: 'event_callback',
+      event: { type: 'message', user: 'U001', channel: 'C_ISSUES', text: 'a normal report', ts: '1234567890.000010' },
+    })
+    await POST(req)
+    await flushAfter()
+
+    const opsAlerts = slack.postMessage.mock.calls.filter(([channel]: [string]) => channel === 'C_IMPROVEMENTS')
+    expect(opsAlerts).toHaveLength(0)
+  })
+
+  it('alerts operators when an interactive action throws', async () => {
+    const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+    const slack = buildSlackClient()
+    slack.postMessage.mockClear()
+    const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
+    getSupabaseServiceClient.mockRejectedValueOnce(new Error('supabase unreachable'))
+
+    const payload = JSON.stringify({
+      type: 'block_actions',
+      trigger_id: 'T1',
+      channel: { id: 'C_ISSUES' },
+      message: { ts: '1234567890.000011', thread_ts: '1234567890.000011' },
+      user: { id: 'U_DEV' },
+      actions: [{ action_id: STATUS_ACTION_ID, selected_option: { value: 'done' } }],
+    })
+    const res = await POST(makeSlackFormRequest(payload))
+    await flushAfter()
+
+    expect(res.status).toBe(200)
+    const opsAlert = slack.postMessage.mock.calls.find(([channel]: [string]) => channel === 'C_IMPROVEMENTS')
+    expect(opsAlert).toBeDefined()
   })
 
   it('returns 200 for a reaction_added event', async () => {

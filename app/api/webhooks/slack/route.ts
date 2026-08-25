@@ -23,6 +23,7 @@ import {
   resolveClickUpUserId,
 } from '@/lib/issue-triage/ticket-actions'
 import { validateIntakePromptChange } from '@/lib/issue-triage/sop-proposal-guard'
+import { alertIntakeFailure } from '@/lib/issue-triage/failure-alert'
 
 interface SlackFile {
   id: string
@@ -98,11 +99,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const parsed = JSON.parse(payloadStr) as SlackBlockAction | SlackViewSubmission
     if (parsed.type === 'block_actions') {
-      after(async () => { await handleBlockAction(parsed as SlackBlockAction) })
+      const blockAction = parsed as SlackBlockAction
+      after(async () => {
+        try { await handleBlockAction(blockAction) } catch (err) {
+          await alertIntakeFailure({
+            stage: 'block-action',
+            err,
+            channel: blockAction.channel?.id,
+            threadTs: blockAction.message?.thread_ts ?? blockAction.message?.ts,
+          })
+        }
+      })
       return NextResponse.json({ ok: true })
     }
     if (parsed.type === 'view_submission') {
-      after(async () => { await handleViewSubmission(parsed as SlackViewSubmission) })
+      const submission = parsed as SlackViewSubmission
+      after(async () => {
+        try { await handleViewSubmission(submission) } catch (err) {
+          await alertIntakeFailure({ stage: 'view-submission', err })
+        }
+      })
       // Slack closes a modal only on an empty 200 (or a valid response_action).
       // A non-empty body like {ok:true} is read as an invalid response_action and
       // surfaces "We had some trouble connecting. Try again?" in the modal.
@@ -142,7 +158,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (event.type === 'reaction_added') {
     const re = event as SlackReactionEvent
     if (re.item.channel === issuesChannel) {
-      after(async () => { await handleReaction(re) })
+      after(async () => {
+        try { await handleReaction(re) } catch (err) {
+          await alertIntakeFailure({
+            stage: 'reaction-added',
+            err,
+            channel: re.item.channel,
+            threadTs: re.item.ts,
+          })
+        }
+      })
     }
     return NextResponse.json({ ok: true })
   }
@@ -156,7 +181,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   after(async () => {
     try { await processMessageEvent(msgEvent) } catch (err) {
-      console.error('[slack-webhook] after() error:', err)
+      await alertIntakeFailure({
+        stage: 'message-event',
+        err,
+        channel: msgEvent.channel,
+        threadTs: msgEvent.thread_ts ?? msgEvent.ts,
+      })
     }
   })
 
