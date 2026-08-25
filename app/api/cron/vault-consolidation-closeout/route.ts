@@ -15,7 +15,7 @@ export const maxDuration = 60
 // ---------------------------------------------------------------------------
 
 const GITHUB_API = 'https://api.github.com'
-const VAULT_REPO = process.env.GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'
+const VAULT_REPO = process.env.GITHUB_VAULT_REPO ?? 'Viscap-Media/documentation'
 
 function githubHeaders(token: string) {
   return {

@@ -207,7 +207,7 @@ I_NDM_norm = sum(NDM_role_weight × usage_freq) / 224
 Usage frequency: 1=Access Default, 2=Access Sometimes, 3=Uses Sometimes, 4=Uses Every Day
 Risk levels: 1.0=Routine, 1.2=Standard, 1.5=Moderate, 2.0=High, 3.0=Critical
 
-THE 7 OBJECTIVES, SCORE MATRICES, AND RISK FRAMEWORK (${devObjectivesContent ? 'sourced live from ViscapMedia/documentation/DevObjectives — canonical source of truth' : 'fallback: DB-seeded data — vault not connected'}):
+THE 7 OBJECTIVES, SCORE MATRICES, AND RISK FRAMEWORK (${devObjectivesContent ? 'sourced live from Viscap-Media/documentation/DevObjectives — canonical source of truth' : 'fallback: DB-seeded data — vault not connected'}):
 ${objectivesText}
 
 AVAILABLE ROLES FOR INFLUENCE CALCULATION:

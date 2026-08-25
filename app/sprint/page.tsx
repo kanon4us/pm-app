@@ -1229,7 +1229,7 @@ export default function SprintPage() {
                   <div style={{ marginTop: 4 }}>
                     {detailTask.git_branch ? (
                       <a
-                        href={`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_VAULT_REPO ?? 'ViscapMedia/documentation'}/tree/${detailTask.git_branch}`}
+                        href={`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_VAULT_REPO ?? 'Viscap-Media/documentation'}/tree/${detailTask.git_branch}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: '#58a6ff', fontSize: 11 }}
