@@ -9,7 +9,7 @@ function makeRequest(email: string) {
   return new NextRequest(`http://localhost/api/developers/${email}/experiment`)
 }
 
-function makeSupabaseMock(overrides: { version?: number; clickupSprintId?: string; startsAt?: string } = {}) {
+function makeSupabaseMock(overrides: { version?: number; clickupSprintId?: string; startDate?: string } = {}) {
   return {
     from: jest.fn().mockImplementation((table: string) => {
       const base = {
@@ -28,7 +28,7 @@ function makeSupabaseMock(overrides: { version?: number; clickupSprintId?: strin
           single: jest.fn().mockResolvedValue({
             data: {
               clickup_sprint_id: overrides.clickupSprintId ?? null,
-              starts_at: overrides.startsAt ?? '2026-06-01T00:00:00Z',
+              start_date: overrides.startDate ?? '2026-06-01T00:00:00Z',
             },
           }),
         }
@@ -41,7 +41,7 @@ function makeSupabaseMock(overrides: { version?: number; clickupSprintId?: strin
 describe('GET /api/developers/[email]/experiment', () => {
   it('returns experiment context with version, bundle_version, and sprint', async () => {
     const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
-    getSupabaseServiceClient.mockResolvedValue(makeSupabaseMock({ version: 3, startsAt: '2026-07-01T00:00:00Z' }))
+    getSupabaseServiceClient.mockResolvedValue(makeSupabaseMock({ version: 3, startDate: '2026-07-01T00:00:00Z' }))
 
     const req = makeRequest('dev@example.com')
     const res = await GET(req, { params: Promise.resolve({ email: 'dev@example.com' }) })
@@ -56,7 +56,7 @@ describe('GET /api/developers/[email]/experiment', () => {
   it('returns sprint from clickup_sprint_id when it contains a date', async () => {
     const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
     getSupabaseServiceClient.mockResolvedValue(
-      makeSupabaseMock({ clickupSprintId: 'sprint-2026-08-planning', startsAt: '2026-06-01T00:00:00Z' })
+      makeSupabaseMock({ clickupSprintId: 'sprint-2026-08-planning', startDate: '2026-06-01T00:00:00Z' })
     )
 
     const req = makeRequest('dev@example.com')
