@@ -133,6 +133,16 @@ function makeSlackFormRequest(payloadJson: string): NextRequest {
   })
 }
 
+/**
+ * The Block Kit payload of a postBlocks call, flattened for substring checks.
+ * postBlocks(channel, fallbackText, blocks, threadTs) — what the reporter
+ * actually reads is the blocks, not the fallback text.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderedBlocks(call: any[]): string {
+  return JSON.stringify(call[2])
+}
+
 describe('POST /api/webhooks/slack', () => {
   it('echoes the URL verification challenge', async () => {
     const req = makeSlackRequest({ type: 'url_verification', challenge: 'xyz-challenge' })
@@ -196,12 +206,14 @@ describe('POST /api/webhooks/slack', () => {
     )
   })
 
-  it('warns the thread and alerts operators when ticket creation throws', async () => {
-    const { createTicket } = jest.requireMock('@/lib/issue-triage/router')
+  // ClickUp failing is recoverable and handled below; this covers a throw the
+  // pipeline genuinely cannot serve the reporter through.
+  it('warns the thread and alerts operators when the pipeline throws', async () => {
+    const { getActiveSop } = jest.requireMock('@/lib/issue-triage/sop')
     const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
     const slack = buildSlackClient()
     slack.postMessage.mockClear()
-    createTicket.mockRejectedValueOnce(new Error('CLICKUP_BOT_TOKEN is not set'))
+    getActiveSop.mockRejectedValueOnce(new Error('No active SOP found'))
 
     const req = makeSlackRequest({
       type: 'event_callback',
@@ -219,7 +231,7 @@ describe('POST /api/webhooks/slack', () => {
 
     const opsAlert = calls.find(([channel]: [string]) => channel === 'C_IMPROVEMENTS')
     expect(opsAlert).toBeDefined()
-    expect(opsAlert[1]).toContain('CLICKUP_BOT_TOKEN is not set')
+    expect(opsAlert[1]).toContain('No active SOP found')
   })
 
   it('stays quiet when intake succeeds', async () => {
@@ -259,6 +271,80 @@ describe('POST /api/webhooks/slack', () => {
     expect(res.status).toBe(200)
     const opsAlert = slack.postMessage.mock.calls.find(([channel]: [string]) => channel === 'C_IMPROVEMENTS')
     expect(opsAlert).toBeDefined()
+  })
+
+  describe('when ClickUp is down at intake', () => {
+    async function runDegradedIntake(ts: string) {
+      const { createTicket } = jest.requireMock('@/lib/issue-triage/router')
+      const { getSupabaseServiceClient } = jest.requireMock('@/lib/supabase/server')
+      const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+      const slack = buildSlackClient()
+      const supabase = await getSupabaseServiceClient()
+
+      slack.postMessage.mockClear()
+      slack.postBlocks.mockClear()
+      slack.addReaction.mockClear()
+      supabase.from().insert.mockClear()
+      createTicket.mockRejectedValueOnce(
+        new Error('ClickUp API error: 401 {"err":"Token invalid","ECODE":"OAUTH_025"}'),
+      )
+
+      const req = makeSlackRequest({
+        type: 'event_callback',
+        event: { type: 'message', user: 'U001', channel: 'C_ISSUES', text: 'boards not loading', ts },
+      })
+      const res = await POST(req)
+      await flushAfter()
+      return { res, slack, insert: supabase.from().insert }
+    }
+
+    it('still records the issue, with no ticket id yet', async () => {
+      const { insert } = await runDegradedIntake('1234567890.000020')
+
+      expect(insert).toHaveBeenCalledWith(
+        expect.objectContaining({ thread_ts: '1234567890.000020', clickup_task_id: null, status: 'gathering' }),
+      )
+    })
+
+    it('still answers the reporter with the intake question', async () => {
+      const { slack } = await runDegradedIntake('1234567890.000021')
+
+      const reply = slack.postBlocks.mock.calls.find(([channel]: [string]) => channel === 'C_ISSUES')
+      expect(reply).toBeDefined()
+      expect(renderedBlocks(reply)).toContain('Tell me more')
+    })
+
+    it('promises no ticket link it cannot deliver', async () => {
+      const { slack } = await runDegradedIntake('1234567890.000022')
+
+      const reply = slack.postBlocks.mock.calls.find(([channel]: [string]) => channel === 'C_ISSUES')
+      expect(renderedBlocks(reply)).not.toContain('app.clickup.com')
+      expect(renderedBlocks(reply)).not.toContain('View in ClickUp')
+    })
+
+    it('does not react as though a ticket was created', async () => {
+      const { slack } = await runDegradedIntake('1234567890.000023')
+
+      expect(slack.addReaction).not.toHaveBeenCalledWith(
+        expect.anything(), expect.anything(), 'admission_tickets',
+      )
+    })
+
+    it('alerts operators without telling the thread a human is needed', async () => {
+      const { slack } = await runDegradedIntake('1234567890.000024')
+
+      const opsAlert = slack.postMessage.mock.calls.find(([channel]: [string]) => channel === 'C_IMPROVEMENTS')
+      expect(opsAlert).toBeDefined()
+      expect(opsAlert[1]).toContain('Token invalid')
+
+      // The reporter was served, so this is infrastructure noise, not an abandoned request.
+      expect(slack.postMessage.mock.calls.some(([channel]: [string]) => channel === 'C_ISSUES')).toBe(false)
+    })
+
+    it('returns 200 so Slack does not retry', async () => {
+      const { res } = await runDegradedIntake('1234567890.000025')
+      expect(res.status).toBe(200)
+    })
   })
 
   it('alerts operators when SLACK_ISSUES_CHANNEL_ID is missing', async () => {

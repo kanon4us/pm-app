@@ -14,6 +14,7 @@ import { buildSlackClient } from '@/lib/slack/client'
 import { getActiveSop } from '@/lib/issue-triage/sop'
 import { recordObservation } from '@/lib/issue-triage/observations'
 import { getDevTeamIds, devMention } from '@/lib/issue-triage/dev-team'
+import { createTicket } from '@/lib/issue-triage/router'
 import {
   decideStaleActions,
   resolveStaleRules,
@@ -22,7 +23,7 @@ import {
   type StaleAction,
   type ThreadState,
 } from '@/lib/issue-triage/stale-nudge'
-import type { NudgeState, SlackIssueMetadata, SlackIssueStatus } from '@/lib/issue-triage/types'
+import type { NudgeState, SlackIssue, SlackIssueMetadata, SlackIssueStatus } from '@/lib/issue-triage/types'
 
 const OPEN_STATUSES = ['gathering', 'confirming', 'triaging'] as const
 const FIX_PHRASE = /\b(try (it )?(now|again)|should (be working|work now)|fixed( now)?|deployed|pushed (a )?fix|is live|live now)\b/i
@@ -34,6 +35,8 @@ interface IssueRow {
   status: SlackIssueStatus
   sop_version: number | null
   clickup_task_id: string | null
+  last_msg_ts: string | null
+  ticket_data: SlackIssue['ticket_data']
   metadata: SlackIssueMetadata | null
 }
 
@@ -85,7 +88,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const { data: openIssues, error } = await supabase
     .from('slack_issues')
-    .select('thread_ts, channel_id, reporter_id, status, sop_version, clickup_task_id, metadata')
+    .select('thread_ts, channel_id, reporter_id, status, sop_version, clickup_task_id, last_msg_ts, ticket_data, metadata')
     .in('status', OPEN_STATUSES)
   if (error) {
     console.error('[stale-check] query failed:', error)
@@ -99,9 +102,36 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const mention = await devMention()
   let ticketsNudged = 0
   let totalActions = 0
+  let ticketsBackfilled = 0
 
   for (const issue of openIssues as unknown as IssueRow[]) {
     try {
+      // Intake may have been unable to create the ClickUp ticket (an expired
+      // CLICKUP_BOT_TOKEN 401s here), in which case the issue was still recorded
+      // so the reporter got answered. Repair it now rather than leaving a
+      // ticketless thread. Business hours only, like nudges: this posts into the
+      // thread, and quiet hours are a deliberate SOP rule, so a few hours' delay
+      // on repair beats a 3am notification.
+      if (inBusinessHours && !issue.clickup_task_id) {
+        try {
+          const task = await createTicket(issue as unknown as SlackIssue)
+          await supabase.from('slack_issues')
+            .update({ clickup_task_id: task.id, updated_at: new Date().toISOString() })
+            .eq('thread_ts', issue.thread_ts)
+          await slack.postMessage(
+            issue.channel_id,
+            `:admission_tickets: Ticket now open: <${task.url}|View in ClickUp>`,
+            issue.thread_ts,
+          )
+          issue.clickup_task_id = task.id
+          ticketsBackfilled++
+        } catch (err) {
+          // Still down. Next run tries again; the intake alert already fired, so
+          // staying quiet here is what keeps this from becoming hourly spam.
+          console.warn('[stale-check] ticket backfill failed for', issue.thread_ts, err)
+        }
+      }
+
       // Gather thread state from Slack.
       const messages = await slack.getThreadReplies(issue.channel_id, issue.thread_ts).catch(() => [])
       const replies = messages.slice(1).filter((m) => !m.bot_id)
@@ -164,5 +194,5 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ ticketsNudged, totalActions, inBusinessHours })
+  return NextResponse.json({ ticketsNudged, totalActions, ticketsBackfilled, inBusinessHours })
 }

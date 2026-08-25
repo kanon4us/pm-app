@@ -25,6 +25,12 @@ import {
 import { validateIntakePromptChange } from '@/lib/issue-triage/sop-proposal-guard'
 import { alertIntakeFailure, alertConfigError } from '@/lib/issue-triage/failure-alert'
 
+// Shown in place of the ticket link when ClickUp refused the create. The
+// reporter still gets acknowledged and questioned; the hourly stale-check cron
+// backfills the ticket and posts the link into the thread once ClickUp is back.
+const TICKET_PENDING_LINE =
+  ":warning: I've logged this and I'm on it — I couldn't open the ClickUp ticket just yet. The team has been alerted, and I'll post the link here as soon as it exists."
+
 interface SlackFile {
   id: string
   name: string
@@ -331,11 +337,24 @@ async function handleNewIssue(
     updated_at: new Date().toISOString(),
   }
 
-  // Create ClickUp ticket immediately
-  const task = await createTicket(tempIssue, visualSummary)
+  // Create the ClickUp ticket immediately — but do not let ClickUp being down
+  // cost us the whole turn. A 401 here (an expired CLICKUP_BOT_TOKEN) used to
+  // throw straight past the reporter: no reply, no record, nothing but a log
+  // line. We now record the issue without a task id and carry on gathering;
+  // the hourly stale-check cron backfills the ticket once ClickUp is reachable.
+  let task: { id: string; url: string } | null = null
+  try {
+    task = await createTicket(tempIssue, visualSummary)
+  } catch (err) {
+    // Operators only: the reporter is about to be answered, so this is an
+    // infrastructure problem, not an abandoned request.
+    await alertIntakeFailure({ stage: 'create-ticket', err })
+  }
 
-  // Upload media now that we have a task ID
-  if (event.files?.length && cuToken) {
+  // Upload media now that we have a task ID. NOTE: when ClickUp is down there is
+  // no task to attach to and the file URLs are not persisted, so attachments on
+  // a degraded ticket are lost — the backfilled ticket will not carry them.
+  if (task && event.files?.length && cuToken) {
     for (const file of event.files) {
       try {
         const data = await fetchSlackFile(file.url_private, botToken)
@@ -348,18 +367,21 @@ async function handleNewIssue(
 
   // Persist to Supabase
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await supabase.from('slack_issues').insert({ ...newIssueData, clickup_task_id: task.id } as any)
+  await supabase.from('slack_issues').insert({ ...newIssueData, clickup_task_id: task?.id ?? null } as any)
 
-  // React with :admission_tickets: to signal the ticket was created
-  await slack.addReaction(event.channel, event.ts, 'admission_tickets').catch(() => undefined)
+  // React with :admission_tickets: to signal the ticket was created. Only when
+  // one actually was — the reaction is how the channel reads "this is tracked".
+  if (task) {
+    await slack.addReaction(event.channel, event.ts, 'admission_tickets').catch(() => undefined)
+  }
 
-  const fullIssue: SlackIssue = { ...tempIssue, clickup_task_id: task.id }
+  const fullIssue: SlackIssue = { ...tempIssue, clickup_task_id: task?.id ?? null }
 
   // Quick duplicate detection on initial message
   let dupStatus = '*No related tickets found at this time.*'
   let triageResult
   try {
-    triageResult = await detectDuplicate(fullIssue.ticket_data, task.id, formatHistoryForTriage(reporterHistory))
+    triageResult = await detectDuplicate(fullIssue.ticket_data, task?.id, formatHistoryForTriage(reporterHistory))
     if (triageResult.duplicate_task_id) {
       dupStatus = `⚠️ Possible duplicate of <https://app.clickup.com/t/${triageResult.duplicate_task_id}|existing ticket> — monitoring as we learn more.`
     }
@@ -384,9 +406,9 @@ async function handleNewIssue(
     }
     await slack.postBlocks(
       event.channel,
-      `I've opened a ticket: ${task.url}`,
+      task ? `I've opened a ticket: ${task.url}` : 'Logged — ClickUp ticket pending',
       [
-        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}${historyBlock ? `\n\n${historyBlock}` : ''}` } },
+        { type: 'section', text: { type: 'mrkdwn', text: `${task ? `I've opened a ticket: <${task.url}|View in ClickUp>` : TICKET_PENDING_LINE}\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}${historyBlock ? `\n\n${historyBlock}` : ''}` } },
         ticketControlsBlock({ includeAssign: true }),
       ],
       event.ts,
@@ -406,7 +428,7 @@ async function handleNewIssue(
         .eq('thread_ts', event.ts)
 
       // Update ClickUp task with the clean AI-generated summary and reporter name prefix
-      if (intakeResult.updated_schema.issue_summary) {
+      if (task && intakeResult.updated_schema.issue_summary) {
         const namePrefix = reporterFirstName ? `[${reporterFirstName}] ` : ''
         const taskName = `${namePrefix}${intakeResult.updated_schema.issue_summary}`.slice(0, 200)
         const updatedIssue = { ...fullIssue, ticket_data: intakeResult.updated_schema }
@@ -423,16 +445,16 @@ async function handleNewIssue(
 
     await slack.postBlocks(
       event.channel,
-      `I've opened a ticket for you: ${task.url}`,
+      task ? `I've opened a ticket for you: ${task.url}` : 'Logged — ClickUp ticket pending',
       [
-        { type: 'section', text: { type: 'mrkdwn', text: `I've opened a ticket for you: <${task.url}|View in ClickUp>\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}${historyBlock ? `\n\n${historyBlock}` : ''}\n\n${firstQuestion}` } },
+        { type: 'section', text: { type: 'mrkdwn', text: `${task ? `I've opened a ticket for you: <${task.url}|View in ClickUp>` : TICKET_PENDING_LINE}\n🔗 <${originalMsgUrl}|Original message>\n\n${dupStatus}${historyBlock ? `\n\n${historyBlock}` : ''}\n\n${firstQuestion}` } },
         ticketControlsBlock({ includeAssign: true }),
       ],
       event.ts,
     )
   }
 
-  await recordObservation(event.ts, task.id, sop.version, 'ticket_created', {
+  await recordObservation(event.ts, task?.id ?? null, sop.version, 'ticket_created', {
     initialTriageConfidence: triageResult?.duplicate_confidence ?? 0,
     possibleDuplicateId: triageResult?.duplicate_task_id ?? null,
     mediaPresent: (event.files?.length ?? 0) > 0,
