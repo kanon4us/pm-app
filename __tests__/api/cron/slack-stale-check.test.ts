@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { SlackApiError } from '@/lib/slack/client'
 
 process.env.SLACK_BOT_TOKEN = 'xoxb-test'
 delete process.env.CRON_SECRET
@@ -13,7 +14,10 @@ const mockGetThreadReplies = jest.fn()
 const mockGetReactions = jest.fn().mockResolvedValue([])
 const eqUpdate = jest.fn().mockResolvedValue({ error: null })
 
+// Spread the real module so SlackApiError / isTransientSlackError keep their
+// real behavior — the route's transient-vs-permanent branch depends on them.
 jest.mock('@/lib/slack/client', () => ({
+  ...jest.requireActual('@/lib/slack/client'),
   buildSlackClient: jest.fn(() => ({
     postMessage: mockPostMessage,
     getThreadReplies: mockGetThreadReplies,
@@ -186,5 +190,70 @@ describe('GET /api/cron/slack-stale-check', () => {
     await GET(new NextRequest('http://localhost/api/cron/slack-stale-check'))
 
     expect(mockCreateTicket).not.toHaveBeenCalled()
+  })
+
+  // A thread_ts Slack can no longer resolve (deleted message, bad row) fails the
+  // replies fetch *and* gets silently dropped by chat.postMessage — which is how
+  // nudges end up at channel root with no ticket context. No evidence about the
+  // thread means stay quiet, not treat it as unanswered and nudge harder.
+  describe('a ticket whose Slack thread cannot be read', () => {
+    beforeEach(() => {
+      mockGetThreadReplies.mockRejectedValue(new Error('thread_not_found'))
+    })
+
+    it('posts no nudge', async () => {
+      await GET(new NextRequest('http://localhost/api/cron/slack-stale-check'))
+
+      expect(mockPostMessage).not.toHaveBeenCalled()
+    })
+
+    it('reports the ticket as skipped rather than nudged', async () => {
+      const res = await GET(new NextRequest('http://localhost/api/cron/slack-stale-check'))
+
+      const body = await res.json()
+      expect(body.ticketsNudged).toBe(0)
+      expect(body.ticketsSkipped).toBe(1)
+    })
+
+    it('does not backfill a ClickUp ticket into the unreachable thread', async () => {
+      openIssues = [issueRow({ clickup_task_id: null })]
+
+      await GET(new NextRequest('http://localhost/api/cron/slack-stale-check'))
+
+      expect(mockCreateTicket).not.toHaveBeenCalled()
+    })
+
+    it('leaves the ticket open when the read failed for a transient reason', async () => {
+      mockGetThreadReplies.mockRejectedValue(new SlackApiError('ratelimited', 'conversations.replies'))
+
+      await GET(new NextRequest('http://localhost/api/cron/slack-stale-check'))
+
+      expect(updatePayloads()).not.toContainEqual(expect.objectContaining({ status: 'complete' }))
+    })
+
+    // A thread Slack will never resolve can never be worked or nudged again, so
+    // the row must not sit in the open scan forever.
+    it('closes the ticket when the thread is permanently gone', async () => {
+      mockGetThreadReplies.mockRejectedValue(new SlackApiError('thread_not_found', 'conversations.replies'))
+
+      const res = await GET(new NextRequest('http://localhost/api/cron/slack-stale-check'))
+
+      expect(updatePayloads()).toContainEqual(expect.objectContaining({ status: 'complete' }))
+      expect((await res.json()).ticketsClosed).toBe(1)
+    })
+
+    it('records an observation rather than closing the ticket silently', async () => {
+      mockGetThreadReplies.mockRejectedValue(new SlackApiError('thread_not_found', 'conversations.replies'))
+
+      await GET(new NextRequest('http://localhost/api/cron/slack-stale-check'))
+
+      expect(mockRecordObservation).toHaveBeenCalledWith(
+        OPENED_TS,
+        'task-existing',
+        1,
+        'thread_unreadable_closed',
+        expect.objectContaining({ slackError: 'thread_not_found' }),
+      )
+    })
   })
 })

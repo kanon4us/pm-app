@@ -604,16 +604,54 @@ async function handleTeamFeedback(
   })
 }
 
+async function findIssueByThreadTs(
+  supabase: Awaited<ReturnType<typeof getSupabaseServiceClient>>,
+  threadTs: string,
+): Promise<SlackIssue | null> {
+  const { data } = await supabase
+    .from('slack_issues').select('*').eq('thread_ts', threadTs).single()
+  return (data as unknown as SlackIssue) ?? null
+}
+
+/**
+ * The ts of the thread a message belongs to, or null if it can't be determined.
+ *
+ * conversations.replies returns the thread parent at index 0, so a root message
+ * with no replies reports its own ts — callers must treat that as "not a reply".
+ */
+async function parentThreadTs(
+  slack: ReturnType<typeof buildSlackClient>,
+  channel: string,
+  ts: string,
+): Promise<string | null> {
+  try {
+    const messages = await slack.getThreadReplies(channel, ts)
+    return messages[0]?.ts ?? null
+  } catch {
+    return null
+  }
+}
+
 async function handleReaction(event: SlackReactionEvent): Promise<void> {
   // white_check_mark from a dev team member: post resolution survey tagging dev + reporter
   if (event.reaction === 'white_check_mark' && (await getDevTeamIds()).has(event.user)) {
     const supabase = await getSupabaseServiceClient()
-    const { data: issueData } = await supabase
-      .from('slack_issues').select('*').eq('thread_ts', event.item.ts).single()
-    if (!issueData) return
-
-    const issue = issueData as unknown as SlackIssue
     const slack = buildSlackClient(process.env.SLACK_BOT_TOKEN ?? '')
+
+    // A dev ✅s whatever message is in front of them — usually the bot's own
+    // nudge, not the reporter's original post. Matching only on the root ts made
+    // that gesture a silent no-op, leaving the ticket open and the nudges
+    // coming, so fall back to the thread the reacted message belongs to.
+    let issue = await findIssueByThreadTs(supabase, event.item.ts)
+    if (!issue) {
+      const parentTs = await parentThreadTs(slack, event.item.channel, event.item.ts)
+      // A message that is its own parent is a root message, not a thread reply —
+      // re-querying its ts would just repeat the lookup that already missed.
+      if (parentTs && parentTs !== event.item.ts) {
+        issue = await findIssueByThreadTs(supabase, parentTs)
+      }
+    }
+    if (!issue) return
 
     await slack.postBlocks(
       event.item.channel,

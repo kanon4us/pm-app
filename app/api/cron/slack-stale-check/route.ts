@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServiceClient } from '@/lib/supabase/server'
-import { buildSlackClient } from '@/lib/slack/client'
+import { buildSlackClient, isTransientSlackError, SlackApiError, type SlackMessage } from '@/lib/slack/client'
 import { getActiveSop } from '@/lib/issue-triage/sop'
 import { recordObservation } from '@/lib/issue-triage/observations'
 import { getDevTeamIds, devMention } from '@/lib/issue-triage/dev-team'
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     console.error('[stale-check] query failed:', error)
     return NextResponse.json({ error: 'query failed' }, { status: 500 })
   }
-  if (!openIssues?.length) return NextResponse.json({ ticketsNudged: 0, inBusinessHours })
+  if (!openIssues?.length) return NextResponse.json({ ticketsNudged: 0, ticketsSkipped: 0, inBusinessHours })
 
   const devIds = await getDevTeamIds()
   // Resolve the roster once per run: it drives who the bot @-mentions, and it
@@ -103,9 +103,45 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   let ticketsNudged = 0
   let totalActions = 0
   let ticketsBackfilled = 0
+  let ticketsSkipped = 0
+  let ticketsClosed = 0
 
   for (const issue of openIssues as unknown as IssueRow[]) {
     try {
+      // Read the thread first: it is the evidence base for every decision below,
+      // and a thread we cannot read is one we must not post into. A thread_ts
+      // Slack can no longer resolve (deleted message, stale row) fails here and
+      // is also silently dropped by chat.postMessage — which is how nudges end
+      // up at channel root with no ticket context, and how a ticket the team
+      // already resolved keeps reading as unanswered every run. Absence of
+      // evidence is not evidence the ticket is stalled: stay quiet instead.
+      let messages: SlackMessage[]
+      try {
+        messages = await slack.getThreadReplies(issue.channel_id, issue.thread_ts)
+      } catch (err) {
+        // Transient (rate limit, Slack outage): stay quiet and retry next hour.
+        // Permanent (thread_not_found): the thread is gone for good, so this row
+        // can never be worked, answered or nudged again — close it rather than
+        // re-scanning it every hour until someone notices. Recorded as an
+        // observation because a bot closing a ticket should never be silent.
+        if (!isTransientSlackError(err)) {
+          await supabase.from('slack_issues')
+            .update({ status: 'complete', updated_at: new Date().toISOString() })
+            .eq('thread_ts', issue.thread_ts)
+          await recordObservation(
+            issue.thread_ts,
+            issue.clickup_task_id,
+            issue.sop_version ?? sop.version,
+            'thread_unreadable_closed',
+            { slackError: err instanceof SlackApiError ? err.code : String(err) },
+          )
+          ticketsClosed++
+        }
+        console.warn('[stale-check] thread unreadable, skipping', issue.thread_ts, err)
+        ticketsSkipped++
+        continue
+      }
+
       // Intake may have been unable to create the ClickUp ticket (an expired
       // CLICKUP_BOT_TOKEN 401s here), in which case the issue was still recorded
       // so the reporter got answered. Repair it now rather than leaving a
@@ -133,7 +169,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
 
       // Gather thread state from Slack.
-      const messages = await slack.getThreadReplies(issue.channel_id, issue.thread_ts).catch(() => [])
       const replies = messages.slice(1).filter((m) => !m.bot_id)
       const repliers = new Set(replies.map((m) => m.user).filter(Boolean) as string[])
       const hasDevReply = [...repliers].some((u) => devIds.has(u))
@@ -194,5 +229,5 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ ticketsNudged, totalActions, ticketsBackfilled, inBusinessHours })
+  return NextResponse.json({ ticketsNudged, totalActions, ticketsBackfilled, ticketsSkipped, ticketsClosed, inBusinessHours })
 }

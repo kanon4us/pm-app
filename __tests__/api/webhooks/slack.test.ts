@@ -26,14 +26,30 @@ async function flushAfter() {
   await Promise.all(fns.map((fn) => fn()))
 }
 
+/** Fake slack_issues rows keyed by thread_ts. Empty by default, so a lookup
+ *  misses exactly as it did before — tests that need a hit populate it. */
+const mockIssueRows = new Map<string, unknown>()
+/** Values passed to .eq(), so single() can answer the lookup it belongs to. */
+const mockEqValues: string[] = []
+/** Payloads passed to .update(), so tests can assert status transitions. */
+const mockUpdatePayloads: Record<string, unknown>[] = []
+
 jest.mock('@/lib/supabase/server', () => ({
   getSupabaseServiceClient: jest.fn().mockResolvedValue({
     from: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      eq: jest.fn(function (this: unknown, _column: string, value: unknown) {
+        mockEqValues.push(String(value))
+        return this
+      }),
+      single: jest.fn(() =>
+        Promise.resolve({ data: mockIssueRows.get(mockEqValues[mockEqValues.length - 1]) ?? null, error: null }),
+      ),
       insert: jest.fn().mockResolvedValue({ data: null, error: null }),
-      update: jest.fn().mockReturnThis(),
+      update: jest.fn((payload: Record<string, unknown>) => {
+        mockUpdatePayloads.push(payload)
+        return { eq: jest.fn().mockResolvedValue({ error: null }) }
+      }),
     }),
   }),
 }))
@@ -144,6 +160,12 @@ function renderedBlocks(call: any[]): string {
 }
 
 describe('POST /api/webhooks/slack', () => {
+  beforeEach(() => {
+    mockIssueRows.clear()
+    mockEqValues.length = 0
+    mockUpdatePayloads.length = 0
+  })
+
   it('echoes the URL verification challenge', async () => {
     const req = makeSlackRequest({ type: 'url_verification', challenge: 'xyz-challenge' })
     const res = await POST(req)
@@ -373,6 +395,78 @@ describe('POST /api/webhooks/slack', () => {
     } finally {
       process.env.SLACK_ISSUES_CHANNEL_ID = saved
     }
+  })
+
+  // Devs reach for ✅ on whatever message is in front of them — usually the
+  // bot's own nudge, not the reporter's original post. Keying the lookup solely
+  // on the root ts made that a silent no-op, so the ticket stayed open and the
+  // nudges kept coming.
+  describe('a dev ✅s a reply inside the ticket thread', () => {
+    const ROOT_TS = '1700000000.000100'
+    const NUDGE_TS = '1700000500.000200'
+    const DEV = 'U020PGH3RFW' // on the dev-team roster
+
+    function reactToNudge() {
+      return makeSlackRequest({
+        type: 'event_callback',
+        event: {
+          type: 'reaction_added',
+          user: DEV,
+          reaction: 'white_check_mark',
+          item: { type: 'message', channel: 'C_ISSUES', ts: NUDGE_TS },
+          item_user: 'U_BOT',
+        },
+      })
+    }
+
+    beforeEach(() => {
+      mockIssueRows.set(ROOT_TS, {
+        thread_ts: ROOT_TS,
+        channel_id: 'C_ISSUES',
+        reporter_id: 'U_REPORTER',
+        status: 'gathering',
+        clickup_task_id: 'task-1',
+        sop_version: 1,
+        ticket_data: {},
+        metadata: null,
+      })
+      const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+      buildSlackClient().getThreadReplies.mockResolvedValue([
+        { user: 'U_REPORTER', ts: ROOT_TS, text: 'clips will not sync' },
+        { bot_id: 'B1', ts: NUDGE_TS, text: 'can we get an update?' },
+      ])
+    })
+
+    it('resolves the ticket that owns the thread', async () => {
+      await POST(reactToNudge())
+      await flushAfter()
+
+      expect(mockUpdatePayloads).toContainEqual(expect.objectContaining({ status: 'complete' }))
+    })
+
+    it('posts the resolution message into the ticket thread, not at channel root', async () => {
+      const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+      const slack = buildSlackClient()
+      slack.postBlocks.mockClear()
+
+      await POST(reactToNudge())
+      await flushAfter()
+
+      const call = slack.postBlocks.mock.calls.at(-1)
+      expect(call[3]).toBe(ROOT_TS)
+    })
+
+    it('ignores a ✅ on a message that belongs to no ticket', async () => {
+      const { buildSlackClient } = jest.requireMock('@/lib/slack/client')
+      buildSlackClient().getThreadReplies.mockResolvedValue([
+        { bot_id: 'B1', ts: NUDGE_TS, text: 'orphaned nudge' },
+      ])
+
+      await POST(reactToNudge())
+      await flushAfter()
+
+      expect(mockUpdatePayloads).not.toContainEqual(expect.objectContaining({ status: 'complete' }))
+    })
   })
 
   it('returns 200 for a reaction_added event', async () => {
