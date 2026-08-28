@@ -165,3 +165,4 @@ export type ObservationEventType =
   | 'handoff_complete'
   | 'human_feedback'
   | 'stale_nudge'
+  | 'thread_unreadable_closed'
