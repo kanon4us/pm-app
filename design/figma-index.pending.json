@@ -793,6 +793,19 @@
       },
       "assignedClickupId": "86e2c7jta",
       "title": "User Story Template"
+    },
+    {
+      "featureId": "ticket-86e2pr5nw",
+      "reason": [
+        "unassigned-feature",
+        "unassigned-codepaths",
+        "unassigned-figma"
+      ],
+      "partial": {
+        "codePaths": []
+      },
+      "assignedClickupId": "86e2pr5nw",
+      "title": "Ideation -> Creative | Naming Convention"
     }
   ]
 }
